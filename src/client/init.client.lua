@@ -485,30 +485,25 @@ wallBtn.BorderSizePixel = 0
 wallBtn.ZIndex = 5
 Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 8)
 
+local getWallPosFunc = ReplicatedStorage:WaitForChild("GetWallPos", 5)
+
 shopsBtn.MouseButton1Click:Connect(function()
 	local char = player.Character
-	if not char then
-		return
-	end
+	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then
-		return
-	end
-	hrp.CFrame = CFrame.new(-48, 3, 0)
+	if not hrp then return end
+	hrp.CFrame = CFrame.new(-245, 3, 89)
 end)
 
 wallBtn.MouseButton1Click:Connect(function()
 	local char = player.Character
-	if not char then
-		return
-	end
+	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then
-		return
-	end
-	local wall = workspace:FindFirstChild("TheWall")
-	if wall then
-		hrp.CFrame = CFrame.new(wall.Position.X - wall.Size.X / 2 - 12, 3, wall.Position.Z)
+	if not hrp then return end
+	if not getWallPosFunc then return end
+	local wallPos = getWallPosFunc:InvokeServer()
+	if wallPos then
+		hrp.CFrame = CFrame.new(wallPos.X + 15, 3, wallPos.Z)
 	end
 end)
 

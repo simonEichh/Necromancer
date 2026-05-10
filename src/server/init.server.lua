@@ -56,6 +56,10 @@ local placeBestResultRemote = Instance.new("RemoteEvent")
 placeBestResultRemote.Name = "PlaceBestResult"
 placeBestResultRemote.Parent = ReplicatedStorage
 
+local getWallPosFunc = Instance.new("RemoteFunction")
+getWallPosFunc.Name = "GetWallPos"
+getWallPosFunc.Parent = ReplicatedStorage
+
 local wheelSpinRemote = Instance.new("RemoteEvent")
 wheelSpinRemote.Name = "WheelSpin"
 wheelSpinRemote.Parent = ReplicatedStorage
@@ -72,68 +76,46 @@ wheelSpinsUpdateRemote.Parent = ReplicatedStorage
 --  WORLD SETUP
 -- ============================================================
 
--- Delete the default Baseplate if it exists (stops floor flickering)
-local baseplate = workspace:FindFirstChild("Baseplate")
-if baseplate then
-	baseplate:Destroy()
-end
-
--- Ground
-local ground = Instance.new("Part")
-ground.Name = "Ground"
-ground.Size = Vector3.new(160, 4, 100)
-ground.Position = Vector3.new(0, -2, 0)
-ground.Anchored = true
-ground.BrickColor = BrickColor.new("Medium stone grey")
-ground.Material = Enum.Material.SmoothPlastic
-ground.TopSurface = Enum.SurfaceType.Smooth
-ground.Parent = workspace
-
--- Move spawn location to the left side
-local spawnLoc = workspace:FindFirstChildOfClass("SpawnLocation")
-if spawnLoc then
-	spawnLoc.Position = Vector3.new(-50, 1, 0)
-end
-
--- Summon zone marker (just a flat coloured slab)
-local spawnMarker = Instance.new("Part")
-spawnMarker.Name = "SpawnZone"
-spawnMarker.Size = Vector3.new(20, 0.2, 30)
-spawnMarker.Position = Vector3.new(-40, 0.1, 0)
-spawnMarker.Anchored = true
-spawnMarker.CanCollide = false
-spawnMarker.BrickColor = BrickColor.new("Lilac")
-spawnMarker.Material = Enum.Material.Neon
-spawnMarker.Transparency = 0.5
-spawnMarker.Parent = workspace
+-- World is built in Studio (Plots folder + HubFloor). Nothing generated here.
 
 -- ============================================================
---  GRAVE SLOTS  (5 at start, +1 per ascension up to 10)
+--  PLOT SYSTEM
 -- ============================================================
-local ALL_GRAVE_POSITIONS = {
-	-- Row 1 (start unlocked)
-	Vector3.new(-28, 0, -8),
-	Vector3.new(-28, 0, -4),
-	Vector3.new(-28, 0, 0),
-	Vector3.new(-28, 0, 4),
-	Vector3.new(-28, 0, 8),
-	-- Row 2 (unlocked via ascension)
-	Vector3.new(-24, 0, -8),
-	Vector3.new(-24, 0, -4),
-	Vector3.new(-24, 0, 0),
-	Vector3.new(-24, 0, 4),
-	Vector3.new(-24, 0, 8),
-}
+local plotsFolder = workspace:WaitForChild("Plots", 10)
+local playerPlots  = {}  -- [userId] = plotState
+local plotOccupied = {}  -- [1..8]  = true/false
+local WALL_SPACING = 60
+local initPlotForPlayer -- forward declared; defined after wall functions
 
-local graveSlots = {}
-local recallUnitFromSlot -- forward declared; defined after activeUnits
+local function getPlot(player)
+	return playerPlots[tostring(player.UserId)]
+end
 
-local function addGraveSlot(i)
-	local basePos = ALL_GRAVE_POSITIONS[i]
-	if not basePos then
-		return
+getWallPosFunc.OnServerInvoke = function(player)
+	local plotState = getPlot(player)
+	if plotState and plotState.wall and plotState.wall.Parent then
+		return plotState.wall.Position
 	end
+	return nil
+end
 
+local function claimPlot()
+	if not plotsFolder then return nil, nil end
+	for i = 1, 8 do
+		if not plotOccupied[i] then
+			local model = plotsFolder:FindFirstChild("Plot" .. i)
+			if model then
+				plotOccupied[i] = true
+				return model, i
+			end
+		end
+	end
+	return nil, nil
+end
+
+local recallUnitFromSlot -- forward declared
+
+local function addGraveSlot(i, basePos, plotState, ownerId)
 	local slab = Instance.new("Part")
 	slab.Name = "GraveSlot_" .. i
 	slab.Size = Vector3.new(2.5, 0.5, 2.5)
@@ -147,7 +129,7 @@ local function addGraveSlot(i)
 	local stone = Instance.new("Part")
 	stone.Name = "GraveHeadstone_" .. i
 	stone.Size = Vector3.new(1.8, 2.8, 0.5)
-	stone.Position = basePos + Vector3.new(0, 1.9, -0.9)
+	stone.Position = basePos + Vector3.new(plotState.laneDir * 0.9, 1.9, 0)
 	stone.Anchored = true
 	stone.BrickColor = BrickColor.new("Medium stone grey")
 	stone.Material = Enum.Material.SmoothPlastic
@@ -191,203 +173,85 @@ local function addGraveSlot(i)
 	prompt.MaxActivationDistance = 8
 	prompt.Parent = slab
 
-	graveSlots[i] = {
-		slab = slab,
-		stone = stone,
-		label = lbl,
-		rarityLabel = rarityLbl,
-		dpsLabel = dpsLbl,
-		prompt = prompt,
-		occupied = false,
+	plotState.graveSlots[i] = {
+		slab = slab, stone = stone, label = lbl,
+		rarityLabel = rarityLbl, dpsLabel = dpsLbl,
+		prompt = prompt, occupied = false,
 	}
 
 	local idx = i
 	local spawnPoint = basePos + Vector3.new(0, 2, 0)
 	prompt.Triggered:Connect(function(player)
-		if graveSlots[idx].occupied then
-			recallUnitFromSlot(idx, player)
+		if tostring(player.UserId) ~= ownerId then return end
+		if plotState.graveSlots[idx].occupied then
+			recallUnitFromSlot(idx, player, plotState)
 		else
 			selectGraveRemote:FireClient(player, spawnPoint, idx)
 		end
 	end)
 end
 
--- Start with 5 slots
-for i = 1, 5 do
-	addGraveSlot(i)
-end
-
--- Grave Shopkeeper NPC
-local graveNPC = Instance.new("Part")
-graveNPC.Name = "GraveShopkeeper"
-graveNPC.Size = Vector3.new(2, 4, 2)
-graveNPC.Position = Vector3.new(-50, 2, 18)
-graveNPC.Anchored = true
-graveNPC.BrickColor = BrickColor.new("Bright violet")
-graveNPC.Material = Enum.Material.SmoothPlastic
-graveNPC.Parent = workspace
-
-local graveHead = Instance.new("Part")
-graveHead.Size = Vector3.new(2.2, 2.2, 2.2)
-graveHead.Position = Vector3.new(-50, 5.1, 18)
-graveHead.Anchored = true
-graveHead.BrickColor = BrickColor.new("Bright violet")
-graveHead.Material = Enum.Material.SmoothPlastic
-graveHead.Parent = workspace
-local graveWeld = Instance.new("WeldConstraint")
-graveWeld.Part0 = graveNPC
-graveWeld.Part1 = graveHead
-graveWeld.Parent = graveNPC
-
--- Grave NPC label
-local graveGui = Instance.new("BillboardGui", graveNPC)
-graveGui.Size = UDim2.new(0, 160, 0, 50)
-graveGui.StudsOffset = Vector3.new(0, 5, 0)
-graveGui.AlwaysOnTop = false
-local graveLbl = Instance.new("TextLabel", graveGui)
-graveLbl.Size = UDim2.new(1, 0, 1, 0)
-graveLbl.BackgroundTransparency = 1
-graveLbl.Text = "🪦 Buy Units"
-graveLbl.TextColor3 = Color3.fromRGB(200, 180, 255)
-graveLbl.TextScaled = true
-graveLbl.Font = Enum.Font.GothamBold
-
--- ProximityPrompt on grave NPC
-local gravePrompt = Instance.new("ProximityPrompt")
-gravePrompt.ActionText = "Open"
-gravePrompt.ObjectText = "Buy Units"
-gravePrompt.KeyboardKeyCode = Enum.KeyCode.E
-gravePrompt.MaxActivationDistance = 10
-gravePrompt.Parent = graveNPC
-
+-- ============================================================
+--  SHOPKEEPER REMOTES
+-- ============================================================
 local openGraveRemote = Instance.new("RemoteEvent")
 openGraveRemote.Name = "OpenGrave"
 openGraveRemote.Parent = ReplicatedStorage
-
-gravePrompt.Triggered:Connect(function(player)
-	openGraveRemote:FireClient(player)
-end)
-
--- ============================================================
---  SELL SHOPKEEPER NPC
--- ============================================================
-local sellNPC = Instance.new("Part")
-sellNPC.Name = "SellShopkeeper"
-sellNPC.Size = Vector3.new(2, 4, 2)
-sellNPC.Position = Vector3.new(-50, 2, -18)
-sellNPC.Anchored = true
-sellNPC.BrickColor = BrickColor.new("Bright orange")
-sellNPC.Material = Enum.Material.SmoothPlastic
-sellNPC.Parent = workspace
-
-local sellHead = Instance.new("Part")
-sellHead.Size = Vector3.new(2.2, 2.2, 2.2)
-sellHead.Position = Vector3.new(-50, 5.1, -18)
-sellHead.Anchored = true
-sellHead.BrickColor = BrickColor.new("Bright orange")
-sellHead.Material = Enum.Material.SmoothPlastic
-sellHead.Parent = workspace
-local sellWeld = Instance.new("WeldConstraint")
-sellWeld.Part0 = sellNPC
-sellWeld.Part1 = sellHead
-sellWeld.Parent = sellNPC
-
-local sellGui = Instance.new("BillboardGui", sellNPC)
-sellGui.Size = UDim2.new(0, 160, 0, 50)
-sellGui.StudsOffset = Vector3.new(0, 5, 0)
-sellGui.AlwaysOnTop = false
-local sellLbl = Instance.new("TextLabel", sellGui)
-sellLbl.Size = UDim2.new(1, 0, 1, 0)
-sellLbl.BackgroundTransparency = 1
-sellLbl.Text = "💰 Sell Units"
-sellLbl.TextColor3 = Color3.fromRGB(255, 220, 100)
-sellLbl.TextScaled = true
-sellLbl.Font = Enum.Font.GothamBold
-
-local sellPrompt = Instance.new("ProximityPrompt")
-sellPrompt.ActionText = "Open"
-sellPrompt.ObjectText = "Sell Units"
-sellPrompt.KeyboardKeyCode = Enum.KeyCode.E
-sellPrompt.MaxActivationDistance = 10
-sellPrompt.Parent = sellNPC
 
 local openSellRemote = Instance.new("RemoteEvent")
 openSellRemote.Name = "OpenSell"
 openSellRemote.Parent = ReplicatedStorage
 
-sellPrompt.Triggered:Connect(function(player)
-	openSellRemote:FireClient(player)
-end)
+local openUpgradeRemote = Instance.new("RemoteEvent")
+openUpgradeRemote.Name = "OpenUpgrade"
+openUpgradeRemote.Parent = ReplicatedStorage
 
--- SellUnit remote — client sends (unitType, oneIn); server gives gold back
 local sellUnitRemote = Instance.new("RemoteEvent")
 sellUnitRemote.Name = "SellUnit"
 sellUnitRemote.Parent = ReplicatedStorage
 
--- Created at startup so the client's WaitForChild finds it immediately
 local addGoldRemote = Instance.new("RemoteEvent")
 addGoldRemote.Name = "AddGold"
 addGoldRemote.Parent = ReplicatedStorage
 
 sellUnitRemote.OnServerEvent:Connect(function(player, unitType, oneIn)
-	if not unitType or not oneIn then
-		return
-	end
+	if not unitType or not oneIn then return end
 	local sellValue = math.floor(oneIn ^ 1.2 * 5)
 	addGoldRemote:FireClient(player, sellValue, unitType)
 	print("💰 " .. player.Name .. " sold " .. unitType .. " for " .. sellValue .. " gold")
 end)
 
--- ============================================================
---  UPGRADE NPC
--- ============================================================
-local upgradeNPC = Instance.new("Part")
-upgradeNPC.Name = "UpgradeShopkeeper"
-upgradeNPC.Size = Vector3.new(2, 4, 2)
-upgradeNPC.Position = Vector3.new(-50, 2, 0)
-upgradeNPC.Anchored = true
-upgradeNPC.BrickColor = BrickColor.new("Cyan")
-upgradeNPC.Material = Enum.Material.SmoothPlastic
-upgradeNPC.Parent = workspace
-
-local upgradeHead = Instance.new("Part")
-upgradeHead.Size = Vector3.new(2.2, 2.2, 2.2)
-upgradeHead.Position = Vector3.new(-50, 5.1, 0)
-upgradeHead.Anchored = true
-upgradeHead.BrickColor = BrickColor.new("Cyan")
-upgradeHead.Material = Enum.Material.SmoothPlastic
-upgradeHead.Parent = workspace
-local upgradeWeld = Instance.new("WeldConstraint")
-upgradeWeld.Part0 = upgradeNPC
-upgradeWeld.Part1 = upgradeHead
-upgradeWeld.Parent = upgradeNPC
-
-local upgradeGui = Instance.new("BillboardGui", upgradeNPC)
-upgradeGui.Size = UDim2.new(0, 160, 0, 50)
-upgradeGui.StudsOffset = Vector3.new(0, 5, 0)
-upgradeGui.AlwaysOnTop = false
-local upgradeLbl = Instance.new("TextLabel", upgradeGui)
-upgradeLbl.Size = UDim2.new(1, 0, 1, 0)
-upgradeLbl.BackgroundTransparency = 1
-upgradeLbl.Text = "⚗️ Upgrades"
-upgradeLbl.TextColor3 = Color3.fromRGB(100, 255, 240)
-upgradeLbl.TextScaled = true
-upgradeLbl.Font = Enum.Font.GothamBold
-
-local upgradePrompt = Instance.new("ProximityPrompt")
-upgradePrompt.ActionText = "Open"
-upgradePrompt.ObjectText = "Upgrades"
-upgradePrompt.KeyboardKeyCode = Enum.KeyCode.E
-upgradePrompt.MaxActivationDistance = 10
-upgradePrompt.Parent = upgradeNPC
-
-local openUpgradeRemote = Instance.new("RemoteEvent")
-openUpgradeRemote.Name = "OpenUpgrade"
-openUpgradeRemote.Parent = ReplicatedStorage
-
-upgradePrompt.Triggered:Connect(function(player)
-	openUpgradeRemote:FireClient(player)
-end)
+-- Wire up Studio-placed shopkeepers
+local shopsFolder = workspace:WaitForChild("Shops", 10)
+if shopsFolder then
+	local function wireShop(name, remote, label)
+		local npc = shopsFolder:FindFirstChild(name)
+		if not npc then warn("Shops." .. name .. " not found") return end
+		local prompt = npc:FindFirstChildOfClass("ProximityPrompt")
+		if not prompt then warn(name .. " has no ProximityPrompt") return end
+		prompt.ActionText = "Talk"
+		prompt.ObjectText = label
+		prompt.Triggered:Connect(function(player)
+			remote:FireClient(player)
+		end)
+		local gui = Instance.new("BillboardGui", npc)
+		gui.Size = UDim2.new(0, 120, 0, 40)
+		gui.StudsOffset = Vector3.new(0, 4, 0)
+		gui.AlwaysOnTop = false
+		local lbl = Instance.new("TextLabel", gui)
+		lbl.Size = UDim2.new(1, 0, 1, 0)
+		lbl.BackgroundTransparency = 1
+		lbl.Text = label
+		lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+		lbl.TextScaled = true
+		lbl.Font = Enum.Font.GothamBold
+	end
+	wireShop("GraveShopkeeper",   openGraveRemote,   "Buy")
+	wireShop("SellShopkeeper",    openSellRemote,    "Sell")
+	wireShop("UpgradeShopkeeper", openUpgradeRemote, "Upgrade")
+else
+	warn("Shops folder not found in Workspace")
+end
 
 -- Per-player upgrade levels (luckBoost, coinBoost)
 local playerUpgrades = {}
@@ -417,18 +281,44 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	local wd = getWheelData(player)
-	-- Notify client of starting spin count once character loads
 	player.CharacterAdded:Connect(function()
 		task.wait(1)
 		local secsLeft = math.max(0, math.floor(900 - (tick() - wd.lastGrantTime)))
 		wheelSpinsUpdateRemote:FireClient(player, wd.spins, secsLeft)
 	end)
+	-- Assign plot (wait for character to load first)
+	task.spawn(function()
+		if not player.Character then
+			player.CharacterAdded:Wait()
+		end
+		task.wait(1)
+		initPlotForPlayer(player)
+	end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
 	local id = tostring(player.UserId)
+	local plotState = playerPlots[id]
+	if plotState then
+		for _, w in ipairs(plotState.wallQueue or {}) do
+			if w and w.Parent then w:Destroy() end
+		end
+		for _, ext in ipairs(plotState.groundExtensions) do
+			if ext and ext.Parent then ext:Destroy() end
+		end
+		for _, u in ipairs(plotState.activeUnits) do
+			if u.block and u.block.Parent then u.block:Destroy() end
+		end
+		for _, slot in ipairs(plotState.graveSlots) do
+			if slot.slab and slot.slab.Parent then slot.slab:Destroy() end
+			if slot.stone and slot.stone.Parent then slot.stone:Destroy() end
+		end
+		plotOccupied[plotState.plotIndex] = false
+		playerPlots[id] = nil
+	end
 	playerWheelData[id] = nil
-	playerUpgrades[id] = nil
+	playerUpgrades[id]  = nil
+	if playerPity then playerPity[id] = nil end
 end)
 
 -- Wheel outcomes (7 segments matching the client display order)
@@ -481,63 +371,8 @@ buyUpgradeRemote.OnServerEvent:Connect(function(player, upgradeType)
 end)
 
 -- ============================================================
---  THE WALL
+--  PER-PLOT WALL FUNCTIONS
 -- ============================================================
-local hpFill
-local hpText
-local WALL_MAX_HP = 500
-local wallHP = WALL_MAX_HP
-local wallLayer = 1
-local wallRegen = 1 -- HP/sec
-local goldMultiplier = 1.0
-local WALL_SPACING = 60
-local wallTarget
-
-local wall = Instance.new("Part")
-wall.Name = "TheWall"
-wall.Size = Vector3.new(4, 20, 100)
-wall.Position = Vector3.new(40, 10, 0)
-wall.Anchored = true
-wall.BrickColor = BrickColor.new("Medium stone grey")
-wall.Material = Enum.Material.SmoothPlastic
-wall.Parent = workspace
-
-wallTarget = Vector3.new(wall.Position.X - wall.Size.X / 2 - 3, 0, 0)
-
--- HP bar floating above the wall
-local wallGui = Instance.new("BillboardGui", wall)
-wallGui.Size = UDim2.new(0, 260, 0, 55)
-wallGui.StudsOffset = Vector3.new(0, 14, 0)
-wallGui.AlwaysOnTop = true
-
-local hpBg = Instance.new("Frame", wallGui)
-hpBg.Size = UDim2.new(1, 0, 0.5, 0)
-hpBg.Position = UDim2.new(0, 0, 0.1, 0)
-hpBg.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-hpBg.BorderSizePixel = 0
-Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 6)
-
-hpFill = Instance.new("Frame", hpBg)
-hpFill.Size = UDim2.new(1, 0, 1, 0)
-hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-hpFill.BorderSizePixel = 0
-Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 6)
-
-hpText = Instance.new("TextLabel", wallGui)
-hpText.Size = UDim2.new(1, 0, 0.38, 0)
-hpText.Position = UDim2.new(0, 0, 0.62, 0)
-hpText.BackgroundTransparency = 1
-hpText.TextColor3 = Color3.fromRGB(255, 210, 210)
-hpText.TextScaled = true
-hpText.Font = Enum.Font.GothamBold
-
-local function updateWallGui()
-	local pct = math.clamp(wallHP / WALL_MAX_HP, 0, 1)
-	hpFill.Size = UDim2.new(pct, 0, 1, 0)
-	hpFill.BackgroundColor3 = Color3.fromRGB(220, math.floor(60 * pct), math.floor(60 * pct))
-	hpText.Text = "Layer " .. wallLayer .. "  " .. math.floor(wallHP) .. " / " .. WALL_MAX_HP
-end
-
 local LAYER_COLORS = {
 	BrickColor.new("Medium stone grey"),
 	BrickColor.new("Bright green"),
@@ -545,140 +380,226 @@ local LAYER_COLORS = {
 	BrickColor.new("Bright violet"),
 	BrickColor.new("Bright pink"),
 }
+local NUM_PREVIEW_WALLS = 8
 
-local function breakWall()
-	wallLayer += 1
-	WALL_MAX_HP = math.floor(500 * (2 ^ (wallLayer - 1)))
-	wallHP = WALL_MAX_HP
-	wallRegen = wallLayer * 2
-
-	-- Save position before destroying
-	local oldX = wall.Position.X
-
-	-- Flash old wall white then destroy it
-	wall.BrickColor = BrickColor.new("White")
-	wall:Destroy()
-
-	-- New wall position: further along the X axis
-	local newX = oldX + WALL_SPACING
-	local newColor = LAYER_COLORS[((wallLayer - 1) % #LAYER_COLORS) + 1]
-
-	-- Build the new wall
-	wall = Instance.new("Part")
-	wall.Name = "TheWall"
-	wall.Size = Vector3.new(4, 20, 100)
-	wall.Position = Vector3.new(newX, 10, 0)
-	wall.Anchored = true
-	wall.BrickColor = newColor
-	wall.Material = Enum.Material.SmoothPlastic
-	wall.Parent = workspace
-
-	-- Rebuild the HP bar GUI on the new wall
-	local newGui = Instance.new("BillboardGui", wall)
-	newGui.Size = UDim2.new(0, 260, 0, 55)
-	newGui.StudsOffset = Vector3.new(0, 14, 0)
-	newGui.AlwaysOnTop = true
-
-	local newHpBg = Instance.new("Frame", newGui)
-	newHpBg.Size = UDim2.new(1, 0, 0.5, 0)
-	newHpBg.Position = UDim2.new(0, 0, 0.1, 0)
-	newHpBg.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-	newHpBg.BorderSizePixel = 0
-	Instance.new("UICorner", newHpBg).CornerRadius = UDim.new(0, 6)
-
-	hpFill = Instance.new("Frame", newHpBg)
-	hpFill.Size = UDim2.new(1, 0, 1, 0)
-	hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-	hpFill.BorderSizePixel = 0
-	Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 6)
-
-	hpText = Instance.new("TextLabel", newGui)
-	hpText.Size = UDim2.new(1, 0, 0.38, 0)
-	hpText.Position = UDim2.new(0, 0, 0.62, 0)
-	hpText.BackgroundTransparency = 1
-	hpText.TextColor3 = Color3.fromRGB(255, 210, 210)
-	hpText.TextScaled = true
-	hpText.Font = Enum.Font.GothamBold
-
-	-- Extend the ground forward to cover the new section
-	-- We just spawn a new ground slab ahead of the current one
-	local groundExtension = Instance.new("Part")
-	groundExtension.Name = "GroundExt"
-	groundExtension.Size = Vector3.new(WALL_SPACING, 4, 100)
-	groundExtension.Position = Vector3.new(newX - WALL_SPACING / 2, -2, 0)
-	groundExtension.Anchored = true
-	groundExtension.BrickColor = BrickColor.new("Medium stone grey")
-	groundExtension.Material = Enum.Material.SmoothPlastic
-	groundExtension.TopSurface = Enum.SurfaceType.Smooth
-	groundExtension.Parent = workspace
-
-	-- Update wallTarget so all units start walking to the new wall
-	wallTarget = Vector3.new(wall.Position.X - wall.Size.X / 2 - 3, 0, 0)
-
-	updateWallGui()
-
-	-- Rewards
-	local goldReward = math.floor(1000 * wallLayer * goldMultiplier)
-	for _, p in ipairs(Players:GetPlayers()) do
-		wallBreakRemote:FireClient(p, goldReward, wallLayer - 1)
-	end
-	print("🎉 Wall " .. (wallLayer - 1) .. " broken! New wall at X=" .. newX)
+local function updateWallGui(plotState)
+	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
+	plotState.hpFill.Size = UDim2.new(pct, 0, 1, 0)
+	plotState.hpFill.BackgroundColor3 = Color3.fromRGB(220, math.floor(60*pct), math.floor(60*pct))
+	plotState.hpText.Text = "Layer " .. plotState.wallLayer .. "  " .. math.floor(plotState.wallHP) .. " / " .. plotState.WALL_MAX_HP
 end
 
-updateWallGui()
+local function buildWallGui(wallPart, plotState)
+	local gui = Instance.new("BillboardGui", wallPart)
+	gui.Size = UDim2.new(0, 260, 0, 55)
+	gui.StudsOffset = Vector3.new(0, 14, 0)
+	gui.AlwaysOnTop = true
+	local bg = Instance.new("Frame", gui)
+	bg.Size = UDim2.new(1, 0, 0.5, 0)
+	bg.Position = UDim2.new(0, 0, 0.1, 0)
+	bg.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+	bg.BorderSizePixel = 0
+	Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 6)
+	plotState.hpFill = Instance.new("Frame", bg)
+	plotState.hpFill.Size = UDim2.new(1, 0, 1, 0)
+	plotState.hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+	plotState.hpFill.BorderSizePixel = 0
+	Instance.new("UICorner", plotState.hpFill).CornerRadius = UDim.new(0, 6)
+	plotState.hpText = Instance.new("TextLabel", gui)
+	plotState.hpText.Size = UDim2.new(1, 0, 0.38, 0)
+	plotState.hpText.Position = UDim2.new(0, 0, 0.62, 0)
+	plotState.hpText.BackgroundTransparency = 1
+	plotState.hpText.TextColor3 = Color3.fromRGB(255, 210, 210)
+	plotState.hpText.TextScaled = true
+	plotState.hpText.Font = Enum.Font.GothamBold
+end
 
--- Reset wall back to layer 1 at the starting position (called on ascension)
-local function resetWall()
-	-- Destroy current wall
-	if wall and wall.Parent then
-		wall:Destroy()
+-- Spawns a dim preview wall showing an upcoming layer number
+local function spawnPreviewWall(x, layerNum, plotState)
+	local wallPart = Instance.new("Part")
+	wallPart.Name = "PreviewWall_" .. plotState.plotIndex
+	wallPart.Size = Vector3.new(4, 20, 40)
+	wallPart.Position = Vector3.new(x, plotState.plotGroundY + 10, plotState.plotCenterZ)
+	wallPart.Anchored = true
+	wallPart.BrickColor = BrickColor.new("Dark stone grey")
+	wallPart.Transparency = 0
+	wallPart.Material = Enum.Material.SmoothPlastic
+	wallPart.Parent = workspace
+	local gui = Instance.new("BillboardGui", wallPart)
+	gui.Name = "PreviewGui"
+	gui.Size = UDim2.new(0, 0, 0, 0)
+	return wallPart
+end
+
+-- Promotes a preview wall to the active wall (full color + HP bar)
+local function activateWall(wallPart, plotState)
+	wallPart.Name = "TheWall_" .. plotState.plotIndex
+	wallPart.BrickColor = LAYER_COLORS[((plotState.wallLayer - 1) % #LAYER_COLORS) + 1]
+	wallPart.Transparency = 0
+	local previewGui = wallPart:FindFirstChild("PreviewGui")
+	if previewGui then previewGui:Destroy() end
+	buildWallGui(wallPart, plotState)
+end
+
+-- Spawns initial ground slab + 8 walls, activates the first one
+local function initWallQueue(plotState)
+	-- Initial ground covering all preview walls
+	local ld = plotState.laneDir
+	local groundLen = (NUM_PREVIEW_WALLS + 1) * WALL_SPACING
+	local initGround = Instance.new("Part")
+	initGround.Name = "GroundExt"
+	initGround.Size = Vector3.new(groundLen, 2, 40)
+	initGround.Position = Vector3.new(
+		plotState.wallOriginX + ld * groundLen / 2,
+		plotState.plotGroundY - 1,
+		plotState.plotCenterZ
+	)
+	initGround.Anchored = true
+	initGround.Color = Color3.fromRGB(165, 8, 8)
+	initGround.Material = Enum.Material.Carpet
+	initGround.TopSurface = Enum.SurfaceType.Smooth
+	initGround.Parent = workspace
+	table.insert(plotState.groundExtensions, initGround)
+	plotState.plotLaneEndX = plotState.wallOriginX + ld * groundLen
+
+	-- Spawn 8 preview walls
+	plotState.wallQueue = {}
+	for i = 1, NUM_PREVIEW_WALLS do
+		local x = plotState.wallOriginX + ld * (i - 1) * WALL_SPACING
+		local wallPart = spawnPreviewWall(x, plotState.wallLayer + (i - 1), plotState)
+		table.insert(plotState.wallQueue, wallPart)
 	end
-	-- Remove all ground extension slabs spawned by breakWall
-	for _, part in ipairs(workspace:GetChildren()) do
-		if part.Name == "GroundExt" then
-			part:Destroy()
+
+	-- Activate the front wall
+	activateWall(plotState.wallQueue[1], plotState)
+	plotState.wall = plotState.wallQueue[1]
+	plotState.wallTarget = Vector3.new(plotState.wall.Position.X - ld * (plotState.wall.Size.X/2 + 3), 0, plotState.plotCenterZ)
+	updateWallGui(plotState)
+end
+
+local function breakWall(plotState)
+	plotState.wallLayer += 1
+	plotState.WALL_MAX_HP = math.floor(500 * (2 ^ (plotState.wallLayer - 1)))
+	plotState.wallHP = plotState.WALL_MAX_HP
+	plotState.wallRegen = plotState.wallLayer * 2
+
+	-- Flash and destroy active wall
+	plotState.wallQueue[1].BrickColor = BrickColor.new("White")
+	plotState.wallQueue[1]:Destroy()
+	table.remove(plotState.wallQueue, 1)
+
+	-- Spawn new preview at the far end
+	local ld = plotState.laneDir
+	local lastWall = plotState.wallQueue[#plotState.wallQueue]
+	local newPreviewX = lastWall.Position.X + ld * WALL_SPACING
+	local newPreview = spawnPreviewWall(newPreviewX, plotState.wallLayer + #plotState.wallQueue - 1, plotState)
+	table.insert(plotState.wallQueue, newPreview)
+
+	-- Ground extension if beyond initial coverage
+	if (newPreviewX - plotState.plotLaneEndX) * ld > 0 then
+		local groundExt = Instance.new("Part")
+		groundExt.Name = "GroundExt"
+		groundExt.Size = Vector3.new(WALL_SPACING, 2, 40)
+		groundExt.Position = Vector3.new(newPreviewX - ld * WALL_SPACING/2, plotState.plotGroundY - 1, plotState.plotCenterZ)
+		groundExt.Anchored = true
+		groundExt.Color = Color3.fromRGB(165, 8, 8)
+		groundExt.Material = Enum.Material.Carpet
+		groundExt.TopSurface = Enum.SurfaceType.Smooth
+		groundExt.Parent = workspace
+		table.insert(plotState.groundExtensions, groundExt)
+		plotState.plotLaneEndX = newPreviewX
+	end
+
+	-- Activate the new front wall
+	activateWall(plotState.wallQueue[1], plotState)
+	plotState.wall = plotState.wallQueue[1]
+	plotState.wallTarget = Vector3.new(plotState.wall.Position.X - ld * (plotState.wall.Size.X/2 + 3), 0, plotState.plotCenterZ)
+	updateWallGui(plotState)
+
+	local goldReward = math.floor(1000 * plotState.wallLayer * plotState.goldMultiplier)
+	for _, p in ipairs(Players:GetPlayers()) do
+		if tostring(p.UserId) == plotState.ownerId then
+			wallBreakRemote:FireClient(p, goldReward, plotState.wallLayer - 1)
+			break
 		end
 	end
-	-- Reset wall state variables
-	wallLayer = 1
-	WALL_MAX_HP = 500
-	wallHP = WALL_MAX_HP
-	wallRegen = 1
-	-- Rebuild wall at original starting position
-	wall = Instance.new("Part")
-	wall.Name = "TheWall"
-	wall.Size = Vector3.new(4, 20, 100)
-	wall.Position = Vector3.new(40, 10, 0)
-	wall.Anchored = true
-	wall.BrickColor = BrickColor.new("Medium stone grey")
-	wall.Material = Enum.Material.SmoothPlastic
-	wall.Parent = workspace
-	-- Rebuild HP bar GUI on the new wall
-	local newGui = Instance.new("BillboardGui", wall)
-	newGui.Size = UDim2.new(0, 260, 0, 55)
-	newGui.StudsOffset = Vector3.new(0, 14, 0)
-	newGui.AlwaysOnTop = true
-	local newHpBg = Instance.new("Frame", newGui)
-	newHpBg.Size = UDim2.new(1, 0, 0.5, 0)
-	newHpBg.Position = UDim2.new(0, 0, 0.1, 0)
-	newHpBg.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-	newHpBg.BorderSizePixel = 0
-	Instance.new("UICorner", newHpBg).CornerRadius = UDim.new(0, 6)
-	hpFill = Instance.new("Frame", newHpBg)
-	hpFill.Size = UDim2.new(1, 0, 1, 0)
-	hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-	hpFill.BorderSizePixel = 0
-	Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 6)
-	hpText = Instance.new("TextLabel", newGui)
-	hpText.Size = UDim2.new(1, 0, 0.38, 0)
-	hpText.Position = UDim2.new(0, 0, 0.62, 0)
-	hpText.BackgroundTransparency = 1
-	hpText.TextColor3 = Color3.fromRGB(255, 210, 210)
-	hpText.TextScaled = true
-	hpText.Font = Enum.Font.GothamBold
-	-- Reset wall target for unit AI
-	wallTarget = Vector3.new(wall.Position.X - wall.Size.X / 2 - 3, 0, 0)
-	updateWallGui()
+	print("🎉 Plot" .. plotState.plotIndex .. " wall " .. (plotState.wallLayer-1) .. " broken!")
+end
+
+local function resetWall(plotState)
+	for _, w in ipairs(plotState.wallQueue or {}) do
+		if w and w.Parent then w:Destroy() end
+	end
+	plotState.wallQueue = {}
+	for _, ext in ipairs(plotState.groundExtensions) do
+		if ext and ext.Parent then ext:Destroy() end
+	end
+	plotState.groundExtensions = {}
+	plotState.wallLayer = 1
+	plotState.WALL_MAX_HP = 500
+	plotState.wallHP = plotState.WALL_MAX_HP
+	plotState.wallRegen = 1
+	initWallQueue(plotState)
+end
+
+initPlotForPlayer = function(player)
+	local plotModel, plotIndex = claimPlot()
+	if not plotModel then
+		warn("No plots available for " .. player.Name)
+		return
+	end
+	local basePart       = plotModel:FindFirstChild("Base")
+	local wallOriginPart = plotModel:FindFirstChild("WallOrigin")
+	local spawnPart2     = plotModel:FindFirstChild("PlayerSpawn")
+	if not basePart or not wallOriginPart then
+		warn("Plot" .. plotIndex .. " missing Base or WallOrigin")
+		plotOccupied[plotIndex] = false
+		return
+	end
+	-- Detect lane direction from WallOrigin vs PlayerSpawn positions
+	local laneDir = -1
+	if spawnPart2 and wallOriginPart.Position.X > spawnPart2.Position.X then
+		laneDir = 1
+	end
+	local plotState = {
+		plotModel        = plotModel,
+		plotIndex        = plotIndex,
+		ownerId          = tostring(player.UserId),
+		plotCenterZ      = basePart.Position.Z,
+		wallOriginX      = wallOriginPart.Position.X,
+		plotLaneEndX     = 0,
+		plotGroundY      = basePart.Position.Y + basePart.Size.Y / 2,
+		laneDir          = laneDir,
+		wall             = nil,
+		wallQueue        = {},
+		wallHP           = 500,
+		wallLayer        = 1,
+		WALL_MAX_HP      = 500,
+		wallRegen        = 1,
+		goldMultiplier   = 1.0,
+		hpFill           = nil,
+		hpText           = nil,
+		wallTarget       = Vector3.new(0, 0, 0),
+		graveSlots       = {},
+		activeUnits      = {},
+		groundExtensions = {},
+	}
+	initWallQueue(plotState)
+	for i = 1, 5 do
+		local graveSpot = plotModel:FindFirstChild("GraveSpot" .. i)
+		if graveSpot then
+			addGraveSlot(i, graveSpot.Position, plotState, tostring(player.UserId))
+		end
+	end
+	playerPlots[tostring(player.UserId)] = plotState
+	local spawnPart = plotModel:FindFirstChild("PlayerSpawn")
+	if spawnPart then
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			hrp.CFrame = CFrame.new(spawnPart.Position + Vector3.new(0, 3, 0))
+		end
+	end
+	print("✅ Assigned Plot" .. plotIndex .. " to " .. player.Name)
 end
 
 -- ============================================================
@@ -1199,28 +1120,21 @@ local function getBaseOneIn(unitType)
 	return math.max(2, math.round(1 / chance))
 end
 
-local activeUnits = {}
-
-recallUnitFromSlot = function(slotIndex, player)
-	local slot = graveSlots[slotIndex]
-	if not slot or not slot.occupied then
-		return
-	end
-	-- Destroy the unit block and remove it from activeUnits
+recallUnitFromSlot = function(slotIndex, player, plotState)
+	local slot = plotState.graveSlots[slotIndex]
+	if not slot or not slot.occupied then return end
 	if slot.unitEntry then
-		for i = #activeUnits, 1, -1 do
-			if activeUnits[i] == slot.unitEntry then
-				if activeUnits[i].block and activeUnits[i].block.Parent then
-					activeUnits[i].block:Destroy()
+		for i = #plotState.activeUnits, 1, -1 do
+			if plotState.activeUnits[i] == slot.unitEntry then
+				if plotState.activeUnits[i].block and plotState.activeUnits[i].block.Parent then
+					plotState.activeUnits[i].block:Destroy()
 				end
-				table.remove(activeUnits, i)
+				table.remove(plotState.activeUnits, i)
 				break
 			end
 		end
 	end
-	-- Return the unit to the player's inventory
 	recallUnitRemote:FireClient(player, slot.unitType, getBaseOneIn(slot.unitType))
-	-- Free the slot
 	slot.occupied = false
 	slot.unitType = nil
 	slot.unitEntry = nil
@@ -1232,24 +1146,16 @@ recallUnitFromSlot = function(slotIndex, player)
 	print("↩️ " .. player.Name .. " recalled unit from grave " .. slotIndex)
 end
 
-local function spawnUnit(unitType, customPos)
+local function spawnUnit(unitType, customPos, plotState)
 	local def = UNITS[unitType]
-	if not def then
-		return
-	end
-	-- When spawning from a grave slot use its Z so the unit walks straight to the wall
-	local laneZ = customPos and customPos.Z or math.random(-45, 45)
+	if not def then return end
 
-	-- Use the given grave position or pick a random spot in the spawn zone.
-	-- When spawning from a grave, push the unit forward (toward the wall) by half its
-	-- size + 2 studs so large units don't clip into or get stuck on the gravestone.
+	local ld = plotState.laneDir
+	local laneZ = customPos and customPos.Z or (plotState.plotCenterZ + math.random(-8, 8))
 	local forwardClearance = def.size.X / 2 + 2
-	local spawnPos = customPos and Vector3.new(customPos.X + forwardClearance, customPos.Y, customPos.Z)
-		or Vector3.new(
-			-40 + math.random(-8, 8),
-			4, -- start a little above ground so it drops naturally
-			math.random(-12, 12)
-		)
+	local spawnPos = customPos
+		and Vector3.new(customPos.X + ld * forwardClearance, customPos.Y + 2, customPos.Z)
+		or  Vector3.new(plotState.wallOriginX - ld * 80, 4, laneZ)
 
 	local block = Instance.new("Part")
 	block.Name = unitType
@@ -1277,7 +1183,7 @@ local function spawnUnit(unitType, customPos)
 	bg.MaxTorque = Vector3.new(0, 1e5, 0)
 	bg.P = 1e4
 	bg.D = 400
-	bg.CFrame = CFrame.new(spawnPos, Vector3.new(wallTarget.X, spawnPos.Y, wallTarget.Z))
+	bg.CFrame = CFrame.new(spawnPos, Vector3.new(plotState.wallTarget.X, spawnPos.Y, plotState.wallTarget.Z))
 	bg.Parent = block
 
 	-- Unit info label (emoji + name / rarity / DPS)
@@ -1347,16 +1253,10 @@ local function spawnUnit(unitType, customPos)
 	dpsLbl.TextScaled = true
 	dpsLbl.Font = Enum.Font.GothamBold
 
-	table.insert(activeUnits, {
-		block = block,
-		bv = bv,
-		bg = bg,
-		def = def,
-		lastAttack = 0,
-		laneZ = laneZ,
+	table.insert(plotState.activeUnits, {
+		block = block, bv = bv, bg = bg, def = def,
+		lastAttack = 0, laneZ = laneZ,
 	})
-
-	print("Spawned unit with laneZ:", laneZ)
 end
 
 -- RemoteEvent for digging a grave
@@ -1402,15 +1302,15 @@ digGraveRemote.OnServerEvent:Connect(function(player, graveType)
 end)
 
 placeAtGraveRemote.OnServerEvent:Connect(function(player, unitType, spawnPos, slotIndex)
-	if not UNITS[unitType] then
-		return
-	end
-	spawnUnit(unitType, spawnPos)
-	if slotIndex and graveSlots[slotIndex] then
-		local slot = graveSlots[slotIndex]
+	if not UNITS[unitType] then return end
+	local plotState = getPlot(player)
+	if not plotState then return end
+	spawnUnit(unitType, spawnPos, plotState)
+	if slotIndex and plotState.graveSlots[slotIndex] then
+		local slot = plotState.graveSlots[slotIndex]
 		slot.occupied = true
 		slot.unitType = unitType
-		slot.unitEntry = activeUnits[#activeUnits]
+		slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
 		local dps = math.floor(UNITS[unitType].damage / UNITS[unitType].attackCD)
 		local rarity = UNIT_RARITY[unitType] or "Common"
 		slot.label.Text = "⚔️ " .. unitType
@@ -1423,20 +1323,17 @@ placeAtGraveRemote.OnServerEvent:Connect(function(player, unitType, spawnPos, sl
 	print("🪦 " .. player.Name .. " placed " .. unitType .. " at grave " .. (slotIndex or "?"))
 end)
 
--- Helper: silently recall a slot without firing RecallUnit to the client
-local function clearSlot(i)
-	local slot = graveSlots[i]
-	if not slot or not slot.occupied then
-		return nil
-	end
+local function clearSlot(i, plotState)
+	local slot = plotState.graveSlots[i]
+	if not slot or not slot.occupied then return nil end
 	local unitType = slot.unitType
 	if slot.unitEntry then
-		for j = #activeUnits, 1, -1 do
-			if activeUnits[j] == slot.unitEntry then
-				if activeUnits[j].block and activeUnits[j].block.Parent then
-					activeUnits[j].block:Destroy()
+		for j = #plotState.activeUnits, 1, -1 do
+			if plotState.activeUnits[j] == slot.unitEntry then
+				if plotState.activeUnits[j].block and plotState.activeUnits[j].block.Parent then
+					plotState.activeUnits[j].block:Destroy()
 				end
-				table.remove(activeUnits, j)
+				table.remove(plotState.activeUnits, j)
 				break
 			end
 		end
@@ -1453,62 +1350,48 @@ local function clearSlot(i)
 end
 
 placeBestRemote.OnServerEvent:Connect(function(player, clientInventory)
-	-- Pool: units in graves + units sent from client inventory
+	local plotState = getPlot(player)
+	if not plotState then return end
 	local pool = {}
-
-	for i = 1, #graveSlots do
-		local item = clearSlot(i)
-		if item then
-			table.insert(pool, item)
-		end
+	for i = 1, #plotState.graveSlots do
+		local item = clearSlot(i, plotState)
+		if item then table.insert(pool, item) end
 	end
-
 	if type(clientInventory) == "table" then
 		for _, item in ipairs(clientInventory) do
 			if item and item.unitType and UNITS[item.unitType] then
-				table.insert(pool, {
-					unitType = item.unitType,
-					oneIn = item.oneIn or getBaseOneIn(item.unitType),
-				})
+				table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn or getBaseOneIn(item.unitType) })
 			end
 		end
 	end
-
-	-- Sort pool by DPS descending
 	table.sort(pool, function(a, b)
 		local dA = UNITS[a.unitType] and (UNITS[a.unitType].damage / UNITS[a.unitType].attackCD) or 0
 		local dB = UNITS[b.unitType] and (UNITS[b.unitType].damage / UNITS[b.unitType].attackCD) or 0
 		return dA > dB
 	end)
-
-	-- Deploy best units into available grave slots
-	local slotCount = #graveSlots
+	local slotCount = #plotState.graveSlots
 	for i, item in ipairs(pool) do
-		if i > slotCount then
-			break
+		if i > slotCount then break end
+		local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. i)
+		if graveSpot then
+			local spawnPos = graveSpot.Position + Vector3.new(0, 2, 0)
+			spawnUnit(item.unitType, spawnPos, plotState)
+			local slot = plotState.graveSlots[i]
+			slot.occupied = true
+			slot.unitType = item.unitType
+			slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
+			local dps = math.floor(UNITS[item.unitType].damage / UNITS[item.unitType].attackCD)
+			local rarity = UNIT_RARITY[item.unitType] or "Common"
+			slot.label.Text = "⚔️ " .. item.unitType
+			slot.rarityLabel.Text = rarity
+			slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
+			slot.dpsLabel.Text = dps .. " DPS"
+			slot.prompt.ActionText = "Recall"
+			slot.prompt.ObjectText = "Grave " .. i .. " (" .. item.unitType .. ")"
 		end
-		local basePos = ALL_GRAVE_POSITIONS[i]
-		local spawnPos = basePos + Vector3.new(0, 2, 0)
-		spawnUnit(item.unitType, spawnPos)
-		local slot = graveSlots[i]
-		slot.occupied = true
-		slot.unitType = item.unitType
-		slot.unitEntry = activeUnits[#activeUnits]
-		local dps = math.floor(UNITS[item.unitType].damage / UNITS[item.unitType].attackCD)
-		local rarity = UNIT_RARITY[item.unitType] or "Common"
-		slot.label.Text = "⚔️ " .. item.unitType
-		slot.rarityLabel.Text = rarity
-		slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
-		slot.dpsLabel.Text = dps .. " DPS"
-		slot.prompt.ActionText = "Recall"
-		slot.prompt.ObjectText = "Grave " .. i .. " (" .. item.unitType .. ")"
 	end
-
-	-- Remaining units (beyond slot count) go back to client
 	local remaining = {}
-	for i = slotCount + 1, #pool do
-		table.insert(remaining, pool[i])
-	end
+	for i = slotCount + 1, #pool do table.insert(remaining, pool[i]) end
 	placeBestResultRemote:FireClient(player, remaining)
 	print("🏆 " .. player.Name .. " used Place Best — deployed " .. math.min(#pool, slotCount) .. " units")
 end)
@@ -1580,61 +1463,59 @@ deployRemote.OnServerEvent:Connect(function(player, unitType, damage)
 	if UNITS[unitType] then
 		UNITS[unitType].damage = damage
 	end
-	spawnUnit(unitType)
-	if UNITS[unitType] then
-		UNITS[unitType].damage = original
-	end
+	local plotState2 = getPlot(player)
+	if plotState2 then spawnUnit(unitType, nil, plotState2) end
+	if UNITS[unitType] then UNITS[unitType].damage = original end
 end)
 
 undeployRemote.OnServerEvent:Connect(function(player, unitIndex)
-	local u = activeUnits[unitIndex]
+	local plotState = getPlot(player)
+	if not plotState then return end
+	local u = plotState.activeUnits[unitIndex]
 	if u then
-		if u.block and u.block.Parent then
-			u.block:Destroy()
-		end
-		table.remove(activeUnits, unitIndex)
+		if u.block and u.block.Parent then u.block:Destroy() end
+		table.remove(plotState.activeUnits, unitIndex)
 	end
 end)
 
 ascendRemote.OnServerEvent:Connect(function(player)
-	-- Unlock a new grave slot (up to 10 max)
-	local nextSlot = #graveSlots + 1
+	local plotState = getPlot(player)
+	if not plotState then return end
+	local nextSlot = #plotState.graveSlots + 1
 	if nextSlot <= 10 then
-		addGraveSlot(nextSlot)
-	end
-	-- Reset wall back to layer 1
-	resetWall()
-	-- Teleport all deployed units back to the spawn zone so they walk toward the new wall
-	-- (without this they'd be stranded beyond the ground and fall off)
-	-- Teleport in front of the grave deployment slots (which sit at X=-28 to X=-24)
-	-- so units don't have to walk through headstones to reach the wall
-	for _, u in ipairs(activeUnits) do
-		if u.block and u.block.Parent then
-			u.block.CFrame = CFrame.new(-10 + math.random(-5, 5), 6, u.laneZ)
+		local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. nextSlot)
+		if graveSpot then
+			addGraveSlot(nextSlot, graveSpot.Position, plotState, tostring(player.UserId))
 		end
 	end
-	print("⬆️ " .. player.Name .. " ascended — wall reset, units returned to spawn, graves: " .. #graveSlots)
+	resetWall(plotState)
+	local graveSpot1 = plotState.plotModel:FindFirstChild("GraveSpot1")
+	local nearX = graveSpot1 and (graveSpot1.Position.X - plotState.laneDir * 10) or (plotState.wallOriginX - plotState.laneDir * 60)
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.block and u.block.Parent then
+			u.block.CFrame = CFrame.new(nearX + math.random(-5, 5), 6, u.laneZ)
+		end
+	end
+	print("⬆️ " .. player.Name .. " ascended — wall reset, graves: " .. #plotState.graveSlots)
 end)
--- ============================================================
---  ACTIVE UNITS
--- ============================================================
 
--- ============================================================
---  SUMMON REMOTE
--- ============================================================
 summonRemote.OnServerEvent:Connect(function(player, unitType)
-	spawnUnit(unitType)
-	print("Summoned " .. unitType .. " for " .. player.Name)
+	local plotState = getPlot(player)
+	if plotState then spawnUnit(unitType, nil, plotState) end
 end)
 
 -- ============================================================
 --  ATTACK FLASH
 -- ============================================================
-local function flashAttack(isGhost, position)
+local function flashAttack(isGhost, position, plotState)
 	local flash = Instance.new("Part")
 	flash.Size = Vector3.new(1.5, 1.5, 0.3)
 	flash.CFrame = CFrame.new(
-		position or Vector3.new(wall.Position.X - wall.Size.X / 2 - 0.2, 1 + math.random(0, 8), math.random(-14, 14))
+		position or Vector3.new(
+			plotState.wall.Position.X - plotState.laneDir * (plotState.wall.Size.X/2 + 0.2),
+			1 + math.random(0, 8),
+			plotState.plotCenterZ + math.random(-8, 8)
+		)
 	)
 	flash.Anchored = true
 	flash.CanCollide = false
@@ -1644,7 +1525,7 @@ local function flashAttack(isGhost, position)
 	game:GetService("Debris"):AddItem(flash, 0.2)
 end
 
-local function shootArrow(fromPos, targetPos, damage)
+local function shootArrow(fromPos, targetPos, damage, plotState)
 	local arrowStart = fromPos + Vector3.new(0, 0.5, 0)
 	local arrow = Instance.new("Part")
 	arrow.Size = Vector3.new(0.2, 0.2, 1.5)
@@ -1655,26 +1536,19 @@ local function shootArrow(fromPos, targetPos, damage)
 	arrow.Anchored = true
 	arrow.CFrame = CFrame.lookAt(arrowStart, targetPos)
 	arrow.Parent = workspace
-
 	local travelTime = (targetPos - arrowStart).Magnitude / 60
-
 	TweenService:Create(
 		arrow,
 		TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
 		{ CFrame = CFrame.lookAt(targetPos, targetPos + (targetPos - arrowStart).Unit) }
 	):Play()
-
 	task.delay(travelTime, function()
-		if arrow and arrow.Parent then
-			arrow:Destroy()
-		end
-		flashAttack(true, targetPos)
-		wallHP = math.max(0, wallHP - damage)
-		updateWallGui()
+		if arrow and arrow.Parent then arrow:Destroy() end
+		flashAttack(true, targetPos, plotState)
+		plotState.wallHP = math.max(0, plotState.wallHP - damage)
+		updateWallGui(plotState)
 		damageRemote:FireAllClients(damage, targetPos, true)
-		if wallHP <= 0 then
-			breakWall()
-		end
+		if plotState.wallHP <= 0 then breakWall(plotState) end
 	end)
 end
 
@@ -1687,15 +1561,16 @@ local lastSpinCheck = tick()
 RunService.Heartbeat:Connect(function(dt)
 	local now = tick()
 
-	-- Wall regen once per second
+	-- Wall regen + spin grants
 	if now - lastRegen >= 1 then
 		lastRegen = now
-		if wallHP < WALL_MAX_HP then
-			wallHP = math.min(wallHP + wallRegen, WALL_MAX_HP)
+		for _, plotState in pairs(playerPlots) do
+			if plotState.wallHP < plotState.WALL_MAX_HP then
+				plotState.wallHP = math.min(plotState.wallHP + plotState.wallRegen, plotState.WALL_MAX_HP)
+			end
+			updateWallGui(plotState)
 		end
-		updateWallGui()
 	end
-	-- Grant wheel spins every 15 minutes of playtime (check every 10 s)
 	if now - lastSpinCheck >= 10 then
 		lastSpinCheck = now
 		for _, p in ipairs(Players:GetPlayers()) do
@@ -1705,75 +1580,72 @@ RunService.Heartbeat:Connect(function(dt)
 				wd.spins += 1
 				local secondsUntilNext = math.max(0, math.floor(900 - (now - wd.lastGrantTime)))
 				wheelSpinsUpdateRemote:FireClient(p, wd.spins, secondsUntilNext)
-				print("🎡 Granted spin to " .. p.Name .. " (total: " .. wd.spins .. ")")
 			end
 		end
 	end
 
-	for i = #activeUnits, 1, -1 do
-		local u = activeUnits[i]
-		if not u.block.Parent then
-			table.remove(activeUnits, i)
-			continue
-		end
+	-- Unit AI — iterate over every player's plot
+	for _, plotState in pairs(playerPlots) do
+		if not plotState.wall or not plotState.wall.Parent then continue end
 
-		if not u.phase then
-			u.phase = math.random() * math.pi * 2
-		end
-
-		local pos = u.block.Position
-		local flatPos = Vector3.new(pos.X, 0, pos.Z)
-		local flatTarget = Vector3.new(wallTarget.X, 0, u.laneZ)
-		local dist = (flatPos - flatTarget).Magnitude
-
-		if dist <= u.def.attackRange then
-			u.bv.Velocity = Vector3.new(0, 0, 0)
-			u.bg.CFrame = CFrame.new(pos, Vector3.new(wall.Position.X, pos.Y, pos.Z))
-
-			local gui = u.block:FindFirstChildOfClass("BillboardGui")
-			if gui then
-				local bob = math.sin(now * 3 + u.phase) * 0.4
-				gui.StudsOffset = Vector3.new(0, 1.5 + bob, 0)
+		for i = #plotState.activeUnits, 1, -1 do
+			local u = plotState.activeUnits[i]
+			if not u.block.Parent then
+				table.remove(plotState.activeUnits, i)
+				continue
 			end
+			if not u.phase then u.phase = math.random() * math.pi * 2 end
 
-			-- Goblin poison: drains wall every frame via dt
-			if u.block.Name == "Goblin" then
-				local poison = UNITS.Goblin.poison or 1
-				wallHP = math.max(0, wallHP - poison * dt)
-				updateWallGui()
-				if wallHP <= 0 then
-					breakWall()
+			local pos = u.block.Position
+			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
+			local flatTarget = Vector3.new(plotState.wallTarget.X, 0, u.laneZ)
+			local dist = (flatPos - flatTarget).Magnitude
+
+			if dist <= u.def.attackRange then
+				u.bv.Velocity = Vector3.new(0, 0, 0)
+				u.bg.CFrame = CFrame.new(pos, Vector3.new(plotState.wall.Position.X, pos.Y, pos.Z))
+
+				local gui = u.block:FindFirstChildOfClass("BillboardGui")
+				if gui then
+					gui.StudsOffset = Vector3.new(0, 1.5 + math.sin(now*3 + u.phase)*0.4, 0)
 				end
-			end
 
-			-- Regular attack tick
-			if now - u.lastAttack >= u.def.attackCD then
-				u.lastAttack = now
-				local fromPos = u.block.Position
-				local targetPos = Vector3.new(wall.Position.X - wall.Size.X / 2, fromPos.Y + 0.5, fromPos.Z)
 				if u.block.Name == "Goblin" then
-					shootArrow(fromPos, targetPos, u.def.damage)
-				else
-					flashAttack(u.def.transparent)
-					wallHP = math.max(0, wallHP - u.def.damage)
-					updateWallGui()
-					local impactPos =
-						Vector3.new(wall.Position.X - wall.Size.X / 2, 2 + math.random(0, 7), math.random(-14, 14))
-					damageRemote:FireAllClients(u.def.damage, impactPos, u.def.transparent)
-					if wallHP <= 0 then
-						breakWall()
+					local poison = UNITS.Goblin.poison or 1
+					plotState.wallHP = math.max(0, plotState.wallHP - poison * dt)
+					updateWallGui(plotState)
+					if plotState.wallHP <= 0 then breakWall(plotState) end
+				end
+
+				if now - u.lastAttack >= u.def.attackCD then
+					u.lastAttack = now
+					local fromPos = u.block.Position
+					local wallFaceX = plotState.wall.Position.X - plotState.laneDir * plotState.wall.Size.X/2
+					local targetPos = Vector3.new(wallFaceX, fromPos.Y + 0.5, fromPos.Z)
+					if u.block.Name == "Goblin" then
+						shootArrow(fromPos, targetPos, u.def.damage, plotState)
+					else
+						local impactPos = Vector3.new(
+							wallFaceX,
+							2 + math.random(0, 7),
+							plotState.plotCenterZ + math.random(-8, 8)
+						)
+						flashAttack(u.def.transparent, impactPos, plotState)
+						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
+						updateWallGui(plotState)
+						damageRemote:FireAllClients(u.def.damage, impactPos, u.def.transparent)
+						if plotState.wallHP <= 0 then breakWall(plotState) end
 					end
 				end
-			end
-		else
-			local dir = (flatTarget - flatPos).Unit
-			u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
-			u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
+			else
+				local dir = (flatTarget - flatPos).Unit
+				u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
+				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
 
-			local gui = u.block:FindFirstChildOfClass("BillboardGui")
-			if gui then
-				local bob = math.abs(math.sin(now * 8 + u.phase)) * 0.3
-				gui.StudsOffset = Vector3.new(0, 1.5 + bob, 0)
+				local gui = u.block:FindFirstChildOfClass("BillboardGui")
+				if gui then
+					gui.StudsOffset = Vector3.new(0, 1.5 + math.abs(math.sin(now*8 + u.phase))*0.3, 0)
+				end
 			end
 		end
 	end
