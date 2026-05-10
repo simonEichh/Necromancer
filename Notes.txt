@@ -1,0 +1,50 @@
+Spin a baddie notes:
+
+start game first time:
+
+you start the game with 300 gold, 0 premium currency
+there is a tutorial arrow leading you to the "buy" shop stall
+there is a tutorial text saying lets get your started. go to teh shop npc to buy dice!
+there is a multiplayer hub where you can see other people at teh shop buying dice
+you have 3 buttons at the top, one teleports you to the shops, one to your plot with your baddies where you can place them, one to the pet shop
+when you interact with the buy shop you can buy basic dice, the tutorial guides you through the process of buying dice, " click the information on basic dice to review it", now click the buy or buy max button to puirchase basic dice, now close the shop, now click the dice to roll,
+you have the dice in an inventory which is always shown in the ui, you then get a short roll animation where you see 4-6 other possible outcomes you could've had and at the end you see the one you got, labeled with a 1-in e.g 22 chance, then u need to equip the rolled unit from the inventory, you then carry it around on your character, you then get the option to place it on your podium, it then passively makes coins, thats it for the tutorial
+
+after tutorial:
+i got some free dice for better units in the beginning
+when rolling dice you have the option to auto roll to roll all of the current dice you have, you can also press animation skip, and hide rolls so it rolls in the background, you can walk around the hub while its rolling and you only see the result
+there is a store panel where you can buy stuff for robux, there is a rebirth button that initiates the prestige system where you get a money multiplier, unlock a new dice to be bought at the shop, potions that temporarely increase stats like money gain or luck multipliers, and you get +1 slot for a unit to have active at a time, the rebirth costs increasingly more gold per rebirth and on rebirth you will lose all your coins and dice, there is also some sort of index compendium where u see all the locked units and u can claim premium currency for each one u unlocked, 
+
+you also have a lucky wheel to spin for each 15 minutes of live playtime taht can give u premium currency, gold or dice or luck multipliers, 
+there are extra unit slots u can buy for robux 
+
+there are temporary weather events where rolled units have a higher chance to get a certain mutation bonus, 
+in the hub area there is also a sell store where u can sell units, there is a potions store, there is an upgrades store, in the upgeades store u can buy passive luck boost upgrade for gold, coin multiplier, and so on 
+
+dice have a rarity label like common, uncommon, and they have a luck percentage, basic dice e.g. have 100% luck, 
+
+in the upgrades shop u can also buy higher mutation chance 8% to 9% is the firce upgrade for 250m, then tehre is pet luck buff, u can also buy extra stock slots in buy shop (1x -> 2x dice stock), there is a gems shop where u can buy bonuses with premium currency like 20x yout egg luck for hatches, vip exclusive tag and buff, 
++1 pet slot, auto skip animation without needing gampass, and extremely luicky boxes, and u can buy gems for robux of course, 100 gems for 99 robux, 500 for 449 robux and 1000 gems for 769 robux
+
+lucky wheel spins mostly only give 1k gtold but it shows that i could also give exttremely good things (bait), u accumulate free spins for each 15min played, 
+
+
+in the sell shop u sell units that u dont need anymore since u got rarer and better ones
+
+the shops have a rotation inventory every 5 minutes, u can see the dice that are in stock and some that are not currently in stock, u unlock the ability to have the higher percentage luck ones with rebirth, 
+the game seems very straightforward, no skills that affect anything besides gold, probably to keep it very simple for younger audiences, just more money, more luck
+
+generally i need to add multiplayer aspect like this game. in this game u can see plots of other people, probably some kind of lobby, u can see their units, im not sure yet how to implement that with my game, maybe u can see multiple wall from other people and the units fighting them, i would have to reconsider the distance approach with the wall so u can actually see the wall in the lobby and not 1000 meters away depending on their progress, 
+
+tehre are quests that can earn you gems, like play for 30m inutes, player for 2 hours, open 100 pet eggs, roll 700 dice, quests reset every 24 hours, 
+
+pets give a luck bonus and float next to ur character, 
+
+in the main hub area there are some leaderboards that show the players with the highest amount of coins, robux spent, gems, rolls and playtime
+there is also a friendlist and you get a boost for each friend u invite or thats playing, probably gold boost
+
+
+notes to implement in my game:
+make grave opening animation, show possible outcomes, give it chances like "1 in 199" chance, make inventory, make units carriable, make it so u can place them on grave slots from where theyt start walking out to the wall, 
+
+im thinking i should streamline the game and make it so each unit just has a damage number DPS so people can know how good it is what they pulled and of course the chance to get it, 
