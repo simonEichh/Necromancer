@@ -64,6 +64,18 @@ local wheelSpinRemote = Instance.new("RemoteEvent")
 wheelSpinRemote.Name = "WheelSpin"
 wheelSpinRemote.Parent = ReplicatedStorage
 
+local buyGraveRequestRemote = Instance.new("RemoteEvent")
+buyGraveRequestRemote.Name = "BuyGraveRequest"
+buyGraveRequestRemote.Parent = ReplicatedStorage
+
+local buyGraveResultRemote = Instance.new("RemoteEvent")
+buyGraveResultRemote.Name = "BuyGraveResult"
+buyGraveResultRemote.Parent = ReplicatedStorage
+
+local shopStockUpdateRemote = Instance.new("RemoteEvent")
+shopStockUpdateRemote.Name = "ShopStockUpdate"
+shopStockUpdateRemote.Parent = ReplicatedStorage
+
 local wheelResultRemote = Instance.new("RemoteEvent")
 wheelResultRemote.Name = "WheelResult"
 wheelResultRemote.Parent = ReplicatedStorage
@@ -279,6 +291,62 @@ local function getWheelData(player)
 	return playerWheelData[id]
 end
 
+-- ============================================================
+--  SHOP ROTATION SYSTEM
+-- ============================================================
+local GRAVE_STOCK_BASE = {
+	Mossy = 999, Stone = 50, Ancient = 30, Cursed = 20,
+	Shadow = 15, Abyssal = 10, Eldritch = 5,
+	Void = 3, Eternal = 2, Celestial = 1,
+}
+local GRAVE_ROTATION_CHANCE = {
+	Mossy = 1.0, Stone = 0.9, Ancient = 0.8, Cursed = 0.7,
+	Shadow = 0.6, Abyssal = 0.5, Eldritch = 0.4,
+	Void = 0.3, Eternal = 0.2, Celestial = 0.1,
+}
+local SHOP_RESTOCK_TIME = 300
+local playerShopData = {}
+
+local function generateRotation(player)
+	local id = tostring(player.UserId)
+	local stock, inRotation = {}, {}
+	for key, baseStock in pairs(GRAVE_STOCK_BASE) do
+		local chance = GRAVE_ROTATION_CHANCE[key] or 1
+		if math.random() <= chance then
+			stock[key] = baseStock
+			inRotation[key] = true
+		else
+			stock[key] = 0
+			inRotation[key] = false
+		end
+	end
+	playerShopData[id] = {
+		stock = stock,
+		inRotation = inRotation,
+		nextRestock = tick() + SHOP_RESTOCK_TIME,
+	}
+end
+
+local function sendShopUpdate(player)
+	local id = tostring(player.UserId)
+	local data = playerShopData[id]
+	if not data then return end
+	local secsLeft = math.max(0, math.floor(data.nextRestock - tick()))
+	shopStockUpdateRemote:FireClient(player, data.stock, data.inRotation, secsLeft)
+end
+
+buyGraveRequestRemote.OnServerEvent:Connect(function(player, graveType, qty)
+	if type(graveType) ~= "string" or type(qty) ~= "number" then return end
+	local id = tostring(player.UserId)
+	local data = playerShopData[id]
+	if not data or not data.inRotation[graveType] then return end
+	local available = data.stock[graveType] or 0
+	local approved = math.min(math.floor(qty), available)
+	if approved <= 0 then return end
+	data.stock[graveType] = available - approved
+	buyGraveResultRemote:FireClient(player, graveType, approved, data.stock[graveType])
+end)
+
 Players.PlayerAdded:Connect(function(player)
 	local wd = getWheelData(player)
 	player.CharacterAdded:Connect(function()
@@ -293,6 +361,8 @@ Players.PlayerAdded:Connect(function(player)
 		end
 		task.wait(1)
 		initPlotForPlayer(player)
+		generateRotation(player)
+		sendShopUpdate(player)
 	end)
 end)
 
@@ -319,6 +389,7 @@ Players.PlayerRemoving:Connect(function(player)
 	playerWheelData[id] = nil
 	playerUpgrades[id]  = nil
 	if playerPity then playerPity[id] = nil end
+	playerShopData[id] = nil
 end)
 
 -- Wheel outcomes (7 segments matching the client display order)
@@ -1580,6 +1651,12 @@ RunService.Heartbeat:Connect(function(dt)
 				wd.spins += 1
 				local secondsUntilNext = math.max(0, math.floor(900 - (now - wd.lastGrantTime)))
 				wheelSpinsUpdateRemote:FireClient(p, wd.spins, secondsUntilNext)
+			end
+			-- Restock shop if timer expired
+			local sd = playerShopData[tostring(p.UserId)]
+			if sd and now >= sd.nextRestock then
+				generateRotation(p)
+				sendShopUpdate(p)
 			end
 		end
 	end

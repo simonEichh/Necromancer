@@ -63,6 +63,7 @@ local autoRollActive = false
 local currentRollGraveType = nil
 local skipCycling = false
 
+
 -- Upgrade levels (synced from server via UpgradeGranted)
 local luckBoostLevel = 0
 local coinBoostLevel = 0
@@ -393,6 +394,7 @@ local ALL_UNIT_KEYS = {
 -- ============================================================
 local GravesDock      = require(script.Modules.GravesDock)
 local InventoryPanel  = require(script.Modules.InventoryPanel)
+local ShopPanel       = require(script.Modules.ShopPanel)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "NecroUI"
@@ -1116,298 +1118,11 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 	tick()
 end
 
--- ============================================================
---  SHOP PANEL
--- ============================================================
-local shopPanel = Instance.new("Frame")
-shopPanel.Name = "ShopPanel"
-shopPanel.Size = UDim2.new(0, 640, 0, 560)
-shopPanel.Position = UDim2.new(0.5, -320, 0.5, -280)
-shopPanel.BackgroundColor3 = Color3.fromRGB(18, 8, 38)
-shopPanel.BorderSizePixel = 0
-shopPanel.Visible = false
-shopPanel.ZIndex = 30
-shopPanel.Parent = screenGui
-Instance.new("UICorner", shopPanel).CornerRadius = UDim.new(0, 16)
-
-local shopTitle = Instance.new("TextLabel", shopPanel)
-shopTitle.Size = UDim2.new(1, -50, 0, 44)
-shopTitle.Position = UDim2.new(0, 10, 0, 8)
-shopTitle.BackgroundTransparency = 1
-shopTitle.Text = "🛒 SHOP"
-shopTitle.TextColor3 = Color3.fromRGB(230, 200, 255)
-shopTitle.TextXAlignment = Enum.TextXAlignment.Left
-shopTitle.TextScaled = true
-shopTitle.Font = Enum.Font.GothamBold
-shopTitle.ZIndex = 31
-
-local shopCloseBtn = Instance.new("TextButton", shopPanel)
-shopCloseBtn.Size = UDim2.new(0, 36, 0, 36)
-shopCloseBtn.Position = UDim2.new(1, -44, 0, 8)
-shopCloseBtn.BackgroundColor3 = Color3.fromRGB(80, 30, 120)
-shopCloseBtn.Text = "X"
-shopCloseBtn.TextColor3 = Color3.fromRGB(255, 200, 255)
-shopCloseBtn.TextScaled = true
-shopCloseBtn.Font = Enum.Font.GothamBold
-shopCloseBtn.BorderSizePixel = 0
-shopCloseBtn.ZIndex = 31
-Instance.new("UICorner", shopCloseBtn).CornerRadius = UDim.new(0, 8)
-shopCloseBtn.MouseButton1Click:Connect(function()
-	shopPanel.Visible = false
-end)
-
--- ── TABS ──
-local TAB_NAMES = { "Graveyard" }
-local activeTab = "Graveyard"
-local tabButtons = {}
-local tabContents = {}
-
-local tabBar = Instance.new("Frame", shopPanel)
-tabBar.Size = UDim2.new(1, -20, 0, 40)
-tabBar.Position = UDim2.new(0, 10, 0, 54)
-tabBar.BackgroundTransparency = 1
-tabBar.ZIndex = 31
-
-local tabWidth = 1 / #TAB_NAMES
-for i, name in ipairs(TAB_NAMES) do
-	local btn = Instance.new("TextButton", tabBar)
-	btn.Size = UDim2.new(tabWidth, -4, 1, 0)
-	btn.Position = UDim2.new((i - 1) * tabWidth, 2, 0, 0)
-	btn.BackgroundColor3 = Color3.fromRGB(40, 18, 75)
-	btn.Text = name
-	btn.TextColor3 = Color3.fromRGB(180, 150, 220)
-	btn.TextScaled = true
-	btn.Font = Enum.Font.GothamBold
-	btn.BorderSizePixel = 0
-	btn.ZIndex = 32
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-	tabButtons[name] = btn
-
-	local content = Instance.new("ScrollingFrame", shopPanel)
-	content.Name = name .. "Content"
-	content.Size = UDim2.new(1, -20, 1, -110)
-	content.Position = UDim2.new(0, 10, 0, 100)
-	content.BackgroundTransparency = 1
-	content.BorderSizePixel = 0
-	content.ScrollBarThickness = 4
-	content.ScrollBarImageColor3 = Color3.fromRGB(120, 60, 200)
-	content.Visible = (name == "Graveyard")
-	content.ZIndex = 31
-	content.Parent = shopPanel
-	tabContents[name] = content
-
-	local layout = Instance.new("UIListLayout", content)
-	layout.Padding = UDim.new(0, 8)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
-	end)
-end
-
-local function switchTab(name)
-	activeTab = name
-	for tabName, btn in pairs(tabButtons) do
-		local on = (tabName == name)
-		btn.BackgroundColor3 = on and Color3.fromRGB(90, 40, 170) or Color3.fromRGB(40, 18, 75)
-		btn.TextColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 150, 220)
-		tabContents[tabName].Visible = on
-	end
-end
-for name, btn in pairs(tabButtons) do
-	btn.MouseButton1Click:Connect(function()
-		switchTab(name)
-	end)
-end
-switchTab("Graveyard")
-
--- ============================================================
---  GRAVEYARD TAB  (buy graves)
--- ============================================================
-local graveyardTab = tabContents["Graveyard"]
-
--- gd: full entry from GRAVE_DATA
--- returns row, buyBtn, ownedLbl
-local function makeGraveRow(parent, order, gd)
-	local row = Instance.new("Frame", parent)
-	row.Size = UDim2.new(1, -8, 0, 130)
-	row.BackgroundColor3 = Color3.fromRGB(28, 12, 55)
-	row.BorderSizePixel = 0
-	row.LayoutOrder = order
-	row.ZIndex = 32
-	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 12)
-
-	-- Left image box
-	local imgBox = Instance.new("Frame", row)
-	imgBox.Size = UDim2.new(0, 100, 0, 100)
-	imgBox.Position = UDim2.new(0, 14, 0.5, -50)
-	imgBox.BackgroundTransparency = 1
-	imgBox.BorderSizePixel = 0
-	imgBox.ZIndex = 33
-	imgBox.ClipsDescendants = false
-	Instance.new("UICorner", imgBox).CornerRadius = UDim.new(0, 12)
-
-	if gd.image ~= "" then
-		local img = Instance.new("ImageLabel", imgBox)
-		img.Size = UDim2.new(1, 0, 1, 0)
-		img.Position = UDim2.new(0, 0, 0, 0)
-		img.BackgroundTransparency = 1
-		img.Image = gd.image
-		img.ScaleType = Enum.ScaleType.Fit
-		img.ZIndex = 34
-	else
-		-- Emoji fallback until image is set
-		local emojiLbl = Instance.new("TextLabel", imgBox)
-		emojiLbl.Size = UDim2.new(1, 0, 1, 0)
-		emojiLbl.BackgroundTransparency = 1
-		emojiLbl.Text = gd.emoji
-		emojiLbl.TextScaled = true
-		emojiLbl.ZIndex = 34
-	end
-
-	-- Name
-	local nameLbl = Instance.new("TextLabel", row)
-	nameLbl.Size = UDim2.new(0, 260, 0, 38)
-	nameLbl.Position = UDim2.new(0, 126, 0, 16)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = gd.name
-	nameLbl.TextColor3 = Color3.fromRGB(240, 220, 255)
-	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-	nameLbl.TextScaled = true
-	nameLbl.Font = Enum.Font.GothamBold
-	nameLbl.ZIndex = 33
-
-	-- Luck
-	local r, g, b = gd.color.R * 255, gd.color.G * 255, gd.color.B * 255
-	local luckColor = Color3.fromRGB(
-		math.min(255, math.floor(r * 0.5 + 120)),
-		math.min(255, math.floor(g * 0.5 + 160)),
-		math.min(255, math.floor(b * 0.5 + 80))
-	)
-	local luckLbl = Instance.new("TextLabel", row)
-	luckLbl.Size = UDim2.new(0, 260, 0, 28)
-	luckLbl.Position = UDim2.new(0, 126, 0, 57)
-	luckLbl.BackgroundTransparency = 1
-	luckLbl.Text = "🍀 " .. gd.luck .. "% Luck"
-	luckLbl.TextColor3 = luckColor
-	luckLbl.TextXAlignment = Enum.TextXAlignment.Left
-	luckLbl.TextScaled = true
-	luckLbl.Font = Enum.Font.GothamBold
-	luckLbl.ZIndex = 33
-
-	-- Owned count
-	local ownedLbl = Instance.new("TextLabel", row)
-	ownedLbl.Size = UDim2.new(0, 260, 0, 24)
-	ownedLbl.Position = UDim2.new(0, 126, 0, 90)
-	ownedLbl.BackgroundTransparency = 1
-	ownedLbl.Text = "Owned: 0"
-	ownedLbl.TextColor3 = Color3.fromRGB(130, 210, 130)
-	ownedLbl.TextXAlignment = Enum.TextXAlignment.Left
-	ownedLbl.TextScaled = true
-	ownedLbl.Font = Enum.Font.Gotham
-	ownedLbl.ZIndex = 33
-
-	-- Buy 1 button
-	local buy1Btn = Instance.new("TextButton", row)
-	buy1Btn.Size = UDim2.new(0, 130, 0, 54)
-	buy1Btn.Position = UDim2.new(1, -142, 0, 12)
-	buy1Btn.BackgroundColor3 = Color3.fromRGB(80, 40, 150)
-	buy1Btn.Text = "Buy 1\n💰 " .. fmtGold(gd.cost)
-	buy1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	buy1Btn.TextScaled = true
-	buy1Btn.Font = Enum.Font.GothamBold
-	buy1Btn.BorderSizePixel = 0
-	buy1Btn.ZIndex = 33
-	Instance.new("UICorner", buy1Btn).CornerRadius = UDim.new(0, 10)
-
-	-- Buy Max button
-	local buyMaxBtn = Instance.new("TextButton", row)
-	buyMaxBtn.Size = UDim2.new(0, 130, 0, 54)
-	buyMaxBtn.Position = UDim2.new(1, -142, 0, 72)
-	buyMaxBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 50)
-	buyMaxBtn.Text = "Buy x0\n💰 0"
-	buyMaxBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
-	buyMaxBtn.TextScaled = true
-	buyMaxBtn.Font = Enum.Font.GothamBold
-	buyMaxBtn.BorderSizePixel = 0
-	buyMaxBtn.ZIndex = 33
-	Instance.new("UICorner", buyMaxBtn).CornerRadius = UDim.new(0, 10)
-
-	return row, buy1Btn, buyMaxBtn, ownedLbl
-end
-
--- Build all grave rows from GRAVE_DATA and store button/lock/owned references by key
-local graveButtons    = {}  -- key → buy1 button
-local graveBuyMaxBtns = {}  -- key → buyMax button
-local graveLocks      = {}  -- key → lock overlay frame
-local graveOwnedLbls  = {}  -- key → owned count label
-
-for i, gd in ipairs(GRAVE_DATA) do
-	local row, buy1Btn, buyMaxBtn, ownedLbl = makeGraveRow(graveyardTab, i, gd)
-	graveButtons[gd.key]    = buy1Btn
-	graveBuyMaxBtns[gd.key] = buyMaxBtn
-	graveOwnedLbls[gd.key]  = ownedLbl
-
-	if gd.unlockAscension > 0 then
-		local lockFrame = Instance.new("Frame", row)
-		lockFrame.Size = UDim2.new(1, 0, 1, 0)
-		lockFrame.BackgroundColor3 = Color3.fromRGB(10, 5, 25)
-		lockFrame.BackgroundTransparency = 0.25
-		lockFrame.BorderSizePixel = 0
-		lockFrame.ZIndex = 35
-		Instance.new("UICorner", lockFrame).CornerRadius = UDim.new(0, 12)
-		local lockLbl = Instance.new("TextLabel", lockFrame)
-		lockLbl.Size = UDim2.new(1, 0, 1, 0)
-		lockLbl.BackgroundTransparency = 1
-		lockLbl.Text = "🔒  Unlock at Ascension " .. gd.unlockAscension
-		lockLbl.TextColor3 = Color3.fromRGB(200, 180, 255)
-		lockLbl.TextScaled = true
-		lockLbl.Font = Enum.Font.GothamBold
-		lockLbl.ZIndex = 36
-		graveLocks[gd.key] = lockFrame
-	end
-end
-
--- ============================================================
---  BUTTON HANDLERS
--- ============================================================
-
--- Lookup cost/unlockAscension by key
-local graveDataByKey = {}
-for _, gd in ipairs(GRAVE_DATA) do
-	graveDataByKey[gd.key] = gd
-end
-
-local function isGraveLocked(graveType)
-	local gd = graveDataByKey[graveType]
-	return gd and rebirthCount < gd.unlockAscension
-end
-
-local function buyGrave(graveType, qty)
-	if isGraveLocked(graveType) then return end
-	local gd = graveDataByKey[graveType]
-	if not gd then return end
-	qty = qty or 1
-	local maxAffordable = math.floor(gold / gd.cost)
-	qty = math.min(qty, maxAffordable)
-	if qty <= 0 then return end
-	gold -= gd.cost * qty
-	ownedGraves[graveType] = (ownedGraves[graveType] or 0) + qty
-	updateHUD()
-	GravesDock.refresh()
-end
-
-local function buyGraveMax(graveType)
-	local gd = graveDataByKey[graveType]
-	if not gd then return end
-	local qty = math.floor(gold / gd.cost)
-	buyGrave(graveType, qty)
-end
-
 function openGrave(graveType)
 	if isRolling then
 		return
 	end -- locked while animation is active
-	if isGraveLocked(graveType) then
+	if ShopPanel.isGraveLocked(graveType) then
 		return
 	end
 	if (ownedGraves[graveType] or 0) <= 0 then
@@ -1455,50 +1170,16 @@ end
 -- Initialise GravesDock now that openGrave is defined
 GravesDock.init(screenGui, ownedGraves, GRAVE_DATA, openGrave)
 
--- Wire buy buttons
-for _, gd in ipairs(GRAVE_DATA) do
-	local key = gd.key
-	graveButtons[key].MouseButton1Click:Connect(function()
-		buyGrave(key, 1)
-	end)
-	graveBuyMaxBtns[key].MouseButton1Click:Connect(function()
-		buyGraveMax(key)
-	end)
-end
-
-local function updateGraveyard()
-	for _, gd in ipairs(GRAVE_DATA) do
-		local locked = isGraveLocked(gd.key)
-		local canAfford1 = not locked and gold >= gd.cost
-		local qty = (not locked) and math.floor(gold / gd.cost) or 0
-
-		local btn = graveButtons[gd.key]
-		if btn then
-			btn.BackgroundColor3 = canAfford1 and Color3.fromRGB(80, 40, 150) or Color3.fromRGB(40, 20, 70)
-			btn.TextColor3 = canAfford1 and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(120, 90, 150)
-		end
-
-		local maxBtn = graveBuyMaxBtns[gd.key]
-		if maxBtn then
-			if qty > 1 then
-				maxBtn.Text = "Buy x" .. qty .. "\n💰 " .. fmtGold(gd.cost * qty)
-				maxBtn.BackgroundColor3 = Color3.fromRGB(40, 110, 40)
-				maxBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
-			else
-				maxBtn.Text = "Buy Max"
-				maxBtn.BackgroundColor3 = Color3.fromRGB(30, 55, 30)
-				maxBtn.TextColor3 = Color3.fromRGB(100, 140, 100)
-			end
-		end
-
-		local ol = graveOwnedLbls[gd.key]
-		if ol then
-			local count = ownedGraves[gd.key] or 0
-			ol.Text = "Owned: " .. count
-			ol.TextColor3 = count > 0 and Color3.fromRGB(130, 220, 130) or Color3.fromRGB(100, 100, 100)
-		end
-	end
-end
+-- Initialise ShopPanel
+ShopPanel.init(screenGui, {
+	GRAVE_DATA      = GRAVE_DATA,
+	ownedGraves     = ownedGraves,
+	getGold         = function() return gold end,
+	spendGold       = function(n) gold = gold - n; updateHUD() end,
+	getRebirthCount = function() return rebirthCount end,
+	fmtGold         = fmtGold,
+	refreshDock     = function() GravesDock.refresh() end,
+})
 
 -- ============================================================
 --  GRAVE PLACEMENT  (E on physical grave in world)
@@ -1717,8 +1398,7 @@ end
 local openGraveEvt = ReplicatedStorage:WaitForChild("OpenGrave", 5)
 if openGraveEvt then
 	openGraveEvt.OnClientEvent:Connect(function()
-		shopPanel.Visible = true
-		switchTab("Graveyard")
+		ShopPanel.show()
 	end)
 end
 
@@ -1841,16 +1521,13 @@ ascendConfirmBtn.MouseButton1Click:Connect(function()
 	-- Remove the lock overlay for whichever grave tier just unlocked
 	for _, gd in ipairs(GRAVE_DATA) do
 		if gd.unlockAscension == rebirthCount then
-			local lf = graveLocks[gd.key]
-			if lf and lf.Parent then
-				lf:Destroy()
-			end
+			ShopPanel.unlockGrave(gd.key)
 		end
 	end
 
 	ascendPanel.Visible = false
 	updateHUD()
-	updateGraveyard()
+	ShopPanel.updateGraveyard()
 
 	local ascendRemote = ReplicatedStorage:FindFirstChild("PlayerAscend")
 	if ascendRemote then
@@ -2025,6 +1702,7 @@ local function refreshSellPanel()
 
 	sellScroll.CanvasSize = UDim2.new(0, 0, 0, rowCount * 60)
 end
+
 
 -- AddGold remote — server sends gold reward after a sell
 local addGoldEvt = ReplicatedStorage:WaitForChild("AddGold", 5)
@@ -2681,9 +2359,6 @@ end -- do-block end
 -- ============================================================
 --  MAIN LOOP
 -- ============================================================
-RunService.Heartbeat:Connect(function()
-	updateGraveyard()
-end)
 
 updateHUD()
 refreshToolbar()
