@@ -68,6 +68,18 @@ local buyGraveRequestRemote = Instance.new("RemoteEvent")
 buyGraveRequestRemote.Name = "BuyGraveRequest"
 buyGraveRequestRemote.Parent = ReplicatedStorage
 
+local questUpdateRemote = Instance.new("RemoteEvent")
+questUpdateRemote.Name = "QuestUpdate"
+questUpdateRemote.Parent = ReplicatedStorage
+
+local claimQuestRemote = Instance.new("RemoteEvent")
+claimQuestRemote.Name = "ClaimQuest"
+claimQuestRemote.Parent = ReplicatedStorage
+
+local addGemsRemote = Instance.new("RemoteEvent")
+addGemsRemote.Name = "AddGems"
+addGemsRemote.Parent = ReplicatedStorage
+
 local buyGraveResultRemote = Instance.new("RemoteEvent")
 buyGraveResultRemote.Name = "BuyGraveResult"
 buyGraveResultRemote.Parent = ReplicatedStorage
@@ -127,25 +139,47 @@ end
 
 local recallUnitFromSlot -- forward declared
 
-local function addGraveSlot(i, basePos, plotState, ownerId)
-	local slab = Instance.new("Part")
-	slab.Name = "GraveSlot_" .. i
-	slab.Size = Vector3.new(2.5, 0.5, 2.5)
-	slab.Position = basePos + Vector3.new(0, 0.25, 0)
-	slab.Anchored = true
-	slab.BrickColor = BrickColor.new("Dark stone grey")
-	slab.Material = Enum.Material.SmoothPlastic
-	slab.TopSurface = Enum.SurfaceType.Smooth
-	slab.Parent = workspace
+local ServerStorage       = game:GetService("ServerStorage")
+local modelsFolder        = ServerStorage:FindFirstChild("Models")
+local tombstoneTemplate   = modelsFolder and modelsFolder:FindFirstChild("Tombstone")
 
-	local stone = Instance.new("Part")
-	stone.Name = "GraveHeadstone_" .. i
-	stone.Size = Vector3.new(1.8, 2.8, 0.5)
-	stone.Position = basePos + Vector3.new(plotState.laneDir * 0.9, 1.9, 0)
-	stone.Anchored = true
-	stone.BrickColor = BrickColor.new("Medium stone grey")
-	stone.Material = Enum.Material.SmoothPlastic
-	stone.Parent = workspace
+local function addGraveSlot(i, basePos, plotState, ownerId)
+	local slab, graveModel
+
+	if tombstoneTemplate and tombstoneTemplate:IsA("Model") then
+		graveModel = tombstoneTemplate:Clone()
+		for _, p in ipairs(graveModel:GetDescendants()) do
+			if p:IsA("BasePart") then p.Anchored = true end
+		end
+		graveModel.Parent = workspace
+		if graveModel.PrimaryPart then
+			graveModel:SetPrimaryPartCFrame(CFrame.new(basePos))
+		else
+			graveModel:MoveTo(basePos)
+		end
+		slab = graveModel.PrimaryPart or graveModel:FindFirstChildWhichIsA("BasePart")
+	else
+		-- Fallback: plain parts
+		slab = Instance.new("Part")
+		slab.Name = "GraveSlot_" .. i
+		slab.Size = Vector3.new(2.5, 0.5, 2.5)
+		slab.Position = basePos + Vector3.new(0, 0.25, 0)
+		slab.Anchored = true
+		slab.BrickColor = BrickColor.new("Dark stone grey")
+		slab.Material = Enum.Material.SmoothPlastic
+		slab.TopSurface = Enum.SurfaceType.Smooth
+		slab.Parent = workspace
+
+		local stone = Instance.new("Part")
+		stone.Name = "GraveHeadstone_" .. i
+		stone.Size = Vector3.new(1.8, 2.8, 0.5)
+		stone.Position = basePos + Vector3.new(plotState.laneDir * 0.9, 1.9, 0)
+		stone.Anchored = true
+		stone.BrickColor = BrickColor.new("Medium stone grey")
+		stone.Material = Enum.Material.SmoothPlastic
+		stone.Parent = workspace
+		graveModel = stone
+	end
 
 	local gui = Instance.new("BillboardGui", slab)
 	gui.Size = UDim2.new(0, 150, 0, 68)
@@ -155,7 +189,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	lbl.Size = UDim2.new(1, 0, 0.38, 0)
 	lbl.Position = UDim2.new(0, 0, 0, 0)
 	lbl.BackgroundTransparency = 1
-	lbl.Text = "🪦 Empty"
+	lbl.Text = "Empty"
 	lbl.TextColor3 = Color3.fromRGB(160, 200, 160)
 	lbl.TextScaled = true
 	lbl.Font = Enum.Font.GothamBold
@@ -186,7 +220,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	prompt.Parent = slab
 
 	plotState.graveSlots[i] = {
-		slab = slab, stone = stone, label = lbl,
+		slab = slab, stone = graveModel, label = lbl,
 		rarityLabel = rarityLbl, dpsLabel = dpsLbl,
 		prompt = prompt, occupied = false,
 	}
@@ -347,6 +381,114 @@ buyGraveRequestRemote.OnServerEvent:Connect(function(player, graveType, qty)
 	buyGraveResultRemote:FireClient(player, graveType, approved, data.stock[graveType])
 end)
 
+-- ============================================================
+--  QUEST SYSTEM
+-- ============================================================
+local DAILY_QUESTS = {
+	{ id = "d_graves",   label = "Open 50 Graves",      type = "openGraves", target = 50,      reward = 15 },
+	{ id = "d_playtime", label = "Play for 30 Minutes", type = "playtime",   target = 1800,    reward = 20 },
+	{ id = "d_walls",    label = "Break 5 Walls",       type = "breakWalls", target = 5,       reward = 25 },
+}
+local WEEKLY_QUESTS = {
+	{ id = "w_graves",   label = "Open 300 Graves",     type = "openGraves", target = 300,     reward = 75  },
+	{ id = "w_playtime", label = "Play for 3 Hours",    type = "playtime",   target = 10800,   reward = 100 },
+	{ id = "w_gold",     label = "Earn 1,000,000 Gold", type = "earnGold",   target = 1000000, reward = 125 },
+}
+
+local playerQuestData = {}
+
+local function getDayKey()  return math.floor(os.time() / 86400)   end
+local function getWeekKey() return math.floor(os.time() / 604800)  end
+
+local function initQuestData(player)
+	local id = tostring(player.UserId)
+	local dp, dc, wp, wc = {}, {}, {}, {}
+	for _, q in ipairs(DAILY_QUESTS)  do dp[q.id] = 0; dc[q.id] = false end
+	for _, q in ipairs(WEEKLY_QUESTS) do wp[q.id] = 0; wc[q.id] = false end
+	playerQuestData[id] = {
+		daily   = { progress = dp, claimed = dc, dayKey  = getDayKey()  },
+		weekly  = { progress = wp, claimed = wc, weekKey = getWeekKey() },
+		playtimeAccum = 0,
+	}
+end
+
+local function checkQuestReset(player)
+	local id = tostring(player.UserId)
+	local data = playerQuestData[id]
+	if not data then return end
+	if data.daily.dayKey ~= getDayKey() then
+		data.daily.dayKey = getDayKey()
+		for _, q in ipairs(DAILY_QUESTS) do
+			data.daily.progress[q.id] = 0
+			data.daily.claimed[q.id]  = false
+		end
+	end
+	if data.weekly.weekKey ~= getWeekKey() then
+		data.weekly.weekKey = getWeekKey()
+		for _, q in ipairs(WEEKLY_QUESTS) do
+			data.weekly.progress[q.id] = 0
+			data.weekly.claimed[q.id]  = false
+		end
+	end
+end
+
+local function sendQuestUpdate(player)
+	local id   = tostring(player.UserId)
+	local data = playerQuestData[id]
+	if not data then return end
+	local now = os.time()
+	questUpdateRemote:FireClient(player,
+		data.daily.progress,  data.daily.claimed,
+		data.weekly.progress, data.weekly.claimed,
+		86400  - (now % 86400),
+		604800 - (now % 604800)
+	)
+end
+
+local function incrementQuest(player, questType, amount)
+	local id   = tostring(player.UserId)
+	local data = playerQuestData[id]
+	if not data then return end
+	local changed = false
+	for _, q in ipairs(DAILY_QUESTS) do
+		if q.type == questType and not data.daily.claimed[q.id] then
+			local prev = data.daily.progress[q.id] or 0
+			if prev < q.target then
+				data.daily.progress[q.id] = math.min(prev + amount, q.target)
+				changed = true
+			end
+		end
+	end
+	for _, q in ipairs(WEEKLY_QUESTS) do
+		if q.type == questType and not data.weekly.claimed[q.id] then
+			local prev = data.weekly.progress[q.id] or 0
+			if prev < q.target then
+				data.weekly.progress[q.id] = math.min(prev + amount, q.target)
+				changed = true
+			end
+		end
+	end
+	if changed then sendQuestUpdate(player) end
+end
+
+claimQuestRemote.OnServerEvent:Connect(function(player, questId, isWeekly)
+	local id   = tostring(player.UserId)
+	local data = playerQuestData[id]
+	if not data then return end
+	local questList = isWeekly and WEEKLY_QUESTS or DAILY_QUESTS
+	local qd        = isWeekly and data.weekly   or data.daily
+	for _, q in ipairs(questList) do
+		if q.id == questId then
+			if qd.claimed[questId] then return end
+			if (qd.progress[questId] or 0) < q.target then return end
+			qd.claimed[questId] = true
+			addGemsRemote:FireClient(player, q.reward)
+			sendQuestUpdate(player)
+			return
+		end
+	end
+end)
+
 Players.PlayerAdded:Connect(function(player)
 	local wd = getWheelData(player)
 	player.CharacterAdded:Connect(function()
@@ -363,6 +505,8 @@ Players.PlayerAdded:Connect(function(player)
 		initPlotForPlayer(player)
 		generateRotation(player)
 		sendShopUpdate(player)
+		initQuestData(player)
+		sendQuestUpdate(player)
 	end)
 end)
 
@@ -380,8 +524,8 @@ Players.PlayerRemoving:Connect(function(player)
 			if u.block and u.block.Parent then u.block:Destroy() end
 		end
 		for _, slot in ipairs(plotState.graveSlots) do
-			if slot.slab and slot.slab.Parent then slot.slab:Destroy() end
 			if slot.stone and slot.stone.Parent then slot.stone:Destroy() end
+			if slot.slab and slot.slab.Parent then slot.slab:Destroy() end
 		end
 		plotOccupied[plotState.plotIndex] = false
 		playerPlots[id] = nil
@@ -389,7 +533,8 @@ Players.PlayerRemoving:Connect(function(player)
 	playerWheelData[id] = nil
 	playerUpgrades[id]  = nil
 	if playerPity then playerPity[id] = nil end
-	playerShopData[id] = nil
+	playerShopData[id]  = nil
+	playerQuestData[id] = nil
 end)
 
 -- Wheel outcomes (7 segments matching the client display order)
@@ -485,6 +630,13 @@ local function buildWallGui(wallPart, plotState)
 	plotState.hpText.Font = Enum.Font.GothamBold
 end
 
+local WALL_MATERIALS = {
+	Enum.Material.SmoothPlastic, Enum.Material.Brick,   Enum.Material.Cobblestone,
+	Enum.Material.Concrete,      Enum.Material.Granite,  Enum.Material.Marble,
+	Enum.Material.Sandstone,     Enum.Material.Slate,    Enum.Material.Wood,
+	Enum.Material.WoodPlanks,    Enum.Material.Basalt,   Enum.Material.Limestone,
+}
+
 -- Spawns a dim preview wall showing an upcoming layer number
 local function spawnPreviewWall(x, layerNum, plotState)
 	local wallPart = Instance.new("Part")
@@ -494,7 +646,7 @@ local function spawnPreviewWall(x, layerNum, plotState)
 	wallPart.Anchored = true
 	wallPart.BrickColor = BrickColor.new("Dark stone grey")
 	wallPart.Transparency = 0
-	wallPart.Material = Enum.Material.SmoothPlastic
+	wallPart.Material = WALL_MATERIALS[math.random(#WALL_MATERIALS)]
 	wallPart.Parent = workspace
 	local gui = Instance.new("BillboardGui", wallPart)
 	gui.Name = "PreviewGui"
@@ -591,6 +743,8 @@ local function breakWall(plotState)
 	for _, p in ipairs(Players:GetPlayers()) do
 		if tostring(p.UserId) == plotState.ownerId then
 			wallBreakRemote:FireClient(p, goldReward, plotState.wallLayer - 1)
+			incrementQuest(p, "breakWalls", 1)
+			incrementQuest(p, "earnGold", goldReward)
 			break
 		end
 	end
@@ -1209,7 +1363,7 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 	slot.occupied = false
 	slot.unitType = nil
 	slot.unitEntry = nil
-	slot.label.Text = "🪦 Empty"
+	slot.label.Text = "Empty"
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"
@@ -1369,6 +1523,7 @@ digGraveRemote.OnServerEvent:Connect(function(player, graveType)
 	local pity = getPity(player, graveType)
 	local oneIn = getBaseOneIn(unitType)
 	rollResultRemote:FireClient(player, unitType, rarity, pity, oneIn)
+	incrementQuest(player, "openGraves", 1)
 	print("🪦 " .. player.Name .. " dug up: " .. unitType .. " (" .. rarity .. ")")
 end)
 
@@ -1412,7 +1567,7 @@ local function clearSlot(i, plotState)
 	slot.occupied = false
 	slot.unitType = nil
 	slot.unitEntry = nil
-	slot.label.Text = "🪦 Empty"
+	slot.label.Text = "Empty"
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"
@@ -1652,11 +1807,24 @@ RunService.Heartbeat:Connect(function(dt)
 				local secondsUntilNext = math.max(0, math.floor(900 - (now - wd.lastGrantTime)))
 				wheelSpinsUpdateRemote:FireClient(p, wd.spins, secondsUntilNext)
 			end
-			-- Restock shop if timer expired
 			local sd = playerShopData[tostring(p.UserId)]
 			if sd and now >= sd.nextRestock then
 				generateRotation(p)
 				sendShopUpdate(p)
+			end
+			checkQuestReset(p)
+		end
+	end
+
+	-- Playtime quest tracking
+	for _, p in ipairs(Players:GetPlayers()) do
+		local qd = playerQuestData[tostring(p.UserId)]
+		if qd then
+			qd.playtimeAccum = (qd.playtimeAccum or 0) + dt
+			if qd.playtimeAccum >= 30 then
+				local secs = math.floor(qd.playtimeAccum)
+				qd.playtimeAccum = qd.playtimeAccum - secs
+				incrementQuest(p, "playtime", secs)
 			end
 		end
 	end

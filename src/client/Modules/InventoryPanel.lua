@@ -233,7 +233,7 @@ function InventoryPanel.init(sg, deps)
 		closeBtn.Size = UDim2.new(0, 36, 0, 36)
 		closeBtn.Position = UDim2.new(1, -44, 0, 6)
 		closeBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 80)
-		closeBtn.Text = "✕"
+		closeBtn.Text = "X"
 		closeBtn.TextColor3 = Color3.fromRGB(210, 160, 255)
 		closeBtn.TextScaled = true
 		closeBtn.Font = Enum.Font.GothamBold

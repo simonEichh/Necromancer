@@ -28,6 +28,8 @@ local selectedSlot = 1
 
 -- Forward declarations (defined after the UI is built)
 local wheelPanel
+local ascendPanel
+local updateAscendPanel
 
 -- Owned (bought, unopened) graves
 local ownedGraves = {
@@ -395,6 +397,8 @@ local ALL_UNIT_KEYS = {
 local GravesDock      = require(script.Modules.GravesDock)
 local InventoryPanel  = require(script.Modules.InventoryPanel)
 local ShopPanel       = require(script.Modules.ShopPanel)
+local QuestsPanel     = require(script.Modules.QuestsPanel)
+local HUD             = require(script.Modules.HUD)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "NecroUI"
@@ -402,116 +406,6 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
--- ── TOP HUD BAR ──────────────────────────────────────────────
-local hudBar = Instance.new("Frame")
-hudBar.Size = UDim2.new(1, 0, 0, 48)
-hudBar.Position = UDim2.new(0, 0, 0, 0)
-hudBar.BackgroundColor3 = Color3.fromRGB(20, 10, 40)
-hudBar.BackgroundTransparency = 0.2
-hudBar.BorderSizePixel = 0
-hudBar.Parent = screenGui
-
-local goldLabel = Instance.new("TextLabel")
-goldLabel.Size = UDim2.new(0.45, 0, 1, 0)
-goldLabel.Position = UDim2.new(0.25, 0, 0, 0)
-goldLabel.BackgroundTransparency = 1
-goldLabel.Text = "💰 300  💎 0"
-goldLabel.TextColor3 = Color3.fromRGB(255, 215, 100)
-goldLabel.TextScaled = true
-goldLabel.Font = Enum.Font.GothamBold
-goldLabel.Parent = hudBar
-
--- Luck buff indicator (shown below gold label when active)
-local luckBuffLabel = Instance.new("TextLabel")
-luckBuffLabel.Size = UDim2.new(0.2, 0, 0, 22)
-luckBuffLabel.Position = UDim2.new(0.25, 0, 1, 2)
-luckBuffLabel.BackgroundColor3 = Color3.fromRGB(30, 120, 30)
-luckBuffLabel.BackgroundTransparency = 0.3
-luckBuffLabel.Text = "🍀 2x Luck!"
-luckBuffLabel.TextColor3 = Color3.fromRGB(180, 255, 180)
-luckBuffLabel.TextScaled = true
-luckBuffLabel.Font = Enum.Font.GothamBold
-luckBuffLabel.BorderSizePixel = 0
-luckBuffLabel.ZIndex = 5
-luckBuffLabel.Visible = false
-luckBuffLabel.Parent = screenGui
-Instance.new("UICorner", luckBuffLabel).CornerRadius = UDim.new(0, 6)
-
--- ── NAV BUTTONS (top-right of hud bar) ───────────────────────
--- 🎡 Wheel button (far left of the nav cluster)
-local wheelHudBtn = Instance.new("TextButton", hudBar)
-wheelHudBtn.Size = UDim2.new(0, 150, 0, 34)
-wheelHudBtn.Position = UDim2.new(1, -528, 0.5, -17)
-wheelHudBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 0)
-wheelHudBtn.Text = "🎡 Spin (0)"
-wheelHudBtn.TextColor3 = Color3.fromRGB(255, 220, 100)
-wheelHudBtn.TextScaled = true
-wheelHudBtn.Font = Enum.Font.GothamBold
-wheelHudBtn.BorderSizePixel = 0
-wheelHudBtn.ZIndex = 5
-Instance.new("UICorner", wheelHudBtn).CornerRadius = UDim.new(0, 8)
-
-local invHudBtn = Instance.new("TextButton", hudBar)
-invHudBtn.Size = UDim2.new(0, 120, 0, 34)
-invHudBtn.Position = UDim2.new(1, -368, 0.5, -17)
-invHudBtn.BackgroundColor3 = Color3.fromRGB(30, 15, 60)
-invHudBtn.Text = "📦 Inventory"
-invHudBtn.TextColor3 = Color3.fromRGB(200, 175, 255)
-invHudBtn.TextScaled = true
-invHudBtn.Font = Enum.Font.GothamBold
-invHudBtn.BorderSizePixel = 0
-invHudBtn.ZIndex = 5
-Instance.new("UICorner", invHudBtn).CornerRadius = UDim.new(0, 8)
-
-local shopsBtn = Instance.new("TextButton", hudBar)
-shopsBtn.Size = UDim2.new(0, 110, 0, 34)
-shopsBtn.Position = UDim2.new(1, -238, 0.5, -17)
-shopsBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 80)
-shopsBtn.Text = "🛒 Shops"
-shopsBtn.TextColor3 = Color3.fromRGB(220, 200, 255)
-shopsBtn.TextScaled = true
-shopsBtn.Font = Enum.Font.GothamBold
-shopsBtn.BorderSizePixel = 0
-shopsBtn.ZIndex = 5
-Instance.new("UICorner", shopsBtn).CornerRadius = UDim.new(0, 8)
-
-local wallBtn = Instance.new("TextButton", hudBar)
-wallBtn.Size = UDim2.new(0, 110, 0, 34)
-wallBtn.Position = UDim2.new(1, -120, 0.5, -17)
-wallBtn.BackgroundColor3 = Color3.fromRGB(80, 25, 25)
-wallBtn.Text = "🏰 Wall"
-wallBtn.TextColor3 = Color3.fromRGB(255, 190, 190)
-wallBtn.TextScaled = true
-wallBtn.Font = Enum.Font.GothamBold
-wallBtn.BorderSizePixel = 0
-wallBtn.ZIndex = 5
-Instance.new("UICorner", wallBtn).CornerRadius = UDim.new(0, 8)
-
-local getWallPosFunc = ReplicatedStorage:WaitForChild("GetWallPos", 5)
-
-shopsBtn.MouseButton1Click:Connect(function()
-	local char = player.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-	hrp.CFrame = CFrame.new(-245, 3, 89)
-end)
-
-wallBtn.MouseButton1Click:Connect(function()
-	local char = player.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-	if not getWallPosFunc then return end
-	local wallPos = getWallPosFunc:InvokeServer()
-	if wallPos then
-		hrp.CFrame = CFrame.new(wallPos.X + 15, 3, wallPos.Z)
-	end
-end)
-
-invHudBtn.MouseButton1Click:Connect(function()
-	InventoryPanel.toggle()
-end)
 
 -- ============================================================
 --  HELPERS
@@ -530,17 +424,6 @@ local function fmt(n)
 	end
 end
 
-local function updateHUD()
-	goldLabel.Text = "💰 " .. fmt(gold) .. "  💎 " .. gems
-	local buffActive = tick() < luckBuffEnd
-	luckBuffLabel.Visible = buffActive
-	if buffActive then
-		local secs = math.max(0, math.floor(luckBuffEnd - tick()))
-		local m = math.floor(secs / 60)
-		local s = secs % 60
-		luckBuffLabel.Text = string.format("🍀 2x Luck %d:%02d", m, s)
-	end
-end
 
 -- ============================================================
 --  TOOLBAR  (10 slots at bottom)
@@ -870,7 +753,7 @@ InventoryPanel.init(screenGui, {
 local placeBestBtn = Instance.new("TextButton")
 placeBestBtn.Name = "PlaceBestBtn"
 placeBestBtn.Size = UDim2.new(0, 170, 0, 36)
-placeBestBtn.Position = UDim2.new(0.5, -85, 0, 48)
+placeBestBtn.Position = UDim2.new(0.5, -85, 0, 72)
 placeBestBtn.BackgroundColor3 = Color3.fromRGB(130, 25, 25)
 placeBestBtn.Text = "🏆 Place Best"
 placeBestBtn.TextColor3 = Color3.fromRGB(255, 210, 210)
@@ -1069,7 +952,7 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 		end
 
 		-- Skip becomes Close
-		skipBtn.Text = "✕  Close"
+		skipBtn.Text = "X  Close"
 		skipBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
 		skipBtn.TextColor3 = Color3.fromRGB(255, 150, 150)
 
@@ -1175,10 +1058,59 @@ ShopPanel.init(screenGui, {
 	GRAVE_DATA      = GRAVE_DATA,
 	ownedGraves     = ownedGraves,
 	getGold         = function() return gold end,
-	spendGold       = function(n) gold = gold - n; updateHUD() end,
+	spendGold       = function(n) gold = gold - n; HUD.update() end,
 	getRebirthCount = function() return rebirthCount end,
 	fmtGold         = fmtGold,
 	refreshDock     = function() GravesDock.refresh() end,
+})
+
+QuestsPanel.init(screenGui, {
+	claimQuestRemote = ReplicatedStorage:WaitForChild("ClaimQuest", 5),
+	onGemsAdded = function(amount)
+		gems = gems + amount
+		HUD.update()
+	end,
+})
+
+local getWallPosFunc = ReplicatedStorage:WaitForChild("GetWallPos", 5)
+
+HUD.init(screenGui, {
+	getGold        = function() return gold end,
+	getGems        = function() return gems end,
+	getSpins       = function() return wheelSpins end,
+	getCountdown   = function() return wheelCountdownSecs end,
+	getLuckBuffEnd = function() return luckBuffEnd end,
+	fmtNumber      = fmt,
+	onShops = function()
+		local char = player.Character
+		if not char then return end
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		hrp.CFrame = CFrame.new(-245, 3, 89)
+	end,
+	onWall = function()
+		local char = player.Character
+		if not char then return end
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		local wallPos = getWallPosFunc and getWallPosFunc:InvokeServer()
+		if wallPos then hrp.CFrame = CFrame.new(wallPos.X + 15, 3, wallPos.Z) end
+	end,
+	onAscend    = function()
+		if ascendPanel then
+			if not ascendPanel.Visible then updateAscendPanel() end
+			ascendPanel.Visible = not ascendPanel.Visible
+		end
+	end,
+	onInventory = function() InventoryPanel.toggle() end,
+	onSpin      = function() if wheelPanel then wheelPanel.Visible = not wheelPanel.Visible end end,
+	onQuests    = function() QuestsPanel.show() end,
+	onFriends   = function()
+		local ok, err = pcall(function()
+			game:GetService("SocialService"):PromptGameInvite(player)
+		end)
+		if not ok then warn("Friends invite failed:", err) end
+	end,
 })
 
 -- ============================================================
@@ -1333,7 +1265,7 @@ local wallBreakEvt = ReplicatedStorage:WaitForChild("WallBreak", 5)
 if wallBreakEvt then
 	wallBreakEvt.OnClientEvent:Connect(function(goldReward, clearedLayer)
 		gold += math.floor(goldReward * (goldMultiplier + coinBoostLevel * 0.5))
-		updateHUD()
+		HUD.update()
 		screenShake(0.35, 0.6)
 		spawnConfetti()
 		showBigText(
@@ -1405,19 +1337,9 @@ end
 -- ============================================================
 --  ASCEND (REBIRTH) SYSTEM
 -- ============================================================
-local ascendBtn = Instance.new("TextButton")
-ascendBtn.Size = UDim2.new(0, 160, 0, 42)
-ascendBtn.Position = UDim2.new(0, 10, 1, -58)
-ascendBtn.BackgroundColor3 = Color3.fromRGB(90, 30, 10)
-ascendBtn.Text = "⬆️ Ascend"
-ascendBtn.TextColor3 = Color3.fromRGB(255, 190, 80)
-ascendBtn.TextScaled = true
-ascendBtn.Font = Enum.Font.GothamBold
-ascendBtn.BorderSizePixel = 0
-ascendBtn.Parent = screenGui
 Instance.new("UICorner", ascendBtn).CornerRadius = UDim.new(0, 10)
 
-local ascendPanel = Instance.new("Frame")
+ascendPanel = Instance.new("Frame")
 ascendPanel.Name = "AscendPanel"
 ascendPanel.Size = UDim2.new(0, 420, 0, 280)
 ascendPanel.Position = UDim2.new(0.5, -210, 0.5, -140)
@@ -1474,7 +1396,7 @@ local ascendCancelBtn = Instance.new("TextButton", ascendPanel)
 ascendCancelBtn.Size = UDim2.new(0, 170, 0, 44)
 ascendCancelBtn.Position = UDim2.new(1, -190, 1, -60)
 ascendCancelBtn.BackgroundColor3 = Color3.fromRGB(50, 25, 25)
-ascendCancelBtn.Text = "✖ Cancel"
+ascendCancelBtn.Text = "X Cancel"
 ascendCancelBtn.TextColor3 = Color3.fromRGB(200, 150, 150)
 ascendCancelBtn.TextScaled = true
 ascendCancelBtn.Font = Enum.Font.GothamBold
@@ -1487,7 +1409,7 @@ local ASCEND_UNLOCKS = {
 	[2] = "Unlocks: Ancient Tomb grave",
 }
 
-local function updateAscendPanel()
+updateAscendPanel = function()
 	local tier = rebirthCount + 1
 	local cost = ASCEND_COSTS[math.min(tier, #ASCEND_COSTS)]
 	local unlockText = ASCEND_UNLOCKS[tier] or "No new unlocks — gold multiplier only"
@@ -1499,10 +1421,6 @@ local function updateAscendPanel()
 	ascendConfirmBtn.TextColor3 = canAfford and Color3.fromRGB(255, 230, 150) or Color3.fromRGB(130, 100, 60)
 end
 
-ascendBtn.MouseButton1Click:Connect(function()
-	updateAscendPanel()
-	ascendPanel.Visible = true
-end)
 ascendCancelBtn.MouseButton1Click:Connect(function()
 	ascendPanel.Visible = false
 end)
@@ -1526,7 +1444,7 @@ ascendConfirmBtn.MouseButton1Click:Connect(function()
 	end
 
 	ascendPanel.Visible = false
-	updateHUD()
+	HUD.update()
 	ShopPanel.updateGraveyard()
 
 	local ascendRemote = ReplicatedStorage:FindFirstChild("PlayerAscend")
@@ -1581,7 +1499,7 @@ do -- sell panel header setup
 	sellCloseBtn.Size = UDim2.new(0, 36, 0, 36)
 	sellCloseBtn.Position = UDim2.new(1, -44, 0, 8)
 	sellCloseBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
-	sellCloseBtn.Text = "✕"
+	sellCloseBtn.Text = "X"
 	sellCloseBtn.TextColor3 = Color3.fromRGB(255, 120, 120)
 	sellCloseBtn.TextScaled = true
 	sellCloseBtn.Font = Enum.Font.GothamBold
@@ -1709,7 +1627,7 @@ local addGoldEvt = ReplicatedStorage:WaitForChild("AddGold", 5)
 if addGoldEvt then
 	addGoldEvt.OnClientEvent:Connect(function(amount, unitType)
 		gold += math.floor(amount * (1 + coinBoostLevel * 0.5))
-		updateHUD()
+		HUD.update()
 		showBigText(
 			"💰 SOLD!",
 			unitType .. "  +  " .. amount .. " Gold",
@@ -1760,7 +1678,7 @@ do -- upgrade panel header setup
 	upCloseBtn.Size = UDim2.new(0, 36, 0, 36)
 	upCloseBtn.Position = UDim2.new(1, -44, 0, 8)
 	upCloseBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 80)
-	upCloseBtn.Text = "✕"
+	upCloseBtn.Text = "X"
 	upCloseBtn.TextColor3 = Color3.fromRGB(100, 255, 240)
 	upCloseBtn.TextScaled = true
 	upCloseBtn.Font = Enum.Font.GothamBold
@@ -1910,7 +1828,7 @@ luckBuyBtn.MouseButton1Click:Connect(function()
 		return
 	end
 	gold -= cost
-	updateHUD()
+	HUD.update()
 	if buyUpgradeRemote then
 		buyUpgradeRemote:FireServer("luckBoost")
 	end
@@ -1925,7 +1843,7 @@ coinBuyBtn.MouseButton1Click:Connect(function()
 		return
 	end
 	gold -= cost
-	updateHUD()
+	HUD.update()
 	if buyUpgradeRemote then
 		buyUpgradeRemote:FireServer("coinBoost")
 	end
@@ -2044,7 +1962,7 @@ do
 	wClose.Size = UDim2.new(0, 36, 0, 36)
 	wClose.Position = UDim2.new(1, -44, 0, 8)
 	wClose.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
-	wClose.Text = "✕"
+	wClose.Text = "X"
 	wClose.TextColor3 = Color3.fromRGB(255, 180, 180)
 	wClose.TextScaled = true
 	wClose.Font = Enum.Font.GothamBold
@@ -2243,17 +2161,7 @@ do
 	local wheelSpinsUpdateEvt = ReplicatedStorage:WaitForChild("WheelSpinsUpdate", 5)
 
 	local function updateWheelHudBtn()
-		local m = math.floor(wheelCountdownSecs / 60)
-		local s = wheelCountdownSecs % 60
-		if wheelSpins > 0 then
-			wheelHudBtn.Text = string.format("🎡 Spin! (%d)", wheelSpins)
-			wheelHudBtn.BackgroundColor3 = Color3.fromRGB(140, 70, 0)
-			wheelHudBtn.TextColor3 = Color3.fromRGB(255, 230, 100)
-		else
-			wheelHudBtn.Text = string.format("🎡 %d:%02d", m, s)
-			wheelHudBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 10)
-			wheelHudBtn.TextColor3 = Color3.fromRGB(160, 130, 70)
-		end
+		HUD.update()
 	end
 
 	if wheelSpinsUpdateEvt then
@@ -2275,11 +2183,11 @@ do
 				-- Apply client-side rewards
 				if rewardData.gems then
 					gems += rewardData.gems
-					updateHUD()
+					HUD.update()
 				end
 				if rewardData.buffDuration then
 					luckBuffEnd = tick() + rewardData.buffDuration
-					updateHUD()
+					HUD.update()
 				end
 				if rewardData.graveType and rewardData.graveCount then
 					local gt = rewardData.graveType
@@ -2318,13 +2226,6 @@ do
 		wheelSpinRemote:FireServer()
 	end)
 
-	wheelHudBtn.MouseButton1Click:Connect(function()
-		wheelPanel.Visible = not wheelPanel.Visible
-		if wheelPanel.Visible then
-			refreshWheelUI()
-		end
-	end)
-
 	-- Local countdown ticker (client-side, synced from server grants)
 	local lastCountdownTick = tick()
 	RunService.Heartbeat:Connect(function()
@@ -2347,7 +2248,7 @@ do
 			end
 			-- Update luck buff label
 			if tick() < luckBuffEnd or luckBuffEnd > 0 then
-				updateHUD()
+				HUD.update()
 			end
 		end
 	end)
@@ -2360,6 +2261,6 @@ end -- do-block end
 --  MAIN LOOP
 -- ============================================================
 
-updateHUD()
+HUD.update()
 refreshToolbar()
 GravesDock.refresh()
