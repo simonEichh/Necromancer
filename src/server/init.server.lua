@@ -217,6 +217,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	prompt.ObjectText = "Grave " .. i
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.MaxActivationDistance = 8
+	prompt.RequiresLineOfSight = false
 	prompt.Parent = slab
 
 	plotState.graveSlots[i] = {
@@ -1385,15 +1386,89 @@ local function spawnUnit(unitType, customPos, plotState)
 	local block = Instance.new("Part")
 	block.Name = unitType
 	block.Size = def.size
-	block.BrickColor = def.color
-	block.Material = Enum.Material.SmoothPlastic
 	block.Position = spawnPos
 	block.CanCollide = true
 	block.CastShadow = true
-	if def.transparent then
-		block.Transparency = 0.35
+
+	local walkTrack, attackTrack
+	local unitModelTemplate = modelsFolder and modelsFolder:FindFirstChild(unitType)
+	if unitModelTemplate and unitModelTemplate:IsA("Model") then
+		block.Transparency = 1
+		block.Parent = workspace
+		local modelClone = unitModelTemplate:Clone()
+		local walkAnimId
+		local runAnimId
+		local attackAnimId
+		local toolslashAnimId
+		for _, anim in ipairs(modelClone:GetDescendants()) do
+			if anim:IsA("Animation") then
+				local n = string.lower(anim.Name)
+				if n:find("walk") and not walkAnimId then
+					walkAnimId = anim.AnimationId
+				elseif n:find("run") and not runAnimId then
+					runAnimId = anim.AnimationId
+				elseif n:find("attack") and not attackAnimId then
+					attackAnimId = anim.AnimationId
+				elseif n:find("toolslash") and not toolslashAnimId then
+					toolslashAnimId = anim.AnimationId
+				end
+			end
+		end
+		if not walkAnimId then walkAnimId = runAnimId end
+		if not attackAnimId then attackAnimId = toolslashAnimId end
+		for _, s in ipairs(modelClone:GetDescendants()) do
+			if s:IsA("Script") or s:IsA("LocalScript") or s:IsA("ModuleScript") then
+				s:Destroy()
+			end
+		end
+		if modelClone.PrimaryPart then
+			modelClone:SetPrimaryPartCFrame(CFrame.new(spawnPos))
+		else
+			modelClone:MoveTo(spawnPos)
+		end
+		-- Only weld the root part; limbs stay connected via Motor6D so animations work
+		local root = modelClone.PrimaryPart or modelClone:FindFirstChild("HumanoidRootPart", true)
+		for _, p in ipairs(modelClone:GetDescendants()) do
+			if p:IsA("BasePart") then
+				p.Anchored = false
+				p.CanCollide = false
+			end
+		end
+		if root then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = block
+			weld.Part1 = root
+			weld.Parent = block
+		end
+		modelClone.Parent = block
+
+		-- Load and play animations server-side so they replicate to clients
+		local humanoid = modelClone:FindFirstChildWhichIsA("Humanoid", true)
+		if humanoid then
+			local animator = humanoid:FindFirstChildOfClass("Animator")
+				or Instance.new("Animator", humanoid)
+			if walkAnimId then
+				local animObj = Instance.new("Animation")
+				animObj.AnimationId = walkAnimId
+				walkTrack = animator:LoadAnimation(animObj)
+				walkTrack.Looped = true
+				walkTrack:Play()
+			end
+			if attackAnimId then
+				local animObj = Instance.new("Animation")
+				animObj.AnimationId = attackAnimId
+				attackTrack = animator:LoadAnimation(animObj)
+				attackTrack.Looped = false
+			end
+		end
+	else
+		block.BrickColor = def.color
+		block.Material = Enum.Material.SmoothPlastic
+		if def.transparent then
+			block.Transparency = 0.35
+		end
+		block.Parent = workspace
 	end
-	block.Parent = workspace
 
 	-- BodyVelocity steers the block on X/Z
 	-- MaxForce Y = 0 so gravity still pulls it down onto the floor
@@ -1481,6 +1556,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	table.insert(plotState.activeUnits, {
 		block = block, bv = bv, bg = bg, def = def,
 		lastAttack = 0, laneZ = laneZ,
+		walkTrack = walkTrack, attackTrack = attackTrack,
 	})
 end
 
@@ -1862,8 +1938,10 @@ RunService.Heartbeat:Connect(function(dt)
 					if plotState.wallHP <= 0 then breakWall(plotState) end
 				end
 
+				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				if now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
+					if u.attackTrack then u.attackTrack:Play() end
 					local fromPos = u.block.Position
 					local wallFaceX = plotState.wall.Position.X - plotState.laneDir * plotState.wall.Size.X/2
 					local targetPos = Vector3.new(wallFaceX, fromPos.Y + 0.5, fromPos.Z)
@@ -1883,6 +1961,7 @@ RunService.Heartbeat:Connect(function(dt)
 					end
 				end
 			else
+				if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
 				local dir = (flatTarget - flatPos).Unit
 				u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
 				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
@@ -1894,4 +1973,15 @@ RunService.Heartbeat:Connect(function(dt)
 			end
 		end
 	end
+end)
+
+-- Debug: /give UnitType spawns a unit directly at your plot
+Players.PlayerAdded:Connect(function(player)
+	player.Chatted:Connect(function(msg)
+		if msg:sub(1,6):lower() ~= "/give " then return end
+		local unitType = msg:sub(7)
+		if not UNITS[unitType] then return end
+		local plotState = getPlot(player)
+		if plotState then spawnUnit(unitType, nil, plotState) end
+	end)
 end)
