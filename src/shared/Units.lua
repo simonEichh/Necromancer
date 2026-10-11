@@ -1,0 +1,348 @@
+-- Unit stats, rarity pools and drop-chance helpers shared by server and client.
+local Rarities = require(script.Parent.Rarities)
+local BASE_ODDS = Rarities.BaseOdds
+
+local UNITS = {
+	-- ── Common ──────────────────────────────────────────────────────────
+	Skelly = {
+		color = BrickColor.new("White"),
+		size = Vector3.new(2, 2, 2),
+		damage = 10,
+		speed = 8,
+		attackRange = 5,
+		attackCD = 1.2,
+	},
+	Zombie = {
+		color = BrickColor.new("Medium green"),
+		size = Vector3.new(2.2, 2.2, 2.2),
+		damage = 12,
+		speed = 5,
+		attackRange = 5,
+		attackCD = 2.0,
+	},
+	Ghoul = {
+		color = BrickColor.new("Dark orange"),
+		size = Vector3.new(1.8, 1.8, 1.8),
+		damage = 16,
+		speed = 14,
+		attackRange = 6,
+		attackCD = 1.2,
+	},
+	-- ── Uncommon ────────────────────────────────────────────────────────
+	Ghost = {
+		color = BrickColor.new("Pastel blue"),
+		size = Vector3.new(2.2, 2.2, 2.2),
+		damage = 15,
+		speed = 14,
+		attackRange = 10,
+		attackCD = 0.8,
+		transparent = true,
+	},
+	Goblin = {
+		color = BrickColor.new("Bright green"),
+		size = Vector3.new(1.8, 1.8, 1.8),
+		damage = 22,
+		speed = 16,
+		attackRange = 30,
+		attackCD = 1.0,
+		poison = 3,
+	},
+	Wraith = {
+		color = BrickColor.new("Light stone grey"),
+		size = Vector3.new(2, 2, 2),
+		damage = 28,
+		speed = 16,
+		attackRange = 8,
+		attackCD = 0.8,
+		transparent = true,
+	},
+	CryptBat = {
+		color = BrickColor.new("Dark grey"),
+		size = Vector3.new(1.5, 1.5, 1.5),
+		damage = 25,
+		speed = 22,
+		attackRange = 12,
+		attackCD = 0.6,
+	},
+	-- ── Rare ────────────────────────────────────────────────────────────
+	BaronBone = {
+		color = BrickColor.new("Bright yellow"),
+		size = Vector3.new(2.5, 2.5, 2.5),
+		damage = 50,
+		speed = 8,
+		attackRange = 7,
+		attackCD = 0.9,
+	},
+	PlagueDoctor = {
+		color = BrickColor.new("Olive"),
+		size = Vector3.new(2, 2, 2),
+		damage = 56,
+		speed = 10,
+		attackRange = 20,
+		attackCD = 0.8,
+		poison = 5,
+	},
+	ShadowHound = {
+		color = BrickColor.new("Reddish brown"),
+		size = Vector3.new(2, 2, 2),
+		damage = 60,
+		speed = 24,
+		attackRange = 7,
+		attackCD = 0.7,
+	},
+	BoneColossus = {
+		color = BrickColor.new("White"),
+		size = Vector3.new(3.5, 3.5, 3.5),
+		damage = 120,
+		speed = 4,
+		attackRange = 8,
+		attackCD = 1.2,
+	},
+	-- ── Cursed ──────────────────────────────────────────────────────────
+	Banshee = {
+		color = BrickColor.new("Hot pink"),
+		size = Vector3.new(2.4, 2.4, 2.4),
+		damage = 80,
+		speed = 18,
+		attackRange = 20,
+		attackCD = 0.5,
+		transparent = true,
+		regenReduction = 0.8,
+	},
+	LichAcolyte = {
+		color = BrickColor.new("Medium lavender"),
+		size = Vector3.new(2.2, 2.2, 2.2),
+		damage = 140,
+		speed = 10,
+		attackRange = 25,
+		attackCD = 0.7,
+	},
+	DreadKnight = {
+		color = BrickColor.new("Bright red"),
+		size = Vector3.new(2.8, 2.8, 2.8),
+		damage = 195,
+		speed = 12,
+		attackRange = 8,
+		attackCD = 0.75,
+	},
+	-- ── Legendary ───────────────────────────────────────────────────────
+	SkeletonKing = {
+		color = BrickColor.new("Gold"),
+		size = Vector3.new(3, 3, 3),
+		damage = 350,
+		speed = 10,
+		attackRange = 8,
+		attackCD = 1.0,
+	},
+	LichLord = {
+		color = BrickColor.new("Bright violet"),
+		size = Vector3.new(2.8, 2.8, 2.8),
+		damage = 384,
+		speed = 8,
+		attackRange = 30,
+		attackCD = 0.8,
+		regenReduction = 0.5,
+	},
+	DeathReaper = {
+		color = BrickColor.new("Dark indigo"),
+		size = Vector3.new(2.5, 2.5, 2.5),
+		damage = 455,
+		speed = 20,
+		attackRange = 10,
+		attackCD = 0.7,
+	},
+	VoidWalker = {
+		color = BrickColor.new("Really black"),
+		size = Vector3.new(2.2, 2.2, 2.2),
+		damage = 400,
+		speed = 25,
+		attackRange = 15,
+		attackCD = 0.5,
+		transparent = true,
+	},
+	-- ── Abyssal ─────────────────────────────────────────────────────────
+	SoulEater = {
+		color = BrickColor.new("Bright orange"),
+		size = Vector3.new(3, 3, 3),
+		damage = 720,
+		speed = 16,
+		attackRange = 12,
+		attackCD = 0.6,
+	},
+	AbyssalTitan = {
+		color = BrickColor.new("Bright red"),
+		size = Vector3.new(4, 4, 4),
+		damage = 1600,
+		speed = 6,
+		attackRange = 10,
+		attackCD = 1.0,
+	},
+	ShadeLord = {
+		color = BrickColor.new("Dark purple"),
+		size = Vector3.new(3, 3, 3),
+		damage = 1320,
+		speed = 18,
+		attackRange = 20,
+		attackCD = 0.6,
+		transparent = true,
+		regenReduction = 0.9,
+	},
+	-- ── Eldritch ────────────────────────────────────────────────────────
+	EldritchFiend = {
+		color = BrickColor.new("Teal"),
+		size = Vector3.new(3.5, 3.5, 3.5),
+		damage = 2800,
+		speed = 12,
+		attackRange = 25,
+		attackCD = 0.7,
+	},
+	MindShatterer = {
+		color = BrickColor.new("Cyan"),
+		size = Vector3.new(2.8, 2.8, 2.8),
+		damage = 3900,
+		speed = 22,
+		attackRange = 30,
+		attackCD = 0.6,
+	},
+	-- ── Eternal ─────────────────────────────────────────────────────────
+	TheUndying = {
+		color = BrickColor.new("Institutional white"),
+		size = Vector3.new(4, 4, 4),
+		damage = 8400,
+		speed = 15,
+		attackRange = 15,
+		attackCD = 0.7,
+		transparent = true,
+		regenReduction = 1.0,
+	},
+	DeathIncarnate = {
+		color = BrickColor.new("Really black"),
+		size = Vector3.new(5, 5, 5),
+		damage = 12000,
+		speed = 10,
+		attackRange = 20,
+		attackCD = 0.6,
+		regenReduction = 1.0,
+	},
+}
+
+-- Which units belong to which rarity, each with a relative weight
+-- (higher weight = more likely within that rarity tier)
+local RARITY_UNITS = {
+	Common = {
+		{ unit = "Skelly", weight = 4 },
+		{ unit = "Zombie", weight = 3 },
+		{ unit = "Ghoul", weight = 2 },
+	},
+	Uncommon = {
+		{ unit = "Ghost", weight = 4 },
+		{ unit = "Goblin", weight = 3 },
+		{ unit = "Wraith", weight = 2 },
+		{ unit = "CryptBat", weight = 1 },
+	},
+	Rare = {
+		{ unit = "BaronBone", weight = 3 },
+		{ unit = "PlagueDoctor", weight = 2 },
+		{ unit = "ShadowHound", weight = 2 },
+		{ unit = "BoneColossus", weight = 1 },
+	},
+	Cursed = {
+		{ unit = "Banshee", weight = 3 },
+		{ unit = "LichAcolyte", weight = 2 },
+		{ unit = "DreadKnight", weight = 1 },
+	},
+	Legendary = {
+		{ unit = "SkeletonKing", weight = 6 },
+		{ unit = "LichLord", weight = 3 },
+		{ unit = "DeathReaper", weight = 2 },
+		{ unit = "VoidWalker", weight = 1 },
+	},
+	Abyssal = {
+		{ unit = "SoulEater", weight = 3 },
+		{ unit = "AbyssalTitan", weight = 2 },
+		{ unit = "ShadeLord", weight = 1 },
+	},
+	Eldritch = {
+		{ unit = "EldritchFiend", weight = 2 },
+		{ unit = "MindShatterer", weight = 1 },
+	},
+	Eternal = {
+		{ unit = "TheUndying", weight = 2 },
+		{ unit = "DeathIncarnate", weight = 1 },
+	},
+}
+
+-- Reverse lookup: unitType → rarity string
+local UNIT_RARITY = {}
+for rarity, units in pairs(RARITY_UNITS) do
+	for _, entry in ipairs(units) do
+		UNIT_RARITY[entry.unit] = rarity
+	end
+end
+
+local UNIT_EMOJIS = {
+	-- Common
+	Skelly = "🦴",
+	Zombie = "🧟",
+	Ghoul = "🪦",
+	-- Uncommon
+	Ghost = "👻",
+	Goblin = "🏹",
+	Wraith = "🌫️",
+	CryptBat = "🦇",
+	-- Rare
+	BaronBone = "💀",
+	PlagueDoctor = "🧪",
+	ShadowHound = "🐺",
+	BoneColossus = "🗿",
+	-- Cursed
+	Banshee = "👁️",
+	LichAcolyte = "🔮",
+	DreadKnight = "⚔️",
+	-- Legendary
+	SkeletonKing = "👑",
+	LichLord = "🧙",
+	DeathReaper = "☠️",
+	VoidWalker = "🌑",
+	-- Abyssal
+	SoulEater = "🔥",
+	AbyssalTitan = "🌋",
+	ShadeLord = "🕳️",
+	-- Eldritch
+	EldritchFiend = "🐙",
+	MindShatterer = "🧠",
+	-- Eternal
+	TheUndying = "✨",
+	DeathIncarnate = "💀",
+}
+
+-- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)
+local function getBaseOneIn(unitType)
+	local rarity = UNIT_RARITY[unitType] or "Common"
+	local rarityChance = BASE_ODDS[rarity] / 100
+	local pool = RARITY_UNITS[rarity]
+	local totalWeight = 0
+	for _, entry in ipairs(pool) do
+		totalWeight += entry.weight
+	end
+	local unitWeight = 0
+	for _, entry in ipairs(pool) do
+		if entry.unit == unitType then
+			unitWeight = entry.weight
+			break
+		end
+	end
+	if unitWeight == 0 or totalWeight == 0 then
+		return 999
+	end
+	local chance = rarityChance * (unitWeight / totalWeight)
+	return math.max(2, math.round(1 / chance))
+end
+
+return {
+	Stats = UNITS,
+	Pools = RARITY_UNITS,
+	Rarity = UNIT_RARITY,
+	Emoji = UNIT_EMOJIS,
+	getBaseOneIn = getBaseOneIn,
+}
