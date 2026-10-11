@@ -1,6 +1,7 @@
 -- Plot claiming/assignment, physical grave slots, ascension.
 local ServerStorage = game:GetService("ServerStorage")
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
 local Army = require(script.Parent.Army)
 local Walls = require(script.Parent.Walls)
 local PlotRegistry = require(script.Parent.PlotRegistry)
@@ -178,7 +179,10 @@ initPlotForPlayer = function(player)
 		groundExtensions = {},
 	}
 	initWallQueue(plotState)
-	for i = 1, 5 do
+	-- 5 grave slots to start, +1 per ascension (max 10)
+	local profile = PlayerData.get(player)
+	local slotCount = math.min(10, 5 + (profile and profile.rebirthCount or 0))
+	for i = 1, slotCount do
 		local graveSpot = plotModel:FindFirstChild("GraveSpot" .. i)
 		if graveSpot then
 			addGraveSlot(i, graveSpot.Position, plotState, tostring(player.UserId))
@@ -198,6 +202,7 @@ end
 Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 	local plotState = getPlot(player)
 	if not plotState then return end
+	if not PlayerData.ascend(player) then return end -- can't afford it
 	local nextSlot = #plotState.graveSlots + 1
 	if nextSlot <= 10 then
 		local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. nextSlot)

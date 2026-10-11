@@ -102,9 +102,31 @@ local function remove(player)
 	playerPity[tostring(player.UserId)] = nil
 end
 
+-- Pity counters in a form that can be stored, and restored from stored data.
+local function exportPity(player)
+	local copy = {}
+	for graveType, count in pairs(playerPity[tostring(player.UserId)] or {}) do
+		copy[graveType] = count
+	end
+	return copy
+end
+
+local function importPity(player, saved)
+	if type(saved) ~= "table" then return end
+	local pity = {}
+	for graveType, count in pairs(saved) do
+		if type(graveType) == "string" and type(count) == "number" and count >= 0 then
+			pity[graveType] = math.floor(count)
+		end
+	end
+	playerPity[tostring(player.UserId)] = pity
+end
+
 return {
 	rollRarity = rollRarity,
 	rollUnit = rollUnit,
 	getPity = getPity,
 	remove = remove,
+	exportPity = exportPity,
+	importPity = importPity,
 }

@@ -1,37 +1,24 @@
--- Per-player upgrade levels (luckBoost, coinBoost).
+-- Upgrade purchases (luckBoost, coinBoost). Levels live in PlayerData.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
-
--- Per-player upgrade levels (luckBoost, coinBoost)
-local playerUpgrades = {}
-local UPGRADE_MAX = { luckBoost = 20, coinBoost = 15 }
-
-local function getPlayerUpgrades(player)
-	local id = tostring(player.UserId)
-	if not playerUpgrades[id] then
-		playerUpgrades[id] = { luckBoost = 0, coinBoost = 0 }
-	end
-	return playerUpgrades[id]
-end
+local PlayerData = require(script.Parent.PlayerData)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 Remotes.BuyUpgrade.OnServerEvent:Connect(function(player, upgradeType)
-	local upgrades = getPlayerUpgrades(player)
-	local max = UPGRADE_MAX[upgradeType]
-	if not max or not upgrades[upgradeType] then
+	local profile = PlayerData.get(player)
+	if not profile or type(upgradeType) ~= "string" then
 		return
 	end
-	if upgrades[upgradeType] >= max then
+	local max = Economy.UPGRADE_MAX[upgradeType]
+	local level = profile.upgrades[upgradeType]
+	if not max or not level or level >= max then
 		return
 	end
-	upgrades[upgradeType] += 1
-	Remotes.UpgradeGranted:FireClient(player, upgradeType, upgrades[upgradeType])
-	print("⚗️ " .. player.Name .. " upgraded " .. upgradeType .. " → level " .. upgrades[upgradeType])
+	if not PlayerData.spendGold(player, Economy.upgradeCost(upgradeType, level)) then
+		return
+	end
+	PlayerData.incrementUpgrade(player, upgradeType)
+	print("⚗️ " .. player.Name .. " upgraded " .. upgradeType .. " → level " .. (level + 1))
 end)
 
-local function remove(player)
-	playerUpgrades[tostring(player.UserId)] = nil
-end
-
-return {
-	getPlayerUpgrades = getPlayerUpgrades,
-	remove = remove,
-}
+return {}

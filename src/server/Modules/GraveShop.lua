@@ -1,5 +1,8 @@
 -- Per-player grave shop stock rotation and purchases.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
+local Graves = require(ReplicatedStorage.Shared.Graves)
 
 local GRAVE_STOCK_BASE = {
 	Mossy = 999, Stone = 50, Ancient = 30, Cursed = 20,
@@ -43,13 +46,18 @@ local function sendShopUpdate(player)
 end
 
 Remotes.BuyGraveRequest.OnServerEvent:Connect(function(player, graveType, qty)
-	if type(graveType) ~= "string" or type(qty) ~= "number" then return end
-	local id = tostring(player.UserId)
-	local data = playerShopData[id]
-	if not data or not data.inRotation[graveType] then return end
+	if type(graveType) ~= "string" or type(qty) ~= "number" or qty ~= qty then return end
+	local profile = PlayerData.get(player)
+	local grave = Graves[graveType]
+	local data = playerShopData[tostring(player.UserId)]
+	if not profile or not grave or not data or not data.inRotation[graveType] then return end
+	if profile.rebirthCount < grave.unlockAscension then return end -- tier not unlocked yet
 	local available = data.stock[graveType] or 0
-	local approved = math.min(math.floor(qty), available)
+	local affordable = math.floor(profile.gold / grave.cost)
+	local approved = math.min(math.floor(math.min(qty, available)), affordable)
 	if approved <= 0 then return end
+	if not PlayerData.spendGold(player, grave.cost * approved) then return end
+	PlayerData.addGraves(player, graveType, approved)
 	data.stock[graveType] = available - approved
 	Remotes.BuyGraveResult:FireClient(player, graveType, approved, data.stock[graveType])
 end)

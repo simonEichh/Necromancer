@@ -1,12 +1,5 @@
--- Shopkeeper NPC prompts (Buy / Sell / Upgrade) and the sell handler.
+-- Shopkeeper NPC prompts (Buy / Sell / Upgrade).
 local Remotes = require(script.Parent.Remotes)
-
-Remotes.SellUnit.OnServerEvent:Connect(function(player, unitType, oneIn)
-	if not unitType or not oneIn then return end
-	local sellValue = math.floor(oneIn ^ 1.2 * 5)
-	Remotes.AddGold:FireClient(player, sellValue, unitType)
-	print("💰 " .. player.Name .. " sold " .. unitType .. " for " .. sellValue .. " gold")
-end)
 
 -- Wire up Studio-placed shopkeepers
 local shopsFolder = workspace:WaitForChild("Shops", 10)

@@ -20,6 +20,7 @@ local InventoryPanel = require(Modules.InventoryPanel)
 local ShopPanel = require(Modules.ShopPanel)
 local QuestsPanel = require(Modules.QuestsPanel)
 local HUD = require(Modules.HUD)
+local Sync = require(Modules.Sync)
 
 -- Forward declarations (panels that are built after the HUD, which toggles them)
 local AscendPanel
@@ -47,6 +48,9 @@ InventoryPanel.init(screenGui, {
 	end,
 	refreshToolbar = Toolbar.refresh,
 	updateCarriedUnit = Toolbar.updateCarried,
+	swapSlots = function(a, b)
+		ReplicatedStorage:WaitForChild("SwapInventory"):FireServer(a, b)
+	end,
 })
 
 -- Place Best button, place at grave, recall
@@ -80,10 +84,7 @@ ShopPanel.init(screenGui, {
 
 QuestsPanel.init(screenGui, {
 	claimQuestRemote = ReplicatedStorage:WaitForChild("ClaimQuest", 5),
-	onGemsAdded = function(amount)
-		State.gems = State.gems + amount
-		HUD.update()
-	end,
+	onGemsAdded = function() end, -- gems are granted by the server and arrive via Sync
 })
 
 local getWallPosFunc = ReplicatedStorage:WaitForChild("GetWallPos", 5)
@@ -174,8 +175,10 @@ require(Modules.UpgradePanel)
 WheelPanel = require(Modules.WheelPanel)
 
 -- ============================================================
---  INITIAL REFRESH
+--  SERVER DATA
 -- ============================================================
+-- Gold, gems, inventory, graves and upgrades are owned by the server; Sync mirrors them into State.
 HUD.update()
 Toolbar.refresh()
 GravesDock.refresh()
+Sync.start()

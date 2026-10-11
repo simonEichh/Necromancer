@@ -11,7 +11,7 @@ local UNIT_INFO = GameData.UNIT_INFO
 local UNIT_ONE_IN = GameData.UNIT_ONE_IN
 local RARITY_COLORS = GameData.RARITY_COLORS
 local ALL_UNIT_KEYS = GameData.ALL_UNIT_KEYS
-local addToInventory = Toolbar.add
+local Sync = require(script.Parent.Sync)
 
 local activeRollPopup = nil
 local isRolling = false
@@ -106,9 +106,8 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 			activeRollPopup = nil
 		end
 		if autoRollActive and gt and (State.ownedGraves[gt] or 0) > 0 then
-			-- Fire next roll in the chain
-			State.ownedGraves[gt] -= 1
-			GravesDock.refresh()
+			-- Fire next roll in the chain (the server uses up the grave)
+			Sync.hold()
 			local remote = ReplicatedStorage:FindFirstChild("DigGrave")
 			if remote then
 				remote:FireServer(gt)
@@ -141,11 +140,8 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 			.. (pity or 0)
 			.. " / 60)"
 
-		local added = addToInventory(unitType, oneIn)
-		if not added then
-			subLbl.Text = "⚠️ Inventory full! Unit lost."
-			subLbl.TextColor3 = Color3.fromRGB(255, 100, 80)
-		end
+		-- The server already stored the unit; show the data it held back until now
+		Sync.release()
 
 		-- Skip becomes Close
 		skipBtn.Text = "X  Close"
@@ -238,8 +234,8 @@ local function openGrave(graveType)
 	currentRollGraveType = graveType
 	autoRollActive = false -- always start a fresh session with auto roll off
 
-	State.ownedGraves[graveType] -= 1
-	GravesDock.refresh()
+	-- The server uses up the grave and rolls; hold its data update back until the reveal
+	Sync.hold()
 	local remote = ReplicatedStorage:FindFirstChild("DigGrave")
 	if remote then
 		remote:FireServer(graveType)
@@ -250,6 +246,16 @@ local rollResultEvt = ReplicatedStorage:WaitForChild("RollResult", 5)
 if rollResultEvt then
 	rollResultEvt.OnClientEvent:Connect(function(unitType, rarity, pity, oneIn)
 		playRollAnimation(unitType, rarity, pity, oneIn)
+	end)
+end
+
+-- The server refused the dig (no grave owned / inventory full): unlock and show the real data
+local digRejectedEvt = ReplicatedStorage:WaitForChild("DigRejected", 5)
+if digRejectedEvt then
+	digRejectedEvt.OnClientEvent:Connect(function()
+		isRolling = false
+		autoRollActive = false
+		Sync.release()
 	end)
 end
 

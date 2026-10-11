@@ -11,15 +11,18 @@ local Modules = script.Modules
 -- Remotes must exist before anything else (clients WaitForChild them).
 require(Modules.Remotes)
 
+local PlayerData = require(Modules.PlayerData)
 local PlotRegistry = require(Modules.PlotRegistry)
 local Quests = require(Modules.Quests)
-local Upgrades = require(Modules.Upgrades)
 local Rolling = require(Modules.Rolling)
 local Wheel = require(Modules.Wheel)
 local GraveShop = require(Modules.GraveShop)
 local Walls = require(Modules.Walls)
 local Army = require(Modules.Army)
 local Plots = require(Modules.Plots)
+local Persistence = require(Modules.Persistence)
+require(Modules.Upgrades)
+require(Modules.Inventory)
 require(Modules.ShopNpcs)
 require(Modules.Digging)
 
@@ -30,28 +33,36 @@ local playerPlots = PlotRegistry.playerPlots
 -- ============================================================
 Players.PlayerAdded:Connect(function(player)
 	Wheel.onPlayerAdded(player)
-	-- Assign plot (wait for character to load first)
 	task.spawn(function()
+		-- Load saved data (yields), then wait for the character before assigning a plot
+		if not Persistence.load(player) then
+			return
+		end
 		if not player.Character then
 			player.CharacterAdded:Wait()
 		end
 		task.wait(1)
 		Plots.initPlotForPlayer(player)
+		Persistence.restorePlaced(player)
 		GraveShop.generateRotation(player)
 		GraveShop.sendShopUpdate(player)
-		Quests.init(player)
 		Quests.sendUpdate(player)
+		PlayerData.sync(player)
 	end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+	Persistence.save(player) -- before the plot is torn down (the saved data includes placed units)
 	Plots.releasePlot(player)
 	Wheel.remove(player)
-	Upgrades.remove(player)
 	Rolling.remove(player)
 	GraveShop.remove(player)
 	Quests.remove(player)
+	PlayerData.remove(player)
 end)
+
+Persistence.startAutosave()
+Persistence.bindToClose()
 
 -- ============================================================
 --  MAIN LOOP

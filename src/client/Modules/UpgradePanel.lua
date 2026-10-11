@@ -6,15 +6,12 @@ local HUD = require(script.Parent.HUD)
 local Format = require(script.Parent.Format)
 local fmtGold = Format.fmtGold
 
-local function luckBoostCost(level)
-	return math.floor(500 * (2.5 ^ level))
-end
-local function coinBoostCost(level)
-	return math.floor(1500 * (3.0 ^ level))
-end
+local Sync = require(script.Parent.Sync)
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
+local luckBoostCost = Economy.luckBoostCost
+local coinBoostCost = Economy.coinBoostCost
 
 local buyUpgradeRemote = ReplicatedStorage:WaitForChild("BuyUpgrade", 5)
-local upgradeGrantedEvt = ReplicatedStorage:WaitForChild("UpgradeGranted", 5)
 local openUpgradeEvt = ReplicatedStorage:WaitForChild("OpenUpgrade", 5)
 
 local upgradePanel = Instance.new("Frame")
@@ -193,8 +190,7 @@ luckBuyBtn.MouseButton1Click:Connect(function()
 	if State.gold < cost then
 		return
 	end
-	State.gold -= cost
-	HUD.update()
+	-- The server charges for it and sends back the new level via Sync
 	if buyUpgradeRemote then
 		buyUpgradeRemote:FireServer("luckBoost")
 	end
@@ -208,23 +204,16 @@ coinBuyBtn.MouseButton1Click:Connect(function()
 	if State.gold < cost then
 		return
 	end
-	State.gold -= cost
-	HUD.update()
 	if buyUpgradeRemote then
 		buyUpgradeRemote:FireServer("coinBoost")
 	end
 end)
 
-if upgradeGrantedEvt then
-	upgradeGrantedEvt.OnClientEvent:Connect(function(upgradeType, newLevel)
-		if upgradeType == "luckBoost" then
-			State.luckBoostLevel = newLevel
-		elseif upgradeType == "coinBoost" then
-			State.coinBoostLevel = newLevel
-		end
+Sync.onApplied(function()
+	if upgradePanel.Visible then
 		refreshUpgradePanel()
-	end)
-end
+	end
+end)
 
 if openUpgradeEvt then
 	openUpgradeEvt.OnClientEvent:Connect(function()

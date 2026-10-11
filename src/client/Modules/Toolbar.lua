@@ -272,20 +272,6 @@ function selectSlot(n)
 	updateCarriedUnit()
 end
 
-local function addToInventory(unitType, oneIn)
-	for i = 1, State.INVENTORY_MAX do
-		if State.inventory[i] == nil then
-			State.inventory[i] = { unitType = unitType, oneIn = oneIn or UNIT_ONE_IN[unitType] or 1 }
-			refreshToolbar()
-			if InventoryPanel.isVisible() then
-				InventoryPanel.refresh()
-			end
-			return true
-		end
-	end
-	return false -- full
-end
-
 -- Key 1-0 → select slot
 local KEY_TO_SLOT = {
 	[Enum.KeyCode.One] = 1,
@@ -329,7 +315,6 @@ end)
 return {
 	refresh = refreshToolbar,
 	select = selectSlot,
-	add = addToInventory,
 	updateCarried = updateCarriedUnit,
 	tooltip = {
 		frame = tooltip,

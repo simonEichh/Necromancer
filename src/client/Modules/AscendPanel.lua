@@ -6,6 +6,8 @@ local HUD = require(script.Parent.HUD)
 local ShopPanel = require(script.Parent.ShopPanel)
 local Effects = require(script.Parent.Effects)
 local Format = require(script.Parent.Format)
+local Sync = require(script.Parent.Sync)
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 local GameData = require(script.Parent.GameData)
 local GRAVE_DATA = GameData.GRAVE_DATA
 local fmt = Format.fmt
@@ -86,7 +88,7 @@ local ASCEND_UNLOCKS = {
 
 updateAscendPanel = function()
 	local tier = State.rebirthCount + 1
-	local cost = State.ASCEND_COSTS[math.min(tier, #State.ASCEND_COSTS)]
+	local cost = Economy.ascendCost(State.rebirthCount)
 	local unlockText = ASCEND_UNLOCKS[tier] or "No new unlocks — gold multiplier only"
 	local newMult = 1.0 + (State.rebirthCount + 1)
 	ascendInfoLbl.Text =
@@ -101,38 +103,29 @@ ascendCancelBtn.MouseButton1Click:Connect(function()
 end)
 
 ascendConfirmBtn.MouseButton1Click:Connect(function()
-	local tier = State.rebirthCount + 1
-	local cost = State.ASCEND_COSTS[math.min(tier, #State.ASCEND_COSTS)]
-	if State.gold < cost then
+	if State.gold < Economy.ascendCost(State.rebirthCount) then
 		return
 	end
-
-	State.gold = 0
-	State.rebirthCount += 1
-	State.goldMultiplier = 1.0 + State.rebirthCount
-
-	-- Remove the lock overlay for whichever grave tier just unlocked
-	for _, gd in ipairs(GRAVE_DATA) do
-		if gd.unlockAscension == State.rebirthCount then
-			ShopPanel.unlockGrave(gd.key)
-		end
-	end
-
-	ascendPanel.Visible = false
-	HUD.update()
-	ShopPanel.updateGraveyard()
-
+	-- The server checks the cost and performs the ascension; Sync reports back
 	local ascendRemote = ReplicatedStorage:FindFirstChild("PlayerAscend")
 	if ascendRemote then
 		ascendRemote:FireServer()
 	end
+	ascendPanel.Visible = false
+end)
 
-	showBigText(
-		"⬆️ ASCENDED!",
-		"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.0fx", State.goldMultiplier) .. " Gold Multiplier",
-		Color3.fromRGB(255, 190, 80),
-		Color3.fromRGB(255, 220, 150)
-	)
+Sync.onApplied(function(ascended)
+	if ascendPanel.Visible then
+		updateAscendPanel()
+	end
+	if ascended then
+		showBigText(
+			"⬆️ ASCENDED!",
+			"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.0fx", State.goldMultiplier) .. " Gold Multiplier",
+			Color3.fromRGB(255, 190, 80),
+			Color3.fromRGB(255, 220, 150)
+		)
+	end
 end)
 
 local function toggle()

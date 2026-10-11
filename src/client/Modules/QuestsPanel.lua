@@ -325,13 +325,6 @@ function QuestsPanel.init(screenGui, deps)
 		end)
 	end
 
-	local addGemsEvt = ReplicatedStorage:WaitForChild("AddGems", 5)
-	if addGemsEvt then
-		addGemsEvt.OnClientEvent:Connect(function(amount)
-			onGemsAdded(amount)
-		end)
-	end
-
 	-- ── Countdown heartbeat ──────────────────────────────────
 	RunService.Heartbeat:Connect(function(dt)
 		if not panel.Visible then return end

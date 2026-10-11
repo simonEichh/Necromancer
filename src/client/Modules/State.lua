@@ -1,7 +1,9 @@
--- Shared client game state. Modules read/write fields on this table
--- (e.g. State.gold) instead of sharing locals.
+-- Shared client game state. Modules read fields on this table (e.g. State.gold) instead of
+-- sharing locals. Most of it is a read-only mirror of the server's data, written only by Sync.
+local Economy = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Economy"))
+
 local State = {
-	gold = 50000,
+	gold = 0,
 	gems = 0,
 	rebirthCount = 0,
 	goldMultiplier = 1.0,
@@ -34,9 +36,9 @@ local State = {
 	luckBuffEnd = 0, -- tick() timestamp when 2x luck buff expires
 
 	-- Constants
-	INVENTORY_MAX = 300,
-	ASCEND_COSTS = { 4000, 25000, 50000 },
-	UPGRADE_MAX = { luckBoost = 20, coinBoost = 15 },
+	INVENTORY_MAX = Economy.INVENTORY_MAX,
+	ASCEND_COSTS = Economy.ASCEND_COSTS,
+	UPGRADE_MAX = Economy.UPGRADE_MAX,
 }
 
 return State

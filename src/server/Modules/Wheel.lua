@@ -1,8 +1,10 @@
 -- Lucky wheel: spin grants, outcomes and rewards.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
 local Rolling = require(script.Parent.Rolling)
 local Units = require(ReplicatedStorage.Shared.Units)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 local rollUnit = Rolling.rollUnit
 local getBaseOneIn = Units.getBaseOneIn
@@ -49,33 +51,36 @@ local function rollWheelOutcome()
 end
 
 -- ── LUCKY WHEEL ──────────────────────────────────────────────
-Remotes.WheelSpin.OnServerEvent:Connect(function(player, clientOutcomeIdx)
+Remotes.WheelSpin.OnServerEvent:Connect(function(player)
+	local profile = PlayerData.get(player)
 	local wd = getWheelData(player)
-	if wd.spins <= 0 then
+	if not profile or wd.spins <= 0 then
 		return
 	end
 	wd.spins -= 1
 
-	-- Use the client-nominated index (the animation already landed there)
-	-- but re-validate server-side: we actually do our own roll and just use
-	-- the client index for the animation; override the reward with our roll
+	-- The server rolls the outcome; the client only animates toward the index we send.
 	local idx, outcome = rollWheelOutcome()
 
-	-- Award reward
+	-- Award reward (stored in PlayerData; the client sees it via DataSync)
 	local rewardData = { outcomeIdx = idx, outcome = outcome }
 	if outcome.id == "gold_1k" then
-		Remotes.AddGold:FireClient(player, 1000, nil)
+		PlayerData.addGold(player, math.floor(1000 * Economy.sellGoldMultiplier(profile.upgrades.coinBoost)))
 	elseif outcome.id == "luck_buff" then
 		wd.luckBuffEnd = tick() + 300 -- 5 minutes
 		rewardData.buffDuration = 300
 	elseif outcome.id == "gems_50" then
+		PlayerData.addGems(player, 50)
 		rewardData.gems = 50
 	elseif outcome.id == "gems_100" then
+		PlayerData.addGems(player, 100)
 		rewardData.gems = 100
 	elseif outcome.id == "graves_5" then
+		PlayerData.addGraves(player, outcome.graveType, outcome.count)
 		rewardData.graveType = outcome.graveType
 		rewardData.graveCount = outcome.count
 	elseif outcome.id == "grave_rare" then
+		PlayerData.addGraves(player, outcome.graveType, outcome.count)
 		rewardData.graveType = outcome.graveType
 		rewardData.graveCount = outcome.count
 	elseif outcome.id == "lucky_box" then
@@ -97,6 +102,9 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player, clientOutcomeIdx)
 			local unitType = rollUnit(pickedRarity)
 			local oneIn = getBaseOneIn(unitType)
 			table.insert(boxUnits, { unitType = unitType, oneIn = oneIn })
+			if not PlayerData.addUnit(player, unitType, oneIn) then
+				Remotes.Notice:FireClient(player, "⚠️ Inventory full — " .. unitType .. " lost!")
+			end
 		end
 		rewardData.boxUnits = boxUnits
 	end
@@ -135,9 +143,15 @@ local function remove(player)
 	playerWheelData[tostring(player.UserId)] = nil
 end
 
+-- Spins are the only wheel state that is stored between sessions.
+local function setSpins(player, spins)
+	getWheelData(player).spins = math.max(0, math.floor(spins))
+end
+
 return {
 	getWheelData = getWheelData,
 	onPlayerAdded = onPlayerAdded,
 	grantTick = grantTick,
 	remove = remove,
+	setSpins = setSpins,
 }

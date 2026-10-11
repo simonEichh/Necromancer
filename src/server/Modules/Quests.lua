@@ -1,6 +1,7 @@
 -- Daily/weekly quests.
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
 
 local DAILY_QUESTS = {
 	{ id = "d_graves",   label = "Open 50 Graves",      type = "openGraves", target = 50,      reward = 15 },
@@ -18,16 +19,36 @@ local playerQuestData = {}
 local function getDayKey()  return math.floor(os.time() / 86400)   end
 local function getWeekKey() return math.floor(os.time() / 604800)  end
 
-local function initQuestData(player)
+-- Creates fresh quest data, restoring progress from `saved` (stored quest data) if given.
+local function initQuestData(player, saved)
 	local id = tostring(player.UserId)
-	local dp, dc, wp, wc = {}, {}, {}, {}
-	for _, q in ipairs(DAILY_QUESTS)  do dp[q.id] = 0; dc[q.id] = false end
-	for _, q in ipairs(WEEKLY_QUESTS) do wp[q.id] = 0; wc[q.id] = false end
-	playerQuestData[id] = {
-		daily   = { progress = dp, claimed = dc, dayKey  = getDayKey()  },
-		weekly  = { progress = wp, claimed = wc, weekKey = getWeekKey() },
+	local data = {
+		daily   = { progress = {}, claimed = {}, dayKey  = getDayKey()  },
+		weekly  = { progress = {}, claimed = {}, weekKey = getWeekKey() },
 		playtimeAccum = 0,
 	}
+	for _, q in ipairs(DAILY_QUESTS)  do data.daily.progress[q.id] = 0; data.daily.claimed[q.id] = false end
+	for _, q in ipairs(WEEKLY_QUESTS) do data.weekly.progress[q.id] = 0; data.weekly.claimed[q.id] = false end
+
+	if type(saved) == "table" then
+		local function restore(section, list, src, keyName)
+			if type(src) ~= "table" then return end
+			if type(src[keyName]) == "number" then section[keyName] = src[keyName] end
+			for _, q in ipairs(list) do
+				local progress = type(src.progress) == "table" and src.progress[q.id]
+				if type(progress) == "number" then
+					section.progress[q.id] = math.clamp(progress, 0, q.target)
+				end
+				if type(src.claimed) == "table" and src.claimed[q.id] == true then
+					section.claimed[q.id] = true
+				end
+			end
+		end
+		restore(data.daily, DAILY_QUESTS, saved.daily, "dayKey")
+		restore(data.weekly, WEEKLY_QUESTS, saved.weekly, "weekKey")
+	end
+
+	playerQuestData[id] = data
 end
 
 local function checkQuestReset(player)
@@ -100,7 +121,7 @@ Remotes.ClaimQuest.OnServerEvent:Connect(function(player, questId, isWeekly)
 			if qd.claimed[questId] then return end
 			if (qd.progress[questId] or 0) < q.target then return end
 			qd.claimed[questId] = true
-			Remotes.AddGems:FireClient(player, q.reward)
+			PlayerData.addGems(player, q.reward)
 			sendQuestUpdate(player)
 			return
 		end
@@ -126,6 +147,13 @@ local function remove(player)
 	playerQuestData[tostring(player.UserId)] = nil
 end
 
+-- Quest data in a form that can be stored (nil if the player has none).
+local function getSaveData(player)
+	local data = playerQuestData[tostring(player.UserId)]
+	if not data then return nil end
+	return { daily = data.daily, weekly = data.weekly }
+end
+
 return {
 	init = initQuestData,
 	checkReset = checkQuestReset,
@@ -133,4 +161,5 @@ return {
 	increment = incrementQuest,
 	tickPlaytime = tickPlaytime,
 	remove = remove,
+	getSaveData = getSaveData,
 }

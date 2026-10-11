@@ -104,8 +104,6 @@ end
 local wallBreakEvt = ReplicatedStorage:WaitForChild("WallBreak", 5)
 if wallBreakEvt then
 	wallBreakEvt.OnClientEvent:Connect(function(goldReward, clearedLayer)
-		State.gold += math.floor(goldReward * (State.goldMultiplier + State.coinBoostLevel * 0.5))
-		HUD.update()
 		screenShake(0.35, 0.6)
 		spawnConfetti()
 		showBigText(
@@ -114,6 +112,26 @@ if wallBreakEvt then
 			Color3.fromRGB(255, 220, 80),
 			Color3.fromRGB(200, 170, 255)
 		)
+	end)
+end
+
+-- Short red banner for messages from the server (e.g. "Inventory full")
+local noticeEvt = ReplicatedStorage:WaitForChild("Notice", 5)
+if noticeEvt then
+	noticeEvt.OnClientEvent:Connect(function(text)
+		local banner = Instance.new("TextLabel", screenGui)
+		banner.Size = UDim2.new(0, 340, 0, 40)
+		banner.Position = UDim2.new(0.5, -170, 1, -200)
+		banner.BackgroundColor3 = Color3.fromRGB(120, 30, 30)
+		banner.BackgroundTransparency = 0.2
+		banner.Text = tostring(text)
+		banner.TextColor3 = Color3.fromRGB(255, 180, 180)
+		banner.TextScaled = true
+		banner.Font = Enum.Font.GothamBold
+		banner.ZIndex = 50
+		banner.BorderSizePixel = 0
+		Instance.new("UICorner", banner).CornerRadius = UDim.new(0, 8)
+		game:GetService("Debris"):AddItem(banner, 2.5)
 	end)
 end
 

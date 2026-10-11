@@ -422,8 +422,7 @@ function ShopPanel.init(screenGui, deps)
 			if confirmedQty <= 0 then return end
 			local gd = graveDataByKey[graveType]
 			if not gd then return end
-			spendGold(gd.cost * confirmedQty)
-			ownedGraves[graveType] = (ownedGraves[graveType] or 0) + confirmedQty
+			-- gold and owned graves are updated by the server's data sync; only the stock is tracked here
 			shopStock[graveType] = newStock
 			refreshDock()
 			updateGraveyard()

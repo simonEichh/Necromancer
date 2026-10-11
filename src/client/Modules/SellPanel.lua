@@ -5,6 +5,7 @@ local State = require(script.Parent.State)
 local HUD = require(script.Parent.HUD)
 local Toolbar = require(script.Parent.Toolbar)
 local Effects = require(script.Parent.Effects)
+local Sync = require(script.Parent.Sync)
 local GameData = require(script.Parent.GameData)
 local UNIT_INFO = GameData.UNIT_INFO
 local UNIT_ONE_IN = GameData.UNIT_ONE_IN
@@ -142,13 +143,10 @@ local function refreshSellPanel()
 				if not State.inventory[slotIndex] then
 					return
 				end
-				local u = State.inventory[slotIndex]
+				-- The server sells it; the updated inventory comes back via Sync
 				if sellUnitRemote then
-					sellUnitRemote:FireServer(u.unitType, u.oneIn or UNIT_ONE_IN[u.unitType] or 1)
+					sellUnitRemote:FireServer(slotIndex)
 				end
-				State.inventory[slotIndex] = nil
-				refreshToolbar()
-				refreshSellPanel()
 			end)
 
 			rowCount += 1
@@ -175,8 +173,6 @@ end
 local addGoldEvt = ReplicatedStorage:WaitForChild("AddGold", 5)
 if addGoldEvt then
 	addGoldEvt.OnClientEvent:Connect(function(amount, unitType)
-		State.gold += math.floor(amount * (1 + State.coinBoostLevel * 0.5))
-		HUD.update()
 		showBigText(
 			"💰 SOLD!",
 			unitType .. "  +  " .. amount .. " Gold",
@@ -185,6 +181,12 @@ if addGoldEvt then
 		)
 	end)
 end
+
+Sync.onApplied(function()
+	if sellPanel.Visible then
+		refreshSellPanel()
+	end
+end)
 
 if openSellEvt then
 	openSellEvt.OnClientEvent:Connect(function()

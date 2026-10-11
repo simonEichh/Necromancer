@@ -2,6 +2,8 @@
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
 local Quests = require(script.Parent.Quests)
+local PlayerData = require(script.Parent.PlayerData)
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
 local WALL_SPACING = 60
@@ -159,6 +161,11 @@ local function breakWall(plotState)
 	local goldReward = math.floor(1000 * plotState.wallLayer * plotState.goldMultiplier)
 	for _, p in ipairs(Players:GetPlayers()) do
 		if tostring(p.UserId) == plotState.ownerId then
+			local profile = PlayerData.get(p)
+			if profile then
+				local mult = Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost)
+				PlayerData.addGold(p, math.floor(goldReward * mult))
+			end
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)
 			incrementQuest(p, "breakWalls", 1)
 			incrementQuest(p, "earnGold", goldReward)

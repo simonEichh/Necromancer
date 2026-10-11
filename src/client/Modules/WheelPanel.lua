@@ -6,8 +6,7 @@ local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
 local HUD = require(script.Parent.HUD)
 local GravesDock = require(script.Parent.GravesDock)
-local Toolbar = require(script.Parent.Toolbar)
-local addToInventory = Toolbar.add
+local Sync = require(script.Parent.Sync)
 
 local wheelPanel
 
@@ -320,26 +319,12 @@ do
 			local outcome = WHEEL_OUTCOMES[idx]
 
 			playSpinAnimation(idx, function()
-				-- Apply client-side rewards
-				if rewardData.gems then
-					State.gems += rewardData.gems
-					HUD.update()
-				end
+				-- The server already applied the rewards; show the held-back data now
 				if rewardData.buffDuration then
 					State.luckBuffEnd = tick() + rewardData.buffDuration
-					HUD.update()
 				end
-				if rewardData.graveType and rewardData.graveCount then
-					local gt = rewardData.graveType
-					State.ownedGraves[gt] = (State.ownedGraves[gt] or 0) + rewardData.graveCount
-					GravesDock.refresh()
-				end
-				if rewardData.boxUnits then
-					for _, u in ipairs(rewardData.boxUnits) do
-						addToInventory(u.unitType, u.oneIn)
-					end
-				end
-				-- Gold is handled server-side via AddGold remote
+				Sync.release()
+				HUD.update()
 
 				-- Show result text
 				local label = outcome and outcome.label or "???"
@@ -363,6 +348,7 @@ do
 		pendingSpin = true
 		refreshWheelUI()
 		updateWheelHudBtn()
+		Sync.hold() -- keep the reward hidden until the animation finishes
 		wheelSpinRemote:FireServer()
 	end)
 

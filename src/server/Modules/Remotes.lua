@@ -3,35 +3,34 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EVENTS = {
-	"AddGems",
-	"AddGold",
+	-- client -> server requests
 	"BuyGraveRequest",
-	"BuyGraveResult",
 	"BuyUpgrade",
 	"ClaimQuest",
-	"DamageHit",
-	"DeployUnit",
 	"DigGrave",
+	"PlaceAtGrave",
+	"PlaceBest",
+	"PlayerAscend",
+	"RequestData",
+	"SellUnit",
+	"SwapInventory",
+	"WheelSpin",
+	-- server -> client
+	"AddGold", -- sell banner only; gold itself arrives via DataSync
+	"BuyGraveResult",
+	"DamageHit",
+	"DataSync", -- full snapshot of the player's authoritative data
+	"DigRejected",
+	"Notice", -- short message to show the player
 	"OpenGrave",
 	"OpenSell",
 	"OpenUpgrade",
-	"PlaceAtGrave",
-	"PlaceBest",
-	"PlaceBestResult",
-	"PlayerAscend",
 	"QuestUpdate",
-	"RecallUnit",
 	"RollResult",
 	"SelectGrave",
-	"SellUnit",
 	"ShopStockUpdate",
-	"SpendGold",
-	"SummonUnit",
-	"UndeployUnit",
-	"UpgradeGranted",
 	"WallBreak",
 	"WheelResult",
-	"WheelSpin",
 	"WheelSpinsUpdate",
 }
 

@@ -12,7 +12,7 @@ local panel, invTitle, invScroll
 local inventory, UNIT_INFO, RARITY_COLORS, UNIT_DPS, UNIT_ONE_IN
 local INVENTORY_MAX, screenGui
 local tooltip, ttName, ttRarity, ttDps, ttOneIn
-local getSelectedSlot, refreshToolbarFn, updateCarriedUnitFn
+local getSelectedSlot, refreshToolbarFn, updateCarriedUnitFn, swapSlotsFn
 
 -- ── Constants ────────────────────────────────────────────────
 local INV_COLS = 9
@@ -111,12 +111,7 @@ ensureInvSlots = function()
 			if not invIdx or not inventory[invIdx] then return end
 			local sel = getSelectedSlot()
 			if invIdx == sel then return end
-			local temp = inventory[sel]
-			inventory[sel] = inventory[invIdx]
-			inventory[invIdx] = temp
-			refreshToolbarFn()
-			refresh()
-			updateCarriedUnitFn()
+			swapSlotsFn(sel, invIdx) -- the server swaps them and the new order comes back via Sync
 		end)
 	end
 end
@@ -199,6 +194,7 @@ function InventoryPanel.init(sg, deps)
 	getSelectedSlot   = deps.getSelectedSlot
 	refreshToolbarFn  = deps.refreshToolbar
 	updateCarriedUnitFn = deps.updateCarriedUnit
+	swapSlotsFn       = deps.swapSlots
 
 	-- ── Main panel ───────────────────────────────────────────
 	panel = Instance.new("Frame")

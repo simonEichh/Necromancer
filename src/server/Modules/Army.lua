@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
 local Walls = require(script.Parent.Walls)
+local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
@@ -21,9 +22,15 @@ local breakWall = Walls.breakWall
 
 local modelsFolder = ServerStorage:FindFirstChild("Models")
 
+local recallUnitFromSlot
 recallUnitFromSlot = function(slotIndex, player, plotState)
 	local slot = plotState.graveSlots[slotIndex]
 	if not slot or not slot.occupied then return end
+	-- Refuse (and keep the unit on the grave) when there is nowhere to put it
+	if not PlayerData.hasFreeSlot(player) then
+		Remotes.Notice:FireClient(player, "⚠️ Inventory full — can't recall " .. slot.unitType)
+		return
+	end
 	if slot.unitEntry then
 		for i = #plotState.activeUnits, 1, -1 do
 			if plotState.activeUnits[i] == slot.unitEntry then
@@ -35,7 +42,7 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 			end
 		end
 	end
-	Remotes.RecallUnit:FireClient(player, slot.unitType, getBaseOneIn(slot.unitType))
+	PlayerData.addUnit(player, slot.unitType, getBaseOneIn(slot.unitType))
 	slot.occupied = false
 	slot.unitType = nil
 	slot.unitEntry = nil
@@ -201,26 +208,39 @@ local function spawnUnit(unitType, customPos, plotState)
 	})
 end
 
-Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, unitType, spawnPos, slotIndex)
-	if not UNITS[unitType] then return end
-	local plotState = getPlot(player)
-	if not plotState then return end
-	spawnUnit(unitType, spawnPos, plotState)
-	if slotIndex and plotState.graveSlots[slotIndex] then
-		local slot = plotState.graveSlots[slotIndex]
-		slot.occupied = true
-		slot.unitType = unitType
-		slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
-		local dps = math.floor(UNITS[unitType].damage / UNITS[unitType].attackCD)
-		local rarity = UNIT_RARITY[unitType] or "Common"
-		slot.label.Text = "⚔️ " .. unitType
-		slot.rarityLabel.Text = rarity
-		slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
-		slot.dpsLabel.Text = dps .. " DPS"
-		slot.prompt.ActionText = "Recall"
-		slot.prompt.ObjectText = "Grave " .. slotIndex .. " (" .. unitType .. ")"
+-- Spawns a unit on a grave slot and updates the slot's labels/prompt.
+-- Returns false if the slot is missing or already occupied.
+local function placeInSlot(plotState, slotIndex, unitType)
+	local slot = plotState.graveSlots[slotIndex]
+	local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. tostring(slotIndex))
+	if not slot or slot.occupied or not graveSpot or not UNITS[unitType] then
+		return false
 	end
-	print("🪦 " .. player.Name .. " placed " .. unitType .. " at grave " .. (slotIndex or "?"))
+	spawnUnit(unitType, graveSpot.Position + Vector3.new(0, 2, 0), plotState)
+	slot.occupied = true
+	slot.unitType = unitType
+	slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
+	local dps = math.floor(UNITS[unitType].damage / UNITS[unitType].attackCD)
+	local rarity = UNIT_RARITY[unitType] or "Common"
+	slot.label.Text = "⚔️ " .. unitType
+	slot.rarityLabel.Text = rarity
+	slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
+	slot.dpsLabel.Text = dps .. " DPS"
+	slot.prompt.ActionText = "Recall"
+	slot.prompt.ObjectText = "Grave " .. slotIndex .. " (" .. unitType .. ")"
+	return true
+end
+
+-- Client asks to place the unit from inventory slot `invIndex` on grave slot `slotIndex`.
+Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, invIndex, slotIndex)
+	local plotState = getPlot(player)
+	if not plotState or type(slotIndex) ~= "number" then return end
+	local slot = plotState.graveSlots[slotIndex]
+	local unit = PlayerData.getUnit(player, invIndex)
+	if not slot or slot.occupied or not unit then return end
+	if not placeInSlot(plotState, slotIndex, unit.unitType) then return end
+	PlayerData.takeUnit(player, invIndex)
+	print("🪦 " .. player.Name .. " placed " .. unit.unitType .. " at grave " .. slotIndex)
 end)
 
 local function clearSlot(i, plotState)
@@ -249,20 +269,17 @@ local function clearSlot(i, plotState)
 	return { unitType = unitType, oneIn = getBaseOneIn(unitType) }
 end
 
-Remotes.PlaceBest.OnServerEvent:Connect(function(player, clientInventory)
+-- Re-deploys the strongest units (from the graves and the server-side inventory) onto the graves.
+Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 	local plotState = getPlot(player)
-	if not plotState then return end
+	if not plotState or not PlayerData.get(player) then return end
 	local pool = {}
 	for i = 1, #plotState.graveSlots do
 		local item = clearSlot(i, plotState)
 		if item then table.insert(pool, item) end
 	end
-	if type(clientInventory) == "table" then
-		for _, item in ipairs(clientInventory) do
-			if item and item.unitType and UNITS[item.unitType] then
-				table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn or getBaseOneIn(item.unitType) })
-			end
-		end
+	for _, item in ipairs(PlayerData.inventoryList(player)) do
+		table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn })
 	end
 	table.sort(pool, function(a, b)
 		local dA = UNITS[a.unitType] and (UNITS[a.unitType].damage / UNITS[a.unitType].attackCD) or 0
@@ -270,55 +287,17 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player, clientInventory)
 		return dA > dB
 	end)
 	local slotCount = #plotState.graveSlots
+	local remaining = {}
+	local deployed = 0
 	for i, item in ipairs(pool) do
-		if i > slotCount then break end
-		local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. i)
-		if graveSpot then
-			local spawnPos = graveSpot.Position + Vector3.new(0, 2, 0)
-			spawnUnit(item.unitType, spawnPos, plotState)
-			local slot = plotState.graveSlots[i]
-			slot.occupied = true
-			slot.unitType = item.unitType
-			slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
-			local dps = math.floor(UNITS[item.unitType].damage / UNITS[item.unitType].attackCD)
-			local rarity = UNIT_RARITY[item.unitType] or "Common"
-			slot.label.Text = "⚔️ " .. item.unitType
-			slot.rarityLabel.Text = rarity
-			slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
-			slot.dpsLabel.Text = dps .. " DPS"
-			slot.prompt.ActionText = "Recall"
-			slot.prompt.ObjectText = "Grave " .. i .. " (" .. item.unitType .. ")"
+		if i <= slotCount and placeInSlot(plotState, i, item.unitType) then
+			deployed += 1
+		else
+			table.insert(remaining, item)
 		end
 	end
-	local remaining = {}
-	for i = slotCount + 1, #pool do table.insert(remaining, pool[i]) end
-	Remotes.PlaceBestResult:FireClient(player, remaining)
-	print("🏆 " .. player.Name .. " used Place Best — deployed " .. math.min(#pool, slotCount) .. " units")
-end)
-
-Remotes.DeployUnit.OnServerEvent:Connect(function(player, unitType, damage)
-	local original = UNITS[unitType] and UNITS[unitType].damage
-	if UNITS[unitType] then
-		UNITS[unitType].damage = damage
-	end
-	local plotState2 = getPlot(player)
-	if plotState2 then spawnUnit(unitType, nil, plotState2) end
-	if UNITS[unitType] then UNITS[unitType].damage = original end
-end)
-
-Remotes.UndeployUnit.OnServerEvent:Connect(function(player, unitIndex)
-	local plotState = getPlot(player)
-	if not plotState then return end
-	local u = plotState.activeUnits[unitIndex]
-	if u then
-		if u.block and u.block.Parent then u.block:Destroy() end
-		table.remove(plotState.activeUnits, unitIndex)
-	end
-end)
-
-Remotes.SummonUnit.OnServerEvent:Connect(function(player, unitType)
-	local plotState = getPlot(player)
-	if plotState then spawnUnit(unitType, nil, plotState) end
+	PlayerData.setInventoryList(player, remaining)
+	print("🏆 " .. player.Name .. " used Place Best — deployed " .. deployed .. " units")
 end)
 
 local function flashAttack(isGhost, position, plotState)
@@ -440,6 +419,7 @@ end
 
 -- Debug: /give UnitType spawns a unit directly at your plot
 Players.PlayerAdded:Connect(function(player)
+	if not game:GetService("RunService"):IsStudio() then return end
 	player.Chatted:Connect(function(msg)
 		if msg:sub(1,6):lower() ~= "/give " then return end
 		local unitType = msg:sub(7)
@@ -451,6 +431,7 @@ end)
 
 return {
 	recallUnitFromSlot = recallUnitFromSlot,
+	placeInSlot = placeInSlot,
 	spawnUnit = spawnUnit,
 	update = update,
 }
