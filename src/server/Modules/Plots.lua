@@ -5,6 +5,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local Army = require(script.Parent.Army)
 local Walls = require(script.Parent.Walls)
 local Collision = require(script.Parent.Collision)
+local PlotFrame = require(script.Parent.PlotFrame)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 
 local playerPlots = PlotRegistry.playerPlots
@@ -20,8 +21,9 @@ local initPlotForPlayer -- forward declared; defined below
 Remotes.GetWallPos.OnServerInvoke = function(player)
 	local plotState = getPlot(player)
 	if plotState then
-		-- the front wall never moves; it always stands at the plot's WallOrigin
-		return Vector3.new(plotState.wallOriginX, plotState.plotGroundY, plotState.plotCenterZ)
+		-- the front wall never moves; return a spot 12 studs in front of it, facing the wall
+		local pos = PlotFrame.toWorld(plotState, 0, plotState.wallFwd - 12)
+		return CFrame.lookAt(pos, pos + PlotFrame.forwardFlat(plotState))
 	end
 	return nil
 end
@@ -55,11 +57,8 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 			end
 		end
 		graveModel.Parent = workspace
-		if graveModel.PrimaryPart then
-			graveModel:SetPrimaryPartCFrame(CFrame.new(basePos))
-		else
-			graveModel:MoveTo(basePos)
-		end
+		-- the tombstone model faces +X; turn it to face away from the lane (towards the plaza)
+		graveModel:PivotTo(CFrame.new(basePos) * PlotFrame.rotation(plotState) * CFrame.Angles(0, -math.pi / 2, 0))
 		slab = graveModel.PrimaryPart or graveModel:FindFirstChildWhichIsA("BasePart")
 	else
 		-- Fallback: plain parts
@@ -77,7 +76,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 		local stone = Instance.new("Part")
 		stone.Name = "GraveHeadstone_" .. i
 		stone.Size = Vector3.new(1.8, 2.8, 0.5)
-		stone.Position = basePos + Vector3.new(plotState.laneDir * 0.9, 1.9, 0)
+		stone.Position = basePos + Vector3.new(0, 1.9, 0) + plotState.frame.LookVector * 0.9
 		stone.Anchored = true
 		stone.BrickColor = BrickColor.new("Medium stone grey")
 		stone.Material = Enum.Material.SmoothPlastic
@@ -157,20 +156,16 @@ initPlotForPlayer = function(player)
 		plotOccupied[plotIndex] = false
 		return
 	end
-	-- Detect lane direction from WallOrigin vs PlayerSpawn positions
-	local laneDir = -1
-	if spawnPart2 and wallOriginPart.Position.X > spawnPart2.Position.X then
-		laneDir = 1
-	end
+	-- The plot frame: floor-level centre of the Base, LookVector = lane direction (the Base part's
+	-- local -Z points down the lane, towards the walls). WallOrigin marks where the front wall stands.
+	local frame = basePart.CFrame * CFrame.new(0, basePart.Size.Y / 2, 0)
 	local plotState = {
 		plotModel        = plotModel,
 		plotIndex        = plotIndex,
 		ownerId          = tostring(player.UserId),
-		plotCenterZ      = basePart.Position.Z,
-		wallOriginX      = wallOriginPart.Position.X,
-		plotLaneEndX     = 0,
-		plotGroundY      = basePart.Position.Y + basePart.Size.Y / 2,
-		laneDir          = laneDir,
+		frame            = frame,
+		wallFwd          = (wallOriginPart.Position - frame.Position):Dot(frame.LookVector),
+		plotGroundY      = frame.Position.Y,
 		wall             = nil,
 		wallQueue        = {},
 		wallHP           = 500,
@@ -181,6 +176,8 @@ initPlotForPlayer = function(player)
 		hpFill           = nil,
 		hpText           = nil,
 		wallTarget       = Vector3.new(0, 0, 0),
+		wallTargetFwd    = 0,
+		wallFaceFwd      = 0,
 		graveSlots       = {},
 		activeUnits      = {},
 		groundExtensions = {},
@@ -218,11 +215,15 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 		end
 	end
 	resetWall(plotState)
+	-- put the units back behind the graves (10 studs towards the plaza), in their own lanes
 	local graveSpot1 = plotState.plotModel:FindFirstChild("GraveSpot1")
-	local nearX = graveSpot1 and (graveSpot1.Position.X - plotState.laneDir * 10) or (plotState.wallOriginX - plotState.laneDir * 60)
+	local nearFwd = graveSpot1 and (select(2, PlotFrame.toLocal(plotState, graveSpot1.Position)) - 10)
+		or (plotState.wallFwd - 60)
+	local forward = PlotFrame.forwardFlat(plotState)
 	for _, u in ipairs(plotState.activeUnits) do
 		if u.block and u.block.Parent then
-			u.block.CFrame = CFrame.new(nearX + math.random(-5, 5), 6, u.laneZ)
+			local pos = PlotFrame.toWorld(plotState, u.lateral, nearFwd + math.random(-5, 5)) + Vector3.new(0, 7.7, 0)
+			u.block.CFrame = CFrame.lookAt(pos, pos + forward)
 		end
 	end
 	print("⬆️ " .. player.Name .. " ascended — wall reset, graves: " .. #plotState.graveSlots)

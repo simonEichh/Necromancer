@@ -115,7 +115,9 @@ HUD.init(screenGui, {
 		if not hrp then
 			return
 		end
-		hrp.CFrame = CFrame.new(-245, 3, 89)
+		-- the plaza spawn point is stored on the workspace by tools/studio/build_coliseum.lua
+		local spawnPoint = workspace:GetAttribute("HubSpawn") or Vector3.new(0, 3, 24)
+		hrp.CFrame = CFrame.lookAt(spawnPoint, spawnPoint + Vector3.new(0, 0, -1))
 	end,
 	onWall = function()
 		local char = player.Character
@@ -126,9 +128,10 @@ HUD.init(screenGui, {
 		if not hrp then
 			return
 		end
-		local wallPos = getWallPosFunc and getWallPosFunc:InvokeServer()
-		if wallPos then
-			hrp.CFrame = CFrame.new(wallPos.X + 15, 3, wallPos.Z)
+		-- the server returns a CFrame in front of the wall, facing it
+		local standCFrame = getWallPosFunc and getWallPosFunc:InvokeServer()
+		if standCFrame then
+			hrp.CFrame = standCFrame + Vector3.new(0, 3, 0)
 		end
 	end,
 	onAscend = function()

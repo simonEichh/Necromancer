@@ -4,6 +4,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Remotes = require(script.Parent.Remotes)
 local Collision = require(script.Parent.Collision)
+local PlotFrame = require(script.Parent.PlotFrame)
 local Quests = require(script.Parent.Quests)
 local PlayerData = require(script.Parent.PlayerData)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
@@ -73,12 +74,12 @@ local function wallHeight(slot)
 	return WALL_HEIGHT + (slot - 1) * WALL_HEIGHT_STEP
 end
 
-local function slotX(plotState, slot)
-	return plotState.wallOriginX + plotState.laneDir * (slot - 1) * WALL_SPACING
-end
-
-local function slotPosition(plotState, slot)
-	return Vector3.new(slotX(plotState, slot), plotState.plotGroundY + wallHeight(slot) / 2, plotState.plotCenterZ)
+-- World CFrame of a queue slot: centred across the lane, wallFwd + (slot-1)*spacing along it,
+-- oriented like the plot (part X = across the lane, Z = along it)
+local function slotCFrame(plotState, slot)
+	local pos = PlotFrame.toWorld(plotState, 0, plotState.wallFwd + (slot - 1) * WALL_SPACING)
+		+ Vector3.new(0, wallHeight(slot) / 2, 0)
+	return CFrame.new(pos) * PlotFrame.rotation(plotState)
 end
 
 -- Spawns a preview wall at a queue slot (slot may be one past the end: the wall slides in from there)
@@ -86,8 +87,8 @@ local function spawnPreviewWall(slot, layerNum, plotState, invisible)
 	local height = wallHeight(math.min(slot, NUM_WALLS))
 	local wallPart = Instance.new("Part")
 	wallPart.Name = "PreviewWall_" .. plotState.plotIndex
-	wallPart.Size = Vector3.new(WALL_THICKNESS, height, WALL_WIDTH)
-	wallPart.Position = slotPosition(plotState, slot)
+	wallPart.Size = Vector3.new(WALL_WIDTH, height, WALL_THICKNESS)
+	wallPart.CFrame = slotCFrame(plotState, slot)
 	wallPart.Anchored = true
 	wallPart.BrickColor = BrickColor.new("Dark stone grey")
 	wallPart.Transparency = invisible and 1 or 0
@@ -123,17 +124,13 @@ end
 
 -- Spawns the lane ground + the wall queue, activates the first wall
 local function initWallQueue(plotState)
-	local ld = plotState.laneDir
 	-- lane long enough for every queued wall (plus the slot a new wall slides in from)
 	local groundLen = (NUM_WALLS + 1) * WALL_SPACING + 10
 	local initGround = Instance.new("Part")
 	initGround.Name = "GroundExt"
-	initGround.Size = Vector3.new(groundLen, 2, WALL_WIDTH)
-	initGround.Position = Vector3.new(
-		plotState.wallOriginX + ld * groundLen / 2,
-		plotState.plotGroundY - 1,
-		plotState.plotCenterZ
-	)
+	initGround.Size = Vector3.new(WALL_WIDTH, 2, groundLen)
+	initGround.CFrame = CFrame.new(PlotFrame.toWorld(plotState, 0, plotState.wallFwd + groundLen / 2) - Vector3.new(0, 1, 0))
+		* PlotFrame.rotation(plotState)
 	initGround.Anchored = true
 	initGround.Color = Color3.fromRGB(165, 8, 8)
 	initGround.Material = Enum.Material.Carpet
@@ -149,8 +146,10 @@ local function initWallQueue(plotState)
 
 	activateWall(plotState.wallQueue[1], plotState)
 	plotState.wall = plotState.wallQueue[1]
-	-- units walk to just in front of the fixed front slot
-	plotState.wallTarget = Vector3.new(plotState.wallOriginX - ld * (WALL_THICKNESS / 2 + 3), 0, plotState.plotCenterZ)
+	-- units walk to just in front of the fixed front slot (distances are "forward" along the lane)
+	plotState.wallTargetFwd = plotState.wallFwd - (WALL_THICKNESS / 2 + 3)
+	plotState.wallFaceFwd = plotState.wallFwd - WALL_THICKNESS / 2
+	plotState.wallTarget = PlotFrame.toWorld(plotState, 0, plotState.wallTargetFwd)
 	updateWallGui(plotState)
 end
 
@@ -164,8 +163,8 @@ local function slideQueue(plotState)
 	for slot, wall in ipairs(plotState.wallQueue) do
 		local height = wallHeight(slot)
 		local tween = TweenService:Create(wall, info, {
-			Position = slotPosition(plotState, slot),
-			Size = Vector3.new(WALL_THICKNESS, height, WALL_WIDTH),
+			CFrame = slotCFrame(plotState, slot),
+			Size = Vector3.new(WALL_WIDTH, height, WALL_THICKNESS),
 			Transparency = 0,
 		})
 		tween:Play()
@@ -179,16 +178,18 @@ end
 
 -- A broken wall flashes, fades out and throws a few chunks of itself away from the units
 local function crumbleWall(wall, plotState)
-	local ld = plotState.laneDir
+	local frame = plotState.frame
 	for _ = 1, 10 do
 		local size = math.random(10, 30) / 10
 		local chunk = Instance.new("Part")
 		chunk.Size = Vector3.new(size, size, size)
-		chunk.Position = wall.Position + Vector3.new(0, math.random(-6, 6), math.random(-16, 16))
+		chunk.Position = wall.Position + frame.RightVector * math.random(-16, 16) + Vector3.new(0, math.random(-6, 6), 0)
 		chunk.Color = wall.Color
 		chunk.Material = wall.Material
 		chunk.CollisionGroup = Collision.DEBRIS
-		chunk.AssemblyLinearVelocity = Vector3.new(ld * math.random(6, 18), math.random(8, 22), math.random(-8, 8))
+		chunk.AssemblyLinearVelocity = frame.LookVector * math.random(6, 18)
+			+ frame.RightVector * math.random(-8, 8)
+			+ Vector3.new(0, math.random(8, 22), 0)
 		chunk.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
 		chunk.Parent = workspace
 		Debris:AddItem(chunk, 3)

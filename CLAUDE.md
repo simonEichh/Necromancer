@@ -12,12 +12,12 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 
 ## World (Studio, not in repo)
 
-- `Workspace.Plots.Plot1..Plot8`: each has `Base`, `WallOrigin`, `PlayerSpawn`, `GraveSpot1..10`. Plots are claimed per player. Lane direction is derived from WallOrigin vs PlayerSpawn X.
-  - Layout (all 8 plots identical, relative to plot centre `(CX=-280, CZ_i = 229.5 - (i-1)*52.9)`): `Base` 48 (X, lane direction) x 2 x 40 (Z), floor top at Y=-1.7; `WallOrigin` on the Base's west edge (X=CX-24) where the lane starts; `PlayerSpawn` flush pad at CX-8; `GraveSpot1..10` are invisible markers in 2 columns (X=CX+10 slots 1-5, CX+18 slots 6-10) x 5 rows (Z=CZ-14,-7,0,7,14), spaced for the 6x5.7 tombstone model. The hub strip's west edge touches the plots' east edge. Keep this grid if you add or edit plots.
+- **Coliseum layout** (built by `tools/studio/build_coliseum.lua`, safe to re-run; the server derives everything from the parts it places): a circular plaza (`Workspace.HubFloor`, radius 56, centred on the origin, floor top Y=-1.7) with the 8 plots around it, plot i pointing outward at compass angle (i-1)*45 degrees. Plots are claimed per player.
+- `Workspace.Plots.Plot1..Plot8`: each has `Base` (size 40 across x 2 x 48 along the lane; its **LookVector is the lane direction, outward**), `WallOrigin` (on the Base's outer edge, where the front wall stands), `PlayerSpawn` (+8 along the lane), `GraveSpot1..10` (invisible markers: 2 columns at -10 / -18 along the lane x 5 rows at -14..14 across, spaced for the 6 x 5.7 tombstone). The Base's inner edge is 60 studs from the centre.
   - **Walls never move away.** Each plot keeps a queue of 5 walls (`Walls.lua`: `WALL_SPACING` 45, front wall 20 high, each wall behind +5 taller, "Layer N" tag above the previews). The front wall always stands at the plot's `WallOrigin`; units fight at a fixed spot (`plotState.wallTarget`). Breaking it crumbles it (debris chunks in the `Debris` collision group), queues a new wall at the far end and slides the whole queue one slot forward (1s tween, interruptible). `GetWallPos` returns the fixed front position. Do not reintroduce per-layer distance.
 - Units and tombstones use collision groups (`Collision` module) so units walk through the tombstones.
 - `Workspace.Shops`: `GraveShopkeeper`, `SellShopkeeper`, `UpgradeShopkeeper` - invisible anchor parts with a ProximityPrompt (wired in `ShopNpcs`), sitting on the counters of the stalls in `Workspace.HubDecor`.
-- `Workspace.HubFloor` + `Workspace.HubDecor`: the hub strip (60 x 410.3, centred X=-226, Z=44.35, floor top Y=-1.7, same level as the plots), path, east wall, lamp posts and the three shop stalls. Built by `tools/studio/build_hub.lua` (safe to re-run). There is no Baseplate any more (it also used to be declared in `default.project.json`, where it was removed).
+- `Workspace.HubDecor`: plaza inlays, central monument + beacon, 8 gate paths, rim wall, lamp posts (also on every plot's corners) and the three shop stalls (facing the monument). Workspace attribute `HubSpawn` is where the SHOPS button teleports players.
 - `Workspace.HubFloor`, `ServerStorage.Models` (optional `Tombstone` model, optional per-unit models named after the unit key; scripts inside them are stripped on spawn).
 
 ## Architecture
@@ -36,6 +36,10 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - Older panels with `Module.init(screenGui, ctx)`: `GravesDock`, `InventoryPanel`, `ShopPanel`, `QuestsPanel`, `HUD`
 - Newer modules that build their UI when required: `Toolbar` (hotbar, tooltip, carried block, `refresh`), `Placement` (Place Best, SelectGrave -> PlaceAtGrave), `GraveRolling` (roll animation, `openGrave`), `Effects` (wall-break/damage effects, `showBigText`), `AscendPanel`, `SellPanel`, `UpgradePanel`, `WheelPanel`
 - UI created later draws on top of earlier UI, so keep the require order in `init.client.lua`.
+
+## Plot geometry (never assume an axis)
+
+Plots point in different directions, so **never use world X/Z for lane math**. Each `plotState` has `frame` (CFrame at the plot's floor-level centre, LookVector = lane direction outward, RightVector = across), `wallFwd` (distance of the front wall from the centre), `wallTargetFwd`/`wallFaceFwd`. Use `Modules/PlotFrame`: `toWorld(plotState, lateral, forward)`, `toLocal(plotState, worldPos)` (returns lateral, forward), `rotation`, `forwardFlat`. Units keep their own `lateral` lane. Walls are oriented with the plot (part X = across, Z = thickness). `GetWallPos` returns a CFrame in front of the wall.
 
 ## Models and rigs
 

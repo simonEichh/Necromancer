@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
 local Walls = require(script.Parent.Walls)
 local Collision = require(script.Parent.Collision)
+local PlotFrame = require(script.Parent.PlotFrame)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
@@ -60,17 +61,18 @@ local function spawnUnit(unitType, customPos, plotState)
 	local def = UNITS[unitType]
 	if not def then return end
 
-	local ld = plotState.laneDir
-	local laneZ = customPos and customPos.Z or (plotState.plotCenterZ + math.random(-8, 8))
+	-- "lateral" = which lane line across the plot the unit walks along; units face down the lane
+	local forward = PlotFrame.forwardFlat(plotState)
+	local lateral = customPos and select(1, PlotFrame.toLocal(plotState, customPos)) or math.random(-8, 8)
 	local forwardClearance = def.size.X / 2 + 2
 	local spawnPos = customPos
-		and Vector3.new(customPos.X + ld * forwardClearance, customPos.Y + 2, customPos.Z)
-		or  Vector3.new(plotState.wallOriginX - ld * 80, 4, laneZ)
+		and (customPos + forward * forwardClearance + Vector3.new(0, 2, 0))
+		or  (PlotFrame.toWorld(plotState, lateral, plotState.wallFwd - 80) + Vector3.new(0, 5.7, 0))
 
 	local block = Instance.new("Part")
 	block.Name = unitType
 	block.Size = def.size
-	block.Position = spawnPos
+	block.CFrame = CFrame.lookAt(spawnPos, spawnPos + forward)
 	block.CanCollide = true
 	block.CollisionGroup = Collision.UNITS
 	block.CastShadow = true
@@ -115,14 +117,14 @@ local function spawnUnit(unitType, customPos, plotState)
 			modelClone:ScaleTo(scale)
 			local rootHeight = modelClone:GetAttribute("RootHeight") * scale
 			labelBase = modelClone:GetAttribute("Height") * scale - def.size.Y / 2 + 1.2
-			modelClone:PivotTo(CFrame.new(spawnPos) * CFrame.new(0, rootHeight - def.size.Y / 2, 0))
+			modelClone:PivotTo(block.CFrame * CFrame.new(0, rootHeight - def.size.Y / 2, 0))
 			modelClone:SetAttribute("State", "walk")
 			modelClone:SetAttribute("AttackCount", 0)
 			modelClone:SetAttribute("AttackCD", def.attackCD)
 			modelClone:SetAttribute("Speed", def.speed)
 			rigModel = modelClone
 		elseif modelClone.PrimaryPart then
-			modelClone:SetPrimaryPartCFrame(CFrame.new(spawnPos))
+			modelClone:SetPrimaryPartCFrame(block.CFrame)
 		else
 			modelClone:MoveTo(spawnPos)
 		end
@@ -186,7 +188,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5) -- all axes: the block must never tip over (the CFrame below is always upright)
 	bg.P = 1e4
 	bg.D = 400
-	bg.CFrame = CFrame.new(spawnPos, Vector3.new(plotState.wallTarget.X, spawnPos.Y, plotState.wallTarget.Z))
+	bg.CFrame = CFrame.lookAt(spawnPos, spawnPos + forward)
 	bg.Parent = block
 
 	-- Unit info label (emoji + name / rarity / DPS)
@@ -224,7 +226,7 @@ local function spawnUnit(unitType, customPos, plotState)
 
 	table.insert(plotState.activeUnits, {
 		block = block, bv = bv, bg = bg, def = def,
-		lastAttack = 0, laneZ = laneZ,
+		lastAttack = 0, lateral = lateral,
 		walkTrack = walkTrack, attackTrack = attackTrack,
 		model = rigModel, labelBase = labelBase,
 	})
@@ -325,13 +327,7 @@ end)
 local function flashAttack(isGhost, position, plotState)
 	local flash = Instance.new("Part")
 	flash.Size = Vector3.new(1.5, 1.5, 0.3)
-	flash.CFrame = CFrame.new(
-		position or Vector3.new(
-			plotState.wall.Position.X - plotState.laneDir * (plotState.wall.Size.X/2 + 0.2),
-			1 + math.random(0, 8),
-			plotState.plotCenterZ + math.random(-8, 8)
-		)
-	)
+	flash.CFrame = CFrame.new(position)
 	flash.Anchored = true
 	flash.CanCollide = false
 	flash.BrickColor = isGhost and BrickColor.new("Pastel blue") or BrickColor.new("Bright yellow")
@@ -391,12 +387,14 @@ local function update(now, dt)
 
 			local pos = u.block.Position
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
-			local flatTarget = Vector3.new(plotState.wallTarget.X, 0, u.laneZ)
+			local target     = PlotFrame.toWorld(plotState, u.lateral, plotState.wallTargetFwd)
+			local flatTarget = Vector3.new(target.X, 0, target.Z)
 			local dist = (flatPos - flatTarget).Magnitude
+			local forward = PlotFrame.forwardFlat(plotState)
 
 			if dist <= u.def.attackRange then
 				u.bv.Velocity = Vector3.new(0, 0, 0)
-				u.bg.CFrame = CFrame.new(pos, Vector3.new(plotState.wall.Position.X, pos.Y, pos.Z))
+				u.bg.CFrame = CFrame.lookAt(pos, pos + forward)
 
 				local gui = u.block:FindFirstChildOfClass("BillboardGui")
 				if gui then
@@ -419,16 +417,13 @@ local function update(now, dt)
 					end
 					if u.attackTrack then u.attackTrack:Play() end
 					local fromPos = u.block.Position
-					local wallFaceX = plotState.wall.Position.X - plotState.laneDir * plotState.wall.Size.X/2
-					local targetPos = Vector3.new(wallFaceX, fromPos.Y + 0.5, fromPos.Z)
+					local face = PlotFrame.toWorld(plotState, u.lateral, plotState.wallFaceFwd)
+					local targetPos = Vector3.new(face.X, fromPos.Y + 0.5, face.Z)
 					if u.block.Name == "Goblin" then
 						shootArrow(fromPos, targetPos, u.def.damage, plotState)
 					else
-						local impactPos = Vector3.new(
-							wallFaceX,
-							2 + math.random(0, 7),
-							plotState.plotCenterZ + math.random(-8, 8)
-						)
+						local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
+							+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
 						flashAttack(u.def.transparent, impactPos, plotState)
 						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
 						updateWallGui(plotState)
