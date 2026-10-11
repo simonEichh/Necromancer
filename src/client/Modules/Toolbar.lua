@@ -204,39 +204,6 @@ local function updateCarriedUnit()
 	weld.Part1 = heldBlock
 	weld.C0 = CFrame.new(1.5, -0.4, -0.7)
 	weld.Parent = heldBlock
-
-	local info = UNIT_INFO[unit.unitType] or {}
-	local gui = Instance.new("BillboardGui", heldBlock)
-	gui.Size = UDim2.new(0, 160, 0, 72)
-	gui.StudsOffset = Vector3.new(0, 1.4, 0)
-	gui.AlwaysOnTop = false
-
-	local nameLbl = Instance.new("TextLabel", gui)
-	nameLbl.Size = UDim2.new(1, 0, 0.4, 0)
-	nameLbl.Position = UDim2.new(0, 0, 0, 0)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = (info.emoji or "❓") .. " " .. unit.unitType
-	nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-	nameLbl.TextScaled = true
-	nameLbl.Font = Enum.Font.GothamBold
-
-	local rarityLbl = Instance.new("TextLabel", gui)
-	rarityLbl.Size = UDim2.new(1, 0, 0.3, 0)
-	rarityLbl.Position = UDim2.new(0, 0, 0.4, 0)
-	rarityLbl.BackgroundTransparency = 1
-	rarityLbl.Text = info.rarity or ""
-	rarityLbl.TextColor3 = RARITY_COLORS[info.rarity] or Color3.fromRGB(200, 200, 200)
-	rarityLbl.TextScaled = true
-	rarityLbl.Font = Enum.Font.Gotham
-
-	local dpsLbl = Instance.new("TextLabel", gui)
-	dpsLbl.Size = UDim2.new(1, 0, 0.3, 0)
-	dpsLbl.Position = UDim2.new(0, 0, 0.7, 0)
-	dpsLbl.BackgroundTransparency = 1
-	dpsLbl.Text = (UNIT_DPS[unit.unitType] or "?") .. " DPS"
-	dpsLbl.TextColor3 = Color3.fromRGB(100, 255, 130)
-	dpsLbl.TextScaled = true
-	dpsLbl.Font = Enum.Font.GothamBold
 end
 
 local function refreshToolbar()

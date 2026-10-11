@@ -79,7 +79,7 @@ local function spawnUnit(unitType, customPos, plotState)
 
 	local walkTrack, attackTrack
 	local rigModel -- set for procedurally animated rigs (see client UnitAnimator)
-	local labelBase = 1.5 -- height of the info label above the block centre
+	local labelBase = def.size.Y / 2 + 1.3 -- height of the info label above the block centre
 	local unitModelTemplate = modelsFolder and modelsFolder:FindFirstChild(unitType)
 	if unitModelTemplate and unitModelTemplate:IsA("Model") then
 		block.Transparency = 1
@@ -110,6 +110,15 @@ local function spawnUnit(unitType, customPos, plotState)
 				s:Destroy()
 			end
 		end
+		-- Creator Store rigs come with a Humanoid. Its floor/state physics fights the BodyVelocity-driven block
+		-- (units hover at HipHeight and get stuck), so swap it for an AnimationController, which keeps animations.
+		local animHost
+		local oldHumanoid = modelClone:FindFirstChildWhichIsA("Humanoid", true)
+		if oldHumanoid then
+			animHost = Instance.new("AnimationController")
+			animHost.Parent = oldHumanoid.Parent
+			oldHumanoid:Destroy()
+		end
 		local procedural = modelClone:GetAttribute("Rig") == "Procedural"
 		if procedural and modelClone.PrimaryPart then
 			-- Scale the rig to the unit's size, then stand it on the floor under the invisible block
@@ -123,10 +132,18 @@ local function spawnUnit(unitType, customPos, plotState)
 			modelClone:SetAttribute("AttackCD", def.attackCD)
 			modelClone:SetAttribute("Speed", def.speed)
 			rigModel = modelClone
-		elseif modelClone.PrimaryPart then
-			modelClone:SetPrimaryPartCFrame(block.CFrame)
 		else
-			modelClone:MoveTo(spawnPos)
+			if modelClone.PrimaryPart then
+				modelClone:SetPrimaryPartCFrame(block.CFrame)
+			else
+				modelClone:MoveTo(spawnPos)
+			end
+			-- put the model's feet on the floor (the bottom of the block) now that no Humanoid lifts it
+			local boxCFrame, boxSize = modelClone:GetBoundingBox()
+			local blockBottom = block.Position.Y - def.size.Y / 2
+			local shift = blockBottom - (boxCFrame.Position.Y - boxSize.Y / 2)
+			modelClone:PivotTo(modelClone:GetPivot() + Vector3.new(0, shift, 0))
+			labelBase = (boxCFrame.Position.Y + boxSize.Y / 2 + shift) - block.Position.Y + 1.2
 		end
 		-- Only weld the root part; limbs stay connected via Motor6D so animations work
 		local root = modelClone.PrimaryPart or modelClone:FindFirstChild("HumanoidRootPart", true)
@@ -148,10 +165,8 @@ local function spawnUnit(unitType, customPos, plotState)
 		end
 
 		-- Load and play animations server-side so they replicate to clients
-		local humanoid = modelClone:FindFirstChildWhichIsA("Humanoid", true)
-		if humanoid then
-			local animator = humanoid:FindFirstChildOfClass("Animator")
-				or Instance.new("Animator", humanoid)
+		if animHost then
+			local animator = animHost:FindFirstChildOfClass("Animator") or Instance.new("Animator", animHost)
 			if walkAnimId then
 				local animObj = Instance.new("Animation")
 				animObj.AnimationId = walkAnimId
@@ -195,38 +210,37 @@ local function spawnUnit(unitType, customPos, plotState)
 
 	local unitRarity = UNIT_RARITY[unitType] or "Common"
 	local unitDps = math.floor(def.damage / def.attackCD)
-	local gui = Instance.new("BillboardGui", block)
-	gui.Size = UDim2.new(0, 150, 0, 68)
-	gui.StudsOffset = Vector3.new(0, def.size.Y + 1.8, 0)
-	gui.AlwaysOnTop = true
+	-- Compact two-line tag, sized in studs (so it shrinks with distance), only visible up close and
+	-- never drawn through walls. The name is tinted by rarity. The offset is set once (no per-frame bobbing).
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.new(6, 0, 1.9, 0)
+	gui.StudsOffset = Vector3.new(0, labelBase, 0)
+	gui.AlwaysOnTop = false
+	gui.MaxDistance = 45
+	gui.LightInfluence = 0
+	gui.Parent = block
 	local nameLbl = Instance.new("TextLabel", gui)
-	nameLbl.Size = UDim2.new(1, 0, 0.38, 0)
-	nameLbl.Position = UDim2.new(0, 0, 0, 0)
+	nameLbl.Size = UDim2.new(1, 0, 0.55, 0)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.Text = (UNIT_EMOJIS[unitType] or "💀") .. " " .. unitType
-	nameLbl.TextColor3 = Color3.fromRGB(255, 230, 255)
+	nameLbl.TextColor3 = RARITY_COLOR[unitRarity] or Color3.fromRGB(235, 235, 235)
+	nameLbl.TextStrokeTransparency = 0.35
 	nameLbl.TextScaled = true
 	nameLbl.Font = Enum.Font.GothamBold
-	local rarityLbl = Instance.new("TextLabel", gui)
-	rarityLbl.Size = UDim2.new(1, 0, 0.31, 0)
-	rarityLbl.Position = UDim2.new(0, 0, 0.38, 0)
-	rarityLbl.BackgroundTransparency = 1
-	rarityLbl.Text = unitRarity
-	rarityLbl.TextColor3 = RARITY_COLOR[unitRarity] or Color3.fromRGB(200, 200, 200)
-	rarityLbl.TextScaled = true
-	rarityLbl.Font = Enum.Font.Gotham
 	local dpsLbl = Instance.new("TextLabel", gui)
-	dpsLbl.Size = UDim2.new(1, 0, 0.31, 0)
-	dpsLbl.Position = UDim2.new(0, 0, 0.69, 0)
+	dpsLbl.Size = UDim2.new(1, 0, 0.42, 0)
+	dpsLbl.Position = UDim2.new(0, 0, 0.58, 0)
 	dpsLbl.BackgroundTransparency = 1
 	dpsLbl.Text = unitDps .. " DPS"
-	dpsLbl.TextColor3 = Color3.fromRGB(100, 255, 130)
+	dpsLbl.TextColor3 = Color3.fromRGB(110, 255, 140)
+	dpsLbl.TextStrokeTransparency = 0.35
 	dpsLbl.TextScaled = true
 	dpsLbl.Font = Enum.Font.GothamBold
 
 	table.insert(plotState.activeUnits, {
 		block = block, bv = bv, bg = bg, def = def,
 		lastAttack = 0, lateral = lateral,
+		standoff = (math.random() - 0.5) * 3, -- each unit stops a little nearer or further so they don't pile up
 		walkTrack = walkTrack, attackTrack = attackTrack,
 		model = rigModel, labelBase = labelBase,
 	})
@@ -387,7 +401,7 @@ local function update(now, dt)
 
 			local pos = u.block.Position
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
-			local target     = PlotFrame.toWorld(plotState, u.lateral, plotState.wallTargetFwd)
+			local target     = PlotFrame.toWorld(plotState, u.lateral, plotState.wallTargetFwd + u.standoff)
 			local flatTarget = Vector3.new(target.X, 0, target.Z)
 			local dist = (flatPos - flatTarget).Magnitude
 			local forward = PlotFrame.forwardFlat(plotState)
@@ -395,11 +409,6 @@ local function update(now, dt)
 			if dist <= u.def.attackRange then
 				u.bv.Velocity = Vector3.new(0, 0, 0)
 				u.bg.CFrame = CFrame.lookAt(pos, pos + forward)
-
-				local gui = u.block:FindFirstChildOfClass("BillboardGui")
-				if gui then
-					gui.StudsOffset = Vector3.new(0, (u.labelBase or 1.5) + math.sin(now*3 + u.phase)*0.4, 0)
-				end
 
 				if u.block.Name == "Goblin" then
 					local poison = UNITS.Goblin.poison or 1
@@ -437,11 +446,6 @@ local function update(now, dt)
 				local dir = (flatTarget - flatPos).Unit
 				u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
 				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
-
-				local gui = u.block:FindFirstChildOfClass("BillboardGui")
-				if gui then
-					gui.StudsOffset = Vector3.new(0, (u.labelBase or 1.5) + math.abs(math.sin(now*8 + u.phase))*0.3, 0)
-				end
 			end
 		end
 	end
