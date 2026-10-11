@@ -19,8 +19,9 @@ local initPlotForPlayer -- forward declared; defined below
 
 Remotes.GetWallPos.OnServerInvoke = function(player)
 	local plotState = getPlot(player)
-	if plotState and plotState.wall and plotState.wall.Parent then
-		return plotState.wall.Position
+	if plotState then
+		-- the front wall never moves; it always stands at the plot's WallOrigin
+		return Vector3.new(plotState.wallOriginX, plotState.plotGroundY, plotState.plotCenterZ)
 	end
 	return nil
 end

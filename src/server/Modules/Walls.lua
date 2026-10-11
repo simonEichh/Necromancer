@@ -1,12 +1,22 @@
 -- Per-plot wall: HP bar, preview queue, breaking and reset.
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
 local Remotes = require(script.Parent.Remotes)
+local Collision = require(script.Parent.Collision)
 local Quests = require(script.Parent.Quests)
 local PlayerData = require(script.Parent.PlayerData)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
-local WALL_SPACING = 60
+
+local WALL_SPACING = 45      -- distance between queued walls
+local NUM_WALLS = 5          -- walls in the queue (front wall + 4 behind it)
+local WALL_WIDTH = 40        -- across the lane
+local WALL_THICKNESS = 4
+local WALL_HEIGHT = 20       -- front wall height
+local WALL_HEIGHT_STEP = 5   -- each wall further back is this much taller
+local SLIDE_TIME = 1.0       -- seconds for the queue to slide forward after a break
 
 local LAYER_COLORS = {
 	BrickColor.new("Medium stone grey"),
@@ -15,7 +25,6 @@ local LAYER_COLORS = {
 	BrickColor.new("Bright violet"),
 	BrickColor.new("Bright pink"),
 }
-local NUM_PREVIEW_WALLS = 8
 
 local function updateWallGui(plotState)
 	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
@@ -56,41 +65,70 @@ local WALL_MATERIALS = {
 	Enum.Material.WoodPlanks,    Enum.Material.Basalt,   Enum.Material.Limestone,
 }
 
--- Spawns a dim preview wall showing an upcoming layer number
-local function spawnPreviewWall(x, layerNum, plotState)
+-- ── Wall queue ────────────────────────────────────────────────
+-- The front wall always stays at the same spot (the plot's WallOrigin). Walls further back in the
+-- queue stand behind it, getting taller like a skyline. Breaking the front wall crumbles it and
+-- slides the whole queue one slot forward, so the fight never moves away from the hub.
+local function wallHeight(slot)
+	return WALL_HEIGHT + (slot - 1) * WALL_HEIGHT_STEP
+end
+
+local function slotX(plotState, slot)
+	return plotState.wallOriginX + plotState.laneDir * (slot - 1) * WALL_SPACING
+end
+
+local function slotPosition(plotState, slot)
+	return Vector3.new(slotX(plotState, slot), plotState.plotGroundY + wallHeight(slot) / 2, plotState.plotCenterZ)
+end
+
+-- Spawns a preview wall at a queue slot (slot may be one past the end: the wall slides in from there)
+local function spawnPreviewWall(slot, layerNum, plotState, invisible)
+	local height = wallHeight(math.min(slot, NUM_WALLS))
 	local wallPart = Instance.new("Part")
 	wallPart.Name = "PreviewWall_" .. plotState.plotIndex
-	wallPart.Size = Vector3.new(4, 20, 40)
-	wallPart.Position = Vector3.new(x, plotState.plotGroundY + 10, plotState.plotCenterZ)
+	wallPart.Size = Vector3.new(WALL_THICKNESS, height, WALL_WIDTH)
+	wallPart.Position = slotPosition(plotState, slot)
 	wallPart.Anchored = true
 	wallPart.BrickColor = BrickColor.new("Dark stone grey")
-	wallPart.Transparency = 0
+	wallPart.Transparency = invisible and 1 or 0
 	wallPart.Material = WALL_MATERIALS[math.random(#WALL_MATERIALS)]
 	wallPart.Parent = workspace
+
+	-- small "Layer N" tag above the wall (sized in studs, so it shrinks with distance)
 	local gui = Instance.new("BillboardGui", wallPart)
 	gui.Name = "PreviewGui"
-	gui.Size = UDim2.new(0, 0, 0, 0)
+	gui.Size = UDim2.new(12, 0, 3, 0)
+	gui.StudsOffset = Vector3.new(0, height / 2 + 3, 0)
+	gui.AlwaysOnTop = false
+	gui.MaxDistance = 400
+	local lbl = Instance.new("TextLabel", gui)
+	lbl.Size = UDim2.new(1, 0, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = "Layer " .. layerNum
+	lbl.TextColor3 = Color3.fromRGB(215, 205, 235)
+	lbl.TextStrokeTransparency = 0.5
+	lbl.TextScaled = true
+	lbl.Font = Enum.Font.GothamBold
 	return wallPart
 end
 
--- Promotes a preview wall to the active wall (full color + HP bar)
+-- Promotes a wall to the active wall (full color + HP bar)
 local function activateWall(wallPart, plotState)
 	wallPart.Name = "TheWall_" .. plotState.plotIndex
 	wallPart.BrickColor = LAYER_COLORS[((plotState.wallLayer - 1) % #LAYER_COLORS) + 1]
-	wallPart.Transparency = 0
 	local previewGui = wallPart:FindFirstChild("PreviewGui")
 	if previewGui then previewGui:Destroy() end
 	buildWallGui(wallPart, plotState)
 end
 
--- Spawns initial ground slab + 8 walls, activates the first one
+-- Spawns the lane ground + the wall queue, activates the first wall
 local function initWallQueue(plotState)
-	-- Initial ground covering all preview walls
 	local ld = plotState.laneDir
-	local groundLen = (NUM_PREVIEW_WALLS + 1) * WALL_SPACING
+	-- lane long enough for every queued wall (plus the slot a new wall slides in from)
+	local groundLen = (NUM_WALLS + 1) * WALL_SPACING + 10
 	local initGround = Instance.new("Part")
 	initGround.Name = "GroundExt"
-	initGround.Size = Vector3.new(groundLen, 2, 40)
+	initGround.Size = Vector3.new(groundLen, 2, WALL_WIDTH)
 	initGround.Position = Vector3.new(
 		plotState.wallOriginX + ld * groundLen / 2,
 		plotState.plotGroundY - 1,
@@ -102,21 +140,64 @@ local function initWallQueue(plotState)
 	initGround.TopSurface = Enum.SurfaceType.Smooth
 	initGround.Parent = workspace
 	table.insert(plotState.groundExtensions, initGround)
-	plotState.plotLaneEndX = plotState.wallOriginX + ld * groundLen
 
-	-- Spawn 8 preview walls
 	plotState.wallQueue = {}
-	for i = 1, NUM_PREVIEW_WALLS do
-		local x = plotState.wallOriginX + ld * (i - 1) * WALL_SPACING
-		local wallPart = spawnPreviewWall(x, plotState.wallLayer + (i - 1), plotState)
-		table.insert(plotState.wallQueue, wallPart)
+	plotState.wallTweens = {}
+	for slot = 1, NUM_WALLS do
+		table.insert(plotState.wallQueue, spawnPreviewWall(slot, plotState.wallLayer + slot - 1, plotState))
 	end
 
-	-- Activate the front wall
 	activateWall(plotState.wallQueue[1], plotState)
 	plotState.wall = plotState.wallQueue[1]
-	plotState.wallTarget = Vector3.new(plotState.wall.Position.X - ld * (plotState.wall.Size.X/2 + 3), 0, plotState.plotCenterZ)
+	-- units walk to just in front of the fixed front slot
+	plotState.wallTarget = Vector3.new(plotState.wallOriginX - ld * (WALL_THICKNESS / 2 + 3), 0, plotState.plotCenterZ)
 	updateWallGui(plotState)
+end
+
+-- Slides every queued wall to its slot (cancelling any slide still in progress)
+local function slideQueue(plotState)
+	for _, tween in ipairs(plotState.wallTweens) do
+		tween:Cancel()
+	end
+	plotState.wallTweens = {}
+	local info = TweenInfo.new(SLIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	for slot, wall in ipairs(plotState.wallQueue) do
+		local height = wallHeight(slot)
+		local tween = TweenService:Create(wall, info, {
+			Position = slotPosition(plotState, slot),
+			Size = Vector3.new(WALL_THICKNESS, height, WALL_WIDTH),
+			Transparency = 0,
+		})
+		tween:Play()
+		table.insert(plotState.wallTweens, tween)
+		local previewGui = wall:FindFirstChild("PreviewGui")
+		if previewGui then
+			previewGui.StudsOffset = Vector3.new(0, height / 2 + 3, 0)
+		end
+	end
+end
+
+-- A broken wall flashes, fades out and throws a few chunks of itself away from the units
+local function crumbleWall(wall, plotState)
+	local ld = plotState.laneDir
+	for _ = 1, 10 do
+		local size = math.random(10, 30) / 10
+		local chunk = Instance.new("Part")
+		chunk.Size = Vector3.new(size, size, size)
+		chunk.Position = wall.Position + Vector3.new(0, math.random(-6, 6), math.random(-16, 16))
+		chunk.Color = wall.Color
+		chunk.Material = wall.Material
+		chunk.CollisionGroup = Collision.DEBRIS
+		chunk.AssemblyLinearVelocity = Vector3.new(ld * math.random(6, 18), math.random(8, 22), math.random(-8, 8))
+		chunk.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
+		chunk.Parent = workspace
+		Debris:AddItem(chunk, 3)
+	end
+	wall.BrickColor = BrickColor.new("White")
+	local gui = wall:FindFirstChildOfClass("BillboardGui")
+	if gui then gui:Destroy() end
+	TweenService:Create(wall, TweenInfo.new(0.3), { Transparency = 1 }):Play()
+	Debris:AddItem(wall, 0.4)
 end
 
 local function breakWall(plotState)
@@ -125,37 +206,15 @@ local function breakWall(plotState)
 	plotState.wallHP = plotState.WALL_MAX_HP
 	plotState.wallRegen = plotState.wallLayer * 2
 
-	-- Flash and destroy active wall
-	plotState.wallQueue[1].BrickColor = BrickColor.new("White")
-	plotState.wallQueue[1]:Destroy()
-	table.remove(plotState.wallQueue, 1)
+	-- Crumble the front wall, queue a new wall at the far end (it fades in while sliding)
+	crumbleWall(table.remove(plotState.wallQueue, 1), plotState)
+	local newLayer = plotState.wallLayer + NUM_WALLS - 1
+	table.insert(plotState.wallQueue, spawnPreviewWall(NUM_WALLS + 1, newLayer, plotState, true))
 
-	-- Spawn new preview at the far end
-	local ld = plotState.laneDir
-	local lastWall = plotState.wallQueue[#plotState.wallQueue]
-	local newPreviewX = lastWall.Position.X + ld * WALL_SPACING
-	local newPreview = spawnPreviewWall(newPreviewX, plotState.wallLayer + #plotState.wallQueue - 1, plotState)
-	table.insert(plotState.wallQueue, newPreview)
-
-	-- Ground extension if beyond initial coverage
-	if (newPreviewX - plotState.plotLaneEndX) * ld > 0 then
-		local groundExt = Instance.new("Part")
-		groundExt.Name = "GroundExt"
-		groundExt.Size = Vector3.new(WALL_SPACING, 2, 40)
-		groundExt.Position = Vector3.new(newPreviewX - ld * WALL_SPACING/2, plotState.plotGroundY - 1, plotState.plotCenterZ)
-		groundExt.Anchored = true
-		groundExt.Color = Color3.fromRGB(165, 8, 8)
-		groundExt.Material = Enum.Material.Carpet
-		groundExt.TopSurface = Enum.SurfaceType.Smooth
-		groundExt.Parent = workspace
-		table.insert(plotState.groundExtensions, groundExt)
-		plotState.plotLaneEndX = newPreviewX
-	end
-
-	-- Activate the new front wall
+	-- The next wall slides up to the front; it is the active wall straight away
 	activateWall(plotState.wallQueue[1], plotState)
 	plotState.wall = plotState.wallQueue[1]
-	plotState.wallTarget = Vector3.new(plotState.wall.Position.X - ld * (plotState.wall.Size.X/2 + 3), 0, plotState.plotCenterZ)
+	slideQueue(plotState)
 	updateWallGui(plotState)
 
 	local goldReward = math.floor(1000 * plotState.wallLayer * plotState.goldMultiplier)
