@@ -1,4 +1,5 @@
--- Shopkeeper NPC prompts (Buy / Sell / Upgrade).
+-- Shopkeeper prompts (Buy / Sell / Upgrade). The anchor parts in Workspace.Shops are invisible and sit on the
+-- stall counters built by tools/studio/build_hub.lua (the stalls carry their own signs).
 local Remotes = require(script.Parent.Remotes)
 
 -- Wire up Studio-placed shopkeepers
@@ -11,20 +12,11 @@ if shopsFolder then
 		if not prompt then warn(name .. " has no ProximityPrompt") return end
 		prompt.ActionText = "Talk"
 		prompt.ObjectText = label
+		prompt.RequiresLineOfSight = false -- the anchor sits behind the stall counter
+		prompt.MaxActivationDistance = 12
 		prompt.Triggered:Connect(function(player)
 			remote:FireClient(player)
 		end)
-		local gui = Instance.new("BillboardGui", npc)
-		gui.Size = UDim2.new(0, 120, 0, 40)
-		gui.StudsOffset = Vector3.new(0, 4, 0)
-		gui.AlwaysOnTop = false
-		local lbl = Instance.new("TextLabel", gui)
-		lbl.Size = UDim2.new(1, 0, 1, 0)
-		lbl.BackgroundTransparency = 1
-		lbl.Text = label
-		lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-		lbl.TextScaled = true
-		lbl.Font = Enum.Font.GothamBold
 	end
 	wireShop("GraveShopkeeper",   Remotes.OpenGrave,   "Buy")
 	wireShop("SellShopkeeper",    Remotes.OpenSell,    "Sell")
