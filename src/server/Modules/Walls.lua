@@ -19,12 +19,18 @@ local WALL_HEIGHT = 20       -- front wall height
 local WALL_HEIGHT_STEP = 5   -- each wall further back is this much taller
 local SLIDE_TIME = 1.0       -- seconds for the queue to slide forward after a break
 
+-- lane look (matches the plaza stone)
+local LANE_COLOR = Color3.fromRGB(64, 66, 80)
+local LANE_WALL_COLOR = Color3.fromRGB(88, 91, 106)
+local LANE_CAP_COLOR = Color3.fromRGB(122, 126, 142)
+
+-- Front-wall tint per layer (cycles). Muted so the walls match the gothic stone look.
 local LAYER_COLORS = {
-	BrickColor.new("Medium stone grey"),
-	BrickColor.new("Bright green"),
-	BrickColor.new("Bright blue"),
-	BrickColor.new("Bright violet"),
-	BrickColor.new("Bright pink"),
+	Color3.fromRGB(122, 126, 142),
+	Color3.fromRGB(92, 128, 106),
+	Color3.fromRGB(92, 110, 160),
+	Color3.fromRGB(130, 100, 160),
+	Color3.fromRGB(160, 100, 108),
 }
 
 local function updateWallGui(plotState)
@@ -60,10 +66,8 @@ local function buildWallGui(wallPart, plotState)
 end
 
 local WALL_MATERIALS = {
-	Enum.Material.SmoothPlastic, Enum.Material.Brick,   Enum.Material.Cobblestone,
-	Enum.Material.Concrete,      Enum.Material.Granite,  Enum.Material.Marble,
-	Enum.Material.Sandstone,     Enum.Material.Slate,    Enum.Material.Wood,
-	Enum.Material.WoodPlanks,    Enum.Material.Basalt,   Enum.Material.Limestone,
+	Enum.Material.Cobblestone, Enum.Material.Brick,  Enum.Material.Concrete, Enum.Material.Granite,
+	Enum.Material.Slate,       Enum.Material.Basalt, Enum.Material.Limestone,
 }
 
 -- ── Wall queue ────────────────────────────────────────────────
@@ -90,7 +94,7 @@ local function spawnPreviewWall(slot, layerNum, plotState, invisible)
 	wallPart.Size = Vector3.new(WALL_WIDTH, height, WALL_THICKNESS)
 	wallPart.CFrame = slotCFrame(plotState, slot)
 	wallPart.Anchored = true
-	wallPart.BrickColor = BrickColor.new("Dark stone grey")
+	wallPart.Color = Color3.fromRGB(70, 72, 86)
 	wallPart.Transparency = invisible and 1 or 0
 	wallPart.Material = WALL_MATERIALS[math.random(#WALL_MATERIALS)]
 	wallPart.Parent = workspace
@@ -116,7 +120,7 @@ end
 -- Promotes a wall to the active wall (full color + HP bar)
 local function activateWall(wallPart, plotState)
 	wallPart.Name = "TheWall_" .. plotState.plotIndex
-	wallPart.BrickColor = LAYER_COLORS[((plotState.wallLayer - 1) % #LAYER_COLORS) + 1]
+	wallPart.Color = LAYER_COLORS[((plotState.wallLayer - 1) % #LAYER_COLORS) + 1]
 	local previewGui = wallPart:FindFirstChild("PreviewGui")
 	if previewGui then previewGui:Destroy() end
 	buildWallGui(wallPart, plotState)
@@ -132,11 +136,35 @@ local function initWallQueue(plotState)
 	initGround.CFrame = CFrame.new(PlotFrame.toWorld(plotState, 0, plotState.wallFwd + groundLen / 2) - Vector3.new(0, 1, 0))
 		* PlotFrame.rotation(plotState)
 	initGround.Anchored = true
-	initGround.Color = Color3.fromRGB(165, 8, 8)
-	initGround.Material = Enum.Material.Carpet
+	initGround.Color = LANE_COLOR
+	initGround.Material = Enum.Material.Cobblestone
 	initGround.TopSurface = Enum.SurfaceType.Smooth
 	initGround.Parent = workspace
 	table.insert(plotState.groundExtensions, initGround)
+
+	-- low stone walls along both sides of the lane (so nobody falls into the water), with a lighter cap
+	for _, side in ipairs({ -1, 1 }) do
+		local centre = PlotFrame.toWorld(plotState, side * (WALL_WIDTH / 2 + 0.4), plotState.wallFwd + groundLen / 2)
+		local rot = PlotFrame.rotation(plotState)
+		local sideWall = Instance.new("Part")
+		sideWall.Name = "LaneWall"
+		sideWall.Size = Vector3.new(0.8, 1.4, groundLen)
+		sideWall.CFrame = CFrame.new(centre + Vector3.new(0, 0.7, 0)) * rot
+		sideWall.Anchored = true
+		sideWall.Color = LANE_WALL_COLOR
+		sideWall.Material = Enum.Material.Cobblestone
+		sideWall.Parent = workspace
+		table.insert(plotState.groundExtensions, sideWall)
+		local cap = Instance.new("Part")
+		cap.Name = "LaneWallCap"
+		cap.Size = Vector3.new(1.1, 0.25, groundLen)
+		cap.CFrame = CFrame.new(centre + Vector3.new(0, 1.52, 0)) * rot
+		cap.Anchored = true
+		cap.Color = LANE_CAP_COLOR
+		cap.Material = Enum.Material.Slate
+		cap.Parent = workspace
+		table.insert(plotState.groundExtensions, cap)
+	end
 
 	plotState.wallQueue = {}
 	plotState.wallTweens = {}
