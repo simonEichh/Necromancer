@@ -132,6 +132,7 @@ function Persistence.save(player)
 	saving[player.UserId] = nil
 	if ok then
 		profile.dirty = false
+		print("💾 saved data for " .. player.Name)
 	end
 	return ok
 end

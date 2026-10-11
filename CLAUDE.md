@@ -39,6 +39,7 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - Results come back as a full `DataSync` snapshot. Inventory is sent as a list of `{slot, unitType, oneIn}` (sparse arrays don't survive remotes).
 - Saved per player (`Persistence`, DataStore `PlayerData_v1`, key `player_<UserId>`): gold, gems, ascension, inventory, owned graves, upgrades, pity, units placed on graves, wheel spins, quest progress. Autosaves every 60s, on leave and on shutdown. If a load fails the player gets defaults and is **never saved** that session (`profile.loadFailed`) so stored data can't be overwritten.
 - DataStore does nothing in Studio unless "Enable Studio Access to API Services" is on (Game Settings > Security); without it every load fails and nothing is saved.
+- Testing saves in Studio: the Stop button ends the session before the leave-save finishes, so only the 60s autosave (or `Player:Kick()` from a server `execute_luau`) is reliable there. Save logs `💾 saved data for <name>`.
 - New players start with `START_GOLD = 50000` in `PlayerData` (a testing value; Notes.txt wants 300).
 - `/give <Unit>` debug chat command only works in Studio.
 
