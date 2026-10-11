@@ -129,7 +129,8 @@ end
 -- Spawns the lane ground + the wall queue, activates the first wall
 local function initWallQueue(plotState)
 	-- lane long enough for every queued wall (plus the slot a new wall slides in from)
-	local groundLen = (NUM_WALLS + 1) * WALL_SPACING + 10
+	-- (ends exactly at the gate towers of the outer ring, radius 392: see tools/studio/build_ring.lua)
+	local groundLen = (NUM_WALLS + 1) * WALL_SPACING + 14
 	local initGround = Instance.new("Part")
 	initGround.Name = "GroundExt"
 	initGround.Size = Vector3.new(WALL_WIDTH, 2, groundLen)
