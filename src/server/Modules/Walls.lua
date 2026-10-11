@@ -20,7 +20,7 @@ local WALL_HEIGHT_STEP = 5   -- each wall further back is this much taller
 local SLIDE_TIME = 1.0       -- seconds for the queue to slide forward after a break
 
 -- lane look (matches the plaza stone)
-local LANE_COLOR = Color3.fromRGB(64, 66, 80)
+local LANE_COLOR = Color3.fromRGB(84, 88, 106)
 local LANE_WALL_COLOR = Color3.fromRGB(88, 91, 106)
 local LANE_CAP_COLOR = Color3.fromRGB(122, 126, 142)
 

@@ -8,7 +8,7 @@
 local STONE_DARK = Color3.fromRGB(58, 60, 72)
 local STONE = Color3.fromRGB(88, 91, 106)
 local STONE_LIGHT = Color3.fromRGB(122, 126, 142)
-local BASE_COLOR = Color3.fromRGB(64, 66, 80)
+local BASE_COLOR = Color3.fromRGB(84, 88, 106)
 local GRASS = Color3.fromRGB(52, 80, 58)
 local MUD = Color3.fromRGB(70, 56, 48)
 local GLOW = Color3.fromRGB(120, 255, 190)

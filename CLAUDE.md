@@ -38,6 +38,13 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - Newer modules that build their UI when required: `Toolbar` (hotbar, tooltip, carried block, `refresh`), `Placement` (Place Best, SelectGrave -> PlaceAtGrave), `GraveRolling` (roll animation, `openGrave`), `Effects` (wall-break/damage effects, `showBigText`), `AscendPanel`, `SellPanel`, `UpgradePanel`, `WheelPanel`
 - UI created later draws on top of earlier UI, so keep the require order in `init.client.lua`.
 
+## Lighting
+
+- Lighting is configured in `default.project.json` (Rojo is the source of truth): ShadowMap technology, dusk `ClockTime` 17.7, purple ambient, the `Graveyard Skybox` sky, one `Atmosphere`, `Bloom` and `ColorCorrection`. Edit the JSON, not the Studio properties, or Rojo will overwrite your change. There must be exactly one Sky and one Atmosphere under Lighting (the old place had 12 leftover Skies, now removed).
+- Rojo can create duplicate Lighting children when the project file changes while same-named ones already exist in Studio: if you see doubles, delete the extras.
+- Terrain water (`tools/studio/set_water.lua`) is stored in the place file only.
+- Neon parts (lamps, runes, beacon, eyes) rely on Bloom (threshold 1.0) to glow; keep new light sources `PointLight.Shadows = false`.
+
 ## Plot geometry (never assume an axis)
 
 Plots point in different directions, so **never use world X/Z for lane math**. Each `plotState` has `frame` (CFrame at the plot's floor-level centre, LookVector = lane direction outward, RightVector = across), `wallFwd` (distance of the front wall from the centre), `wallTargetFwd`/`wallFaceFwd`. Use `Modules/PlotFrame`: `toWorld(plotState, lateral, forward)`, `toLocal(plotState, worldPos)` (returns lateral, forward), `rotation`, `forwardFlat`. Units keep their own `lateral` lane. Walls are oriented with the plot (part X = across, Z = thickness). `GetWallPos` returns a CFrame in front of the wall.

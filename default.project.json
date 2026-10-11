@@ -26,15 +26,80 @@
     },
     "Lighting": {
       "$properties": {
-        "Ambient": [
-          0,
-          0,
-          0
-        ],
-        "Brightness": 2,
+        "Technology": "ShadowMap",
         "GlobalShadows": true,
         "Outlines": false,
-        "Technology": "Voxel"
+        "ClockTime": 17.7,
+        "Brightness": 2.2,
+        "Ambient": [
+          0.3608,
+          0.3451,
+          0.4941
+        ],
+        "OutdoorAmbient": [
+          0.4784,
+          0.4549,
+          0.6196
+        ],
+        "ColorShift_Top": [
+          1.0,
+          0.5882,
+          0.4706
+        ],
+        "EnvironmentDiffuseScale": 0.8,
+        "EnvironmentSpecularScale": 0.8
+      },
+      "Graveyard Skybox": {
+        "$className": "Sky",
+        "$properties": {
+          "SkyboxBk": "http://www.roblox.com/asset/?id=228274972",
+          "SkyboxDn": "http://www.roblox.com/asset/?id=228275028",
+          "SkyboxFt": "http://www.roblox.com/asset/?id=228275061",
+          "SkyboxLf": "http://www.roblox.com/asset/?id=228275144",
+          "SkyboxRt": "http://www.roblox.com/asset/?id=228275191",
+          "SkyboxUp": "http://www.roblox.com/asset/?id=228275218",
+          "StarCount": 5000,
+          "CelestialBodiesShown": false
+        }
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.3,
+          "Offset": 0.12,
+          "Color": [
+            0.549,
+            0.4392,
+            0.6588
+          ],
+          "Decay": [
+            0.4078,
+            0.2667,
+            0.4392
+          ],
+          "Glare": 0.2,
+          "Haze": 1.1
+        }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": {
+          "Intensity": 0.8,
+          "Size": 30,
+          "Threshold": 1.0
+        }
+      },
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": {
+          "Saturation": -0.05,
+          "Contrast": 0.1,
+          "TintColor": [
+            0.9412,
+            0.902,
+            1.0
+          ]
+        }
       }
     },
     "SoundService": {
