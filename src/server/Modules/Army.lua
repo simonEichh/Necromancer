@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
 local Walls = require(script.Parent.Walls)
+local Collision = require(script.Parent.Collision)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
@@ -70,6 +71,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	block.Size = def.size
 	block.Position = spawnPos
 	block.CanCollide = true
+	block.CollisionGroup = Collision.UNITS
 	block.CastShadow = true
 
 	local walkTrack, attackTrack

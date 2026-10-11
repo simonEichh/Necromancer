@@ -13,6 +13,8 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 ## World (Studio, not in repo)
 
 - `Workspace.Plots.Plot1..Plot8`: each has `Base`, `WallOrigin`, `PlayerSpawn`, `GraveSpot1..10`. Plots are claimed per player. Lane direction is derived from WallOrigin vs PlayerSpawn X.
+  - Layout (all 8 plots identical, relative to plot centre `(CX=-280, CZ_i = 229.5 - (i-1)*52.9)`): `Base` 48 (X, lane direction) x 2 x 40 (Z), floor top at Y=-1.7; `WallOrigin` on the Base's west edge (X=CX-24) where the lane starts; `PlayerSpawn` flush pad at CX-8; `GraveSpot1..10` are invisible markers in 2 columns (X=CX+10 slots 1-5, CX+18 slots 6-10) x 5 rows (Z=CZ-14,-7,0,7,14), spaced for the 6x5.7 tombstone model. The hub strip's west edge touches the plots' east edge. Keep this grid if you add or edit plots.
+  - Units and tombstones use collision groups (`Collision` module) so units walk through the tombstones.
 - `Workspace.Shops`: `GraveShopkeeper`, `SellShopkeeper`, `UpgradeShopkeeper`, each with a ProximityPrompt.
 - `Workspace.HubFloor`, `ServerStorage.Models` (optional `Tombstone` model, optional per-unit models named after the unit key; scripts inside them are stripped on spawn).
 

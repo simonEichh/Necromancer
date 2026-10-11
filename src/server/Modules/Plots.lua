@@ -4,6 +4,7 @@ local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local Army = require(script.Parent.Army)
 local Walls = require(script.Parent.Walls)
+local Collision = require(script.Parent.Collision)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 
 local playerPlots = PlotRegistry.playerPlots
@@ -47,7 +48,10 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	if tombstoneTemplate and tombstoneTemplate:IsA("Model") then
 		graveModel = tombstoneTemplate:Clone()
 		for _, p in ipairs(graveModel:GetDescendants()) do
-			if p:IsA("BasePart") then p.Anchored = true end
+			if p:IsA("BasePart") then
+				p.Anchored = true
+				p.CollisionGroup = Collision.GRAVES
+			end
 		end
 		graveModel.Parent = workspace
 		if graveModel.PrimaryPart then
@@ -66,6 +70,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 		slab.BrickColor = BrickColor.new("Dark stone grey")
 		slab.Material = Enum.Material.SmoothPlastic
 		slab.TopSurface = Enum.SurfaceType.Smooth
+		slab.CollisionGroup = Collision.GRAVES
 		slab.Parent = workspace
 
 		local stone = Instance.new("Part")
@@ -75,6 +80,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 		stone.Anchored = true
 		stone.BrickColor = BrickColor.new("Medium stone grey")
 		stone.Material = Enum.Material.SmoothPlastic
+		stone.CollisionGroup = Collision.GRAVES
 		stone.Parent = workspace
 		graveModel = stone
 	end
