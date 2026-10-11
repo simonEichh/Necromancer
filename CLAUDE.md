@@ -24,11 +24,13 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - `Rolling` (rarity/unit rolls, pity), `Digging` (DigGrave handler), `Wheel`, `Quests`, `Upgrades`, `GraveShop` (stock rotation), `ShopNpcs` (NPC prompts + sell)
 - Dependency order (no cycles): Remotes -> PlotRegistry/Quests/Upgrades/Rolling/Wheel/GraveShop -> Walls -> Army -> Plots. Modules attach their own remote handlers when required.
 
-**Shared data** (`src/shared`, `ReplicatedStorage.Shared`): `Units` (stats, rarity pools, emojis, `getBaseOneIn`), `Graves`, `Rarities`. The server uses these; the client still has its own copies (to be migrated).
+**Shared data** (`src/shared`, `ReplicatedStorage.Shared`): `Units` (stats, rarity pools, emojis, `getBaseOneIn`), `Graves`, `Rarities`. Both server and client read these; add or change a unit/grave there only. The only client-only grave data is the image/emoji/color in `GameData.GRAVE_UI`.
 
-**Client** (`src/client/init.client.lua`, ~2300 lines) plus `Modules/`: `GravesDock`, `InventoryPanel`, `ShopPanel`, `QuestsPanel`, `HUD`. The main script still holds game state (gold, gems, inventory, upgrades), unit/grave display tables, the toolbar, the roll animation, ascend/sell/upgrade/wheel panels and the main loop. All UI is built in code (no StarterGui instances).
-
-**Duplicated data:** the client still has its own `UNIT_INFO`, `UNIT_DPS`, `UNIT_ONE_IN`, `GRAVE_DATA` tables duplicating `src/shared`. Keep them in sync until the client is migrated.
+**Client** (`src/client/init.client.lua` is a bootstrap that requires the modules in UI draw order). All UI is built in code (no StarterGui instances), parented to the one ScreenGui from `Modules/Gui`. `src/client/Modules/`:
+- Foundations: `State` (all shared client state: `State.gold`, `State.inventory`, ... modules mutate it directly), `GameData` (unit/grave display tables derived from `src/shared`), `Format`, `Gui`
+- Older panels with `Module.init(screenGui, ctx)`: `GravesDock`, `InventoryPanel`, `ShopPanel`, `QuestsPanel`, `HUD`
+- Newer modules that build their UI when required: `Toolbar` (hotbar, tooltip, carried block, `add`/`refresh`), `Placement` (Place Best, SelectGrave, RecallUnit), `GraveRolling` (roll animation, `openGrave`), `Effects` (wall-break/damage effects, `showBigText`), `AscendPanel`, `SellPanel`, `UpgradePanel`, `WheelPanel`
+- UI created later draws on top of earlier UI, so keep the require order in `init.client.lua`.
 
 ## Known issues (do not build on top of these without fixing)
 
