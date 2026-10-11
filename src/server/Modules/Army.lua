@@ -2,6 +2,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
 local Walls = require(script.Parent.Walls)
@@ -75,6 +76,8 @@ local function spawnUnit(unitType, customPos, plotState)
 	block.CastShadow = true
 
 	local walkTrack, attackTrack
+	local rigModel -- set for procedurally animated rigs (see client UnitAnimator)
+	local labelBase = 1.5 -- height of the info label above the block centre
 	local unitModelTemplate = modelsFolder and modelsFolder:FindFirstChild(unitType)
 	if unitModelTemplate and unitModelTemplate:IsA("Model") then
 		block.Transparency = 1
@@ -105,7 +108,20 @@ local function spawnUnit(unitType, customPos, plotState)
 				s:Destroy()
 			end
 		end
-		if modelClone.PrimaryPart then
+		local procedural = modelClone:GetAttribute("Rig") == "Procedural"
+		if procedural and modelClone.PrimaryPart then
+			-- Scale the rig to the unit's size, then stand it on the floor under the invisible block
+			local scale = (def.size.X / 2) * 0.9
+			modelClone:ScaleTo(scale)
+			local rootHeight = modelClone:GetAttribute("RootHeight") * scale
+			labelBase = modelClone:GetAttribute("Height") * scale - def.size.Y / 2 + 1.2
+			modelClone:PivotTo(CFrame.new(spawnPos) * CFrame.new(0, rootHeight - def.size.Y / 2, 0))
+			modelClone:SetAttribute("State", "walk")
+			modelClone:SetAttribute("AttackCount", 0)
+			modelClone:SetAttribute("AttackCD", def.attackCD)
+			modelClone:SetAttribute("Speed", def.speed)
+			rigModel = modelClone
+		elseif modelClone.PrimaryPart then
 			modelClone:SetPrimaryPartCFrame(CFrame.new(spawnPos))
 		else
 			modelClone:MoveTo(spawnPos)
@@ -125,6 +141,9 @@ local function spawnUnit(unitType, customPos, plotState)
 			weld.Parent = block
 		end
 		modelClone.Parent = block
+		if rigModel then
+			CollectionService:AddTag(rigModel, "ProceduralUnit")
+		end
 
 		-- Load and play animations server-side so they replicate to clients
 		local humanoid = modelClone:FindFirstChildWhichIsA("Humanoid", true)
@@ -164,7 +183,7 @@ local function spawnUnit(unitType, customPos, plotState)
 
 	-- BodyGyro keeps it upright and facing the wall
 	local bg = Instance.new("BodyGyro")
-	bg.MaxTorque = Vector3.new(0, 1e5, 0)
+	bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5) -- all axes: the block must never tip over (the CFrame below is always upright)
 	bg.P = 1e4
 	bg.D = 400
 	bg.CFrame = CFrame.new(spawnPos, Vector3.new(plotState.wallTarget.X, spawnPos.Y, plotState.wallTarget.Z))
@@ -207,6 +226,7 @@ local function spawnUnit(unitType, customPos, plotState)
 		block = block, bv = bv, bg = bg, def = def,
 		lastAttack = 0, laneZ = laneZ,
 		walkTrack = walkTrack, attackTrack = attackTrack,
+		model = rigModel, labelBase = labelBase,
 	})
 end
 
@@ -347,6 +367,14 @@ local function shootArrow(fromPos, targetPos, damage, plotState)
 	end)
 end
 
+-- Tells the client how to animate a procedural rig (no-op for other models).
+local function setState(u, state)
+	if u.model and u.state ~= state then
+		u.state = state
+		u.model:SetAttribute("State", state)
+	end
+end
+
 -- Advances every plot's units one frame: walk toward the wall, then attack it.
 local function update(now, dt)
 	-- Unit AI — iterate over every player's plot
@@ -372,7 +400,7 @@ local function update(now, dt)
 
 				local gui = u.block:FindFirstChildOfClass("BillboardGui")
 				if gui then
-					gui.StudsOffset = Vector3.new(0, 1.5 + math.sin(now*3 + u.phase)*0.4, 0)
+					gui.StudsOffset = Vector3.new(0, (u.labelBase or 1.5) + math.sin(now*3 + u.phase)*0.4, 0)
 				end
 
 				if u.block.Name == "Goblin" then
@@ -383,8 +411,12 @@ local function update(now, dt)
 				end
 
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
+				setState(u, "idle")
 				if now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
+					if u.model then
+						u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
+					end
 					if u.attackTrack then u.attackTrack:Play() end
 					local fromPos = u.block.Position
 					local wallFaceX = plotState.wall.Position.X - plotState.laneDir * plotState.wall.Size.X/2
@@ -406,13 +438,14 @@ local function update(now, dt)
 				end
 			else
 				if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
+				setState(u, "walk")
 				local dir = (flatTarget - flatPos).Unit
 				u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
 				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
 
 				local gui = u.block:FindFirstChildOfClass("BillboardGui")
 				if gui then
-					gui.StudsOffset = Vector3.new(0, 1.5 + math.abs(math.sin(now*8 + u.phase))*0.3, 0)
+					gui.StudsOffset = Vector3.new(0, (u.labelBase or 1.5) + math.abs(math.sin(now*8 + u.phase))*0.3, 0)
 				end
 			end
 		end

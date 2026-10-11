@@ -35,6 +35,14 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - Newer modules that build their UI when required: `Toolbar` (hotbar, tooltip, carried block, `refresh`), `Placement` (Place Best, SelectGrave -> PlaceAtGrave), `GraveRolling` (roll animation, `openGrave`), `Effects` (wall-break/damage effects, `showBigText`), `AscendPanel`, `SellPanel`, `UpgradePanel`, `WheelPanel`
 - UI created later draws on top of earlier UI, so keep the require order in `init.client.lua`.
 
+## Models and rigs
+
+- Models live in `ServerStorage.Models` (place file, not the repo): `Tombstone` (grave slot model) and one model per unit key (`Skelly`, ...). `spawnUnit` clones the model named after the unit; units without a model fall back to a coloured block.
+- We are replacing Creator Store models with our own low-poly ones, built by scripts in `tools/studio/` (run in Edit mode via the Studio MCP `execute_luau`; they keep the old model as `<Name>_Old` until approved). Done: `Tombstone`, `Skelly`.
+- **Procedural rigs** (attribute `Rig = "Procedural"`): parts + Motor6D joints named Root/Waist/Neck/Jaw/LShoulder/RShoulder/LElbow/RElbow/LHip/RHip/LKnee/RKnee, front = -Z, right = +X, feet on y = 0, root part `HumanoidRootPart` at `RootHeight`, attributes `RootHeight` and `Height`. No Humanoid and no uploaded Animation assets. The server only sets attributes (`State` walk/idle, `AttackCount`, `Speed`, `AttackCD`) and tags the model `ProceduralUnit`; each client animates the joints in `Modules/UnitAnimator`. The rig is scaled to `def.size.X / 2 * 0.9`.
+- Tombstone model: origin = centre of a thin base plate on the floor, front faces +X, footprint 6 x 5.7 (must fit the 7-stud row pitch / 8-stud column pitch of the grave grid).
+- The unit's invisible collision block uses a BodyGyro with full torque so it can never tip over.
+
 ## Server authority and saving
 
 - **The client never changes gold, gems, inventory, graves, upgrades or ascension.** It sends requests (BuyGraveRequest, DigGrave, PlaceAtGrave(invSlot, graveSlot), PlaceBest, SellUnit(invSlot), SwapInventory, BuyUpgrade, PlayerAscend, WheelSpin, ClaimQuest); the server validates cost/ownership/limits and applies them via `PlayerData`. Any new feature that gives or takes currency/units must go through `PlayerData` on the server.

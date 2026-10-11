@@ -169,6 +169,7 @@ end
 --  EFFECTS + PANELS (built after the HUD)
 -- ============================================================
 require(Modules.Effects)
+require(Modules.UnitAnimator)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.UpgradePanel)
