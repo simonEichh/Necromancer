@@ -305,6 +305,7 @@ local function ownerRebirths(plotState)
 end
 
 local function breakWall(plotState)
+	if plotState.wallLayer > NUM_WALLS then return end -- the gate already fell (late arrows, last barrage hits)
 	local brokenLayer = plotState.wallLayer
 	plotState.wallLayer += 1
 	crumbleWall(plotState.wallQueue[brokenLayer], plotState)

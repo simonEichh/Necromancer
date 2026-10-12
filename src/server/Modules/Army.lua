@@ -670,7 +670,21 @@ end
 local function update(now, dt)
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
-		if not plotState.wall or not plotState.wall.Parent then continue end
+		if not plotState.wall or not plotState.wall.Parent then
+			-- the gate has fallen (or the lane is being rebuilt): nothing left to shoot, so everyone stands down
+			for _, u in ipairs(plotState.activeUnits) do
+				if u.barrage and not u.barrage.endTime then stopBarrage(u) end
+				if u.beam and not u.beam.endTime then stopBeam(u) end
+				u.barrage, u.beam = nil, nil -- shots still in the air are dropped
+				if u.block.Parent then
+					u.bv.Velocity = Vector3.new(0, 0, 0)
+				end
+				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
+				setState(u, "idle")
+			end
+			plotState.barrageBuffer = 0
+			continue
+		end
 
 		-- (re)plan the formation whenever units were added or removed
 		local signature = formationSignature(plotState.activeUnits)
