@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
+local UnitPortrait = require(script.Parent.UnitPortrait)
 local InventoryPanel = require(script.Parent.InventoryPanel)
 local GameData = require(script.Parent.GameData)
 local UNIT_INFO = GameData.UNIT_INFO
@@ -128,7 +129,9 @@ for i = 1, 10 do
 	nameLbl.Font = Enum.Font.Gotham
 	nameLbl.ZIndex = 2
 
-	slotFrames[i] = { frame = slot, emoji = emojiLbl, name = nameLbl }
+	-- the unit's 3D portrait replaces the old emoji spot
+	local portrait = UnitPortrait.attach(slot, { position = UDim2.new(0, 2, 0, 4), size = UDim2.new(1, -4, 1, -18), zIndex = 2 })
+	slotFrames[i] = { frame = slot, emoji = emojiLbl, name = nameLbl, portrait = portrait }
 
 	-- Click to select
 	local btn = Instance.new("TextButton", slot)
@@ -216,7 +219,7 @@ local function refreshToolbar()
 			local info = UNIT_INFO[unit.unitType] or {}
 			local rc = RARITY_COLORS[info.rarity] or Color3.fromRGB(80, 40, 120)
 			local ri, gi, bi = rc.R * 255, rc.G * 255, rc.B * 255
-			sf.emoji.Text = info.emoji or ""
+			sf.portrait.set(unit.unitType)
 			sf.name.Text = unit.unitType
 			sf.frame.BackgroundColor3 = isSel
 					and Color3.fromRGB(
@@ -226,7 +229,7 @@ local function refreshToolbar()
 					)
 				or Color3.fromRGB(math.floor(ri * 0.18 + 6), math.floor(gi * 0.18 + 3), math.floor(bi * 0.18 + 12))
 		else
-			sf.emoji.Text = ""
+			sf.portrait.set(nil)
 			sf.name.Text = ""
 			sf.frame.BackgroundColor3 = isSel and Color3.fromRGB(55, 30, 90) or Color3.fromRGB(22, 10, 45)
 		end

@@ -1,6 +1,7 @@
 local InventoryPanel = {}
 local Theme = require(script.Parent.Theme)
 local C = Theme.Color
+local UnitPortrait = require(script.Parent.UnitPortrait)
 
 -- ── Private state ────────────────────────────────────────────
 local invSortMode   = "DPS"
@@ -78,7 +79,7 @@ ensureInvSlots = function()
 		btn.ZIndex = 39
 
 		local sd = {
-			frame = slot, emoji = eLbl, name = nLbl,
+			frame = slot, emoji = eLbl, name = nLbl, portrait = nil,
 			ind = indLbl, btn = btn, stroke = stroke,
 			currentInvIdx = nil,
 		}
@@ -163,7 +164,11 @@ refresh = function()
 			sd.frame.BackgroundColor3 = C.Stone:Lerp(rc, 0.16) -- dark stone with a tint of the unit's rarity
 			sd.stroke.Color   = rc
 			sd.stroke.Transparency = 0
-			sd.emoji.Text     = info.emoji or ""
+			-- the 3D portrait (made when a slot first holds a unit)
+			if not sd.portrait then
+				sd.portrait = UnitPortrait.attach(sd.frame, { position = UDim2.new(0, 2, 0, 2), size = UDim2.new(1, -4, 1, -18), zIndex = 38 })
+			end
+			sd.portrait.set(unit.unitType)
 			sd.name.Text      = unit.unitType
 			sd.name.TextColor3 = C.Bone
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
@@ -172,7 +177,9 @@ refresh = function()
 			sd.frame.BackgroundColor3 = C.Void
 			sd.stroke.Color = C.Border
 			sd.stroke.Transparency = 0.6
-			sd.emoji.Text     = ""
+			if sd.portrait then
+				sd.portrait.set(nil)
+			end
 			sd.name.Text      = ""
 			sd.ind.Text       = ""
 		end
