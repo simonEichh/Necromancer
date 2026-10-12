@@ -58,6 +58,8 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 end
 
 local nextUnitId = 0 -- ever-growing id of spawned units (orders the units inside a formation row)
+local RISE_TIME = 3.5 -- seconds a static unit (a tower) takes to rise out of the ground when it is placed
+local standDistance -- (unit def) -> distance in front of the wall where the unit stands; defined with the formation code below
 
 local function spawnUnit(unitType, customPos, plotState)
 	local def = UNITS[unitType]
@@ -71,6 +73,13 @@ local function spawnUnit(unitType, customPos, plotState)
 	local spawnPos = customPos
 		and (customPos + forward * forwardClearance + Vector3.new(0, 2, 0))
 		or  (PlotFrame.toWorld(plotState, lateral, plotState.wallFwd - 80) + Vector3.new(0, 5.7, 0))
+
+	if def.static then
+		-- static units (towers, ...) never walk: they rise straight out of the ground at their slot in the formation
+		lateral = 0
+		spawnPos = PlotFrame.toWorld(plotState, lateral, plotState.wallTargetFwd - standDistance(def))
+			+ Vector3.new(0, def.size.Y / 2 + 1, 0)
+	end
 
 	local block = Instance.new("Part")
 	block.Name = unitType
@@ -134,6 +143,11 @@ local function spawnUnit(unitType, customPos, plotState)
 			modelClone:SetAttribute("AttackCount", 0)
 			modelClone:SetAttribute("AttackCD", def.attackCD)
 			modelClone:SetAttribute("Speed", def.speed)
+			if def.static then
+				-- the client lifts the model out of the ground over RiseTime seconds (see UnitAnimator)
+				modelClone:SetAttribute("RiseStart", workspace:GetServerTimeNow())
+				modelClone:SetAttribute("RiseTime", RISE_TIME)
+			end
 			rigModel = modelClone
 		else
 			if modelClone.PrimaryPart then
@@ -219,7 +233,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	gui.Size = UDim2.new(6, 0, 1.9, 0)
 	gui.StudsOffset = Vector3.new(0, labelBase, 0)
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = 45
+	gui.MaxDistance = def.static and 160 or 45
 	gui.LightInfluence = 0
 	gui.Parent = block
 	local nameLbl = Instance.new("TextLabel", gui)
@@ -399,7 +413,7 @@ local STAY_RADIUS = 3            -- a unit that has arrived keeps attacking unle
 local FORMATION_SHORT_RANGE = 12
 local FORMATION_LONG_SCALE = 2.5
 
-local function standDistance(def)
+standDistance = function(def)
 	local range = def.attackRange - 1.5
 	if def.attackRange > FORMATION_SHORT_RANGE then
 		range = (FORMATION_SHORT_RANGE - 1.5) + (def.attackRange - FORMATION_SHORT_RANGE) * FORMATION_LONG_SCALE
@@ -408,16 +422,39 @@ local function standDistance(def)
 end
 
 local function layoutFormation(plotState)
-	local rows, stands = {}, {}
+	local rows, stands, statics = {}, {}, {}
 	for _, u in ipairs(plotState.activeUnits) do
-		local stand = standDistance(u.def)
-		if not rows[stand] then
-			rows[stand] = {}
-			table.insert(stands, stand)
+		if u.def.static then
+			table.insert(statics, u)
+		else
+			local stand = standDistance(u.def)
+			if not rows[stand] then
+				rows[stand] = {}
+				table.insert(stands, stand)
+			end
+			table.insert(rows[stand], u)
 		end
-		table.insert(rows[stand], u)
 	end
 	table.sort(stands)
+
+	-- static units (towers) stand on the centre line of the lane, centre first, a few body widths apart, and are
+	-- never part of a row; one that was not spawned on its final slot is moved there once
+	table.sort(statics, function(a, b) return a.id < b.id end)
+	for i, u in ipairs(statics) do
+		local k = i - 1
+		local side = (k % 2 == 1) and 1 or -1
+		local lat = (k == 0) and 0 or side * math.ceil(k / 2) * u.def.size.X * 5
+		u.slotLat = math.clamp(lat, -FORMATION_HALF_WIDTH, FORMATION_HALF_WIDTH)
+		u.slotStand = standDistance(u.def)
+		if not u.placed then
+			u.placed = true
+			if math.abs(u.slotLat - (u.lateral or 0)) > 0.5 then
+				local pos = PlotFrame.toWorld(plotState, u.slotLat, plotState.wallTargetFwd - u.slotStand)
+					+ Vector3.new(0, u.def.size.Y / 2 + 1, 0)
+				u.block.CFrame = CFrame.lookAt(pos, pos + PlotFrame.forwardFlat(plotState))
+			end
+		end
+	end
 
 	for rowIndex, stand in ipairs(stands) do
 		local row = rows[stand]
@@ -513,11 +550,72 @@ local function stopBarrage(u)
 	end
 end
 
+-- ── Beams (AttackStyle = "BeamCast") ───────────────────────────────
+-- Artillery like the Last Lantern burns the wall with a ray: a beam of BEAM_DURATION seconds, then a pause, every
+-- attackCD seconds (the first one after the unit has finished rising). Same idea as the barrages: the server only
+-- sets the model attributes Beam, BeamStart (server time of the first beam), BeamPeriod, BeamDuration and AimPos, and
+-- the clients draw the cycle from them with the synced server clock (see SpellEffects). The damage of one beam is
+-- the unit's `damage`, dealt evenly while the beam burns, so the DPS is damage / attackCD like every other unit.
+local BEAM_DURATION = 1.0 -- seconds one beam burns
+local BEAM_LEAD = 1.0 -- the first beam starts this long after the unit finished rising
+local BEAM_AIM_HEIGHT = 9 -- studs above the floor on the wall face that the beam hits
+
+-- total damage a beam cycle has dealt by (server) time t
+local function beamDamageBy(b, t)
+	local elapsed = t - b.start
+	if elapsed <= 0 then
+		return 0
+	end
+	local cycles = math.floor(elapsed / b.period)
+	local into = elapsed - cycles * b.period
+	return (cycles + math.min(into, b.duration) / b.duration) * b.perBeam
+end
+
+local function startBeam(u, plotState, lat)
+	if not u.model then return end
+	local face = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
+	local riseEnd = (u.model:GetAttribute("RiseStart") or 0) + (u.model:GetAttribute("RiseTime") or 0)
+	local start = math.max(workspace:GetServerTimeNow(), riseEnd) + BEAM_LEAD
+	u.beam = {
+		start = start,
+		period = math.max(u.def.attackCD, BEAM_DURATION + 0.5),
+		duration = BEAM_DURATION,
+		perBeam = u.def.damage,
+		dealt = 0,
+		endTime = nil,
+	}
+	u.model:SetAttribute("AimPos", face + Vector3.new(0, BEAM_AIM_HEIGHT, 0))
+	u.model:SetAttribute("BeamStart", start)
+	u.model:SetAttribute("BeamPeriod", u.beam.period)
+	u.model:SetAttribute("BeamDuration", BEAM_DURATION)
+	u.model:SetAttribute("Beam", true) -- last, so a client that sees it also sees the rest
+end
+
+local function stopBeam(u)
+	local b = u.beam
+	if not b or b.endTime then return end
+	b.endTime = workspace:GetServerTimeNow()
+	if u.model then
+		u.model:SetAttribute("Beam", false)
+	end
+end
+
 -- Applies the damage of every shot that has landed (called once per plot per frame).
 local function settleBarrages(plotState, now)
 	local t = workspace:GetServerTimeNow()
 	local damage = 0
 	for _, u in ipairs(plotState.activeUnits) do
+		local beam = u.beam
+		if beam then
+			local total = beamDamageBy(beam, math.min(t, beam.endTime or t))
+			if total > beam.dealt then
+				damage += total - beam.dealt
+				beam.dealt = total
+			end
+			if beam.endTime then
+				u.beam = nil -- stopped: its last damage has been counted
+			end
+		end
 		local b = u.barrage
 		if b then
 			local firedBy = b.endTime and math.min(t - b.flight, b.endTime) or (t - b.flight)
@@ -593,10 +691,16 @@ local function update(now, dt)
 
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				setState(u, "idle")
-				if u.model and u.model:GetAttribute("AttackStyle") == "StaffCast" then
+				local attackStyle = u.model and u.model:GetAttribute("AttackStyle")
+				if attackStyle == "StaffCast" then
 					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage)
 					if not u.barrage or u.barrage.endTime then
 						startBarrage(u, plotState, lat)
+					end
+				elseif attackStyle == "BeamCast" then
+					-- artillery burns the wall with a beam on a fixed cycle (see startBeam)
+					if not u.beam or u.beam.endTime then
+						startBeam(u, plotState, lat)
 					end
 				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
@@ -623,6 +727,7 @@ local function update(now, dt)
 				end
 			else
 				if u.barrage and not u.barrage.endTime then stopBarrage(u) end
+				if u.beam and not u.beam.endTime then stopBeam(u) end
 				if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
 				setState(u, "walk")
 				local dir = (flatTarget - flatPos).Unit

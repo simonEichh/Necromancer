@@ -10,11 +10,12 @@ local RARITY_COLOR = {
 	Abyssal = Color3.fromRGB(220, 50, 50),
 	Eldritch = Color3.fromRGB(50, 220, 200),
 	Eternal = Color3.fromRGB(240, 240, 255),
+	Primordial = Color3.fromRGB(255, 130, 235), -- (meant to shimmer through every hue; a plain colour for now)
 }
 
--- Base rarity odds at 1× luck (all graves share this curve)
+-- Base rarity odds at 1× luck (all graves share this curve; they add up to 100)
 local BASE_ODDS = {
-	Common = 45,
+	Common = 44.95,
 	Uncommon = 25,
 	Rare = 15,
 	Cursed = 8,
@@ -22,6 +23,7 @@ local BASE_ODDS = {
 	Abyssal = 2,
 	Eldritch = 0.75,
 	Eternal = 0.25,
+	Primordial = 0.05,
 }
 
 local RARITY_RANK = {
@@ -33,8 +35,9 @@ local RARITY_RANK = {
 	Abyssal = 6,
 	Eldritch = 7,
 	Eternal = 8,
+	Primordial = 9,
 }
-local RARITY_ORDER = { "Eternal", "Eldritch", "Abyssal", "Legendary", "Cursed", "Rare", "Uncommon", "Common" }
+local RARITY_ORDER = { "Primordial", "Eternal", "Eldritch", "Abyssal", "Legendary", "Cursed", "Rare", "Uncommon", "Common" }
 
 return {
 	Color = RARITY_COLOR,

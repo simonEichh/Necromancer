@@ -19,6 +19,13 @@
 -- stride-th shot, drawn a bit bigger), while the damage still counts every shot.
 -- Model attributes used (set in the model's build script): AttackStyle, CastColor (Color3, default violet),
 -- CastPart (name of the part at the staff tip that the circle follows, default "StaffOrb").
+--
+-- The same module also draws the BEAMS of artillery (AttackStyle = "BeamCast", e.g. the Last Lantern): every
+-- BeamPeriod seconds the tower charges for BEAM_CHARGE seconds (souls stream into its core, a glow swells), then
+-- burns the wall with a ghostly ray for BeamDuration seconds, then pauses. Like the barrages the cycle comes from
+-- the model attributes Beam, BeamStart, BeamPeriod, BeamDuration and AimPos plus the synced server clock, and the
+-- server deals the damage on the same schedule. CastPart is the muzzle part (default "BeamMuzzle"); CastColor the
+-- colour of the ray. Towers also kick up dust while they rise out of the ground (attributes RiseStart / RiseTime).
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
@@ -482,11 +489,384 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================
+-- Beams: charge-up, ray of souls, impact
+-- ============================================================
+local BEAM_CHARGE = 0.8 -- seconds of charging before each beam
+local BEAM_RENDER_DISTANCE = 600 -- towers are huge: they are drawn from much further away
+local MAX_SOULS = 60
+local DEFAULT_BEAM_COLOR = Color3.fromRGB(110, 255, 160)
+
+local beamers = {} -- [model] = true for every unit model with AttackStyle = "BeamCast"
+local beamFx = {} -- [model] = the effect of the phase being drawn { mode = "charge" | "beam", ... }
+local souls = {} -- souls flowing along a beam
+
+local function glowPart(name, shape, size, color, transparency)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Shape = shape
+	p.Size = size
+	p.Color = color
+	p.Material = Enum.Material.Neon
+	p.Transparency = transparency
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Parent = fxFolder
+	return p
+end
+
+local function invisiblePart(name, size, cf)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Transparency = 1
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Parent = fxFolder
+	return p
+end
+
+local function endBeamFx(model)
+	local fx = beamFx[model]
+	if not fx then
+		return
+	end
+	beamFx[model] = nil
+	-- fade the ray out, stop every emitter, then remove the parts once the particles are gone
+	for _, emitter in ipairs(fx.emitters) do
+		emitter.Enabled = false
+	end
+	local fade = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	for _, p in ipairs(fx.glowParts) do
+		TweenService:Create(p, fade, { Transparency = 1 }):Play()
+	end
+	for _, light in ipairs(fx.lights) do
+		TweenService:Create(light, fade, { Brightness = 0 }):Play()
+	end
+	for _, p in ipairs(fx.allParts) do
+		Debris:AddItem(p, 1.6)
+	end
+end
+
+-- charge-up: a glow swells at the muzzle while souls are sucked into it
+local function startCharge(model, color, scale)
+	local fx = { mode = "charge", color = color, scale = scale }
+	local orb = glowPart("ChargeOrb", Enum.PartType.Ball, Vector3.one * 0.5 * scale, color, 0.5)
+	local intake = invisiblePart("ChargeIntake", Vector3.one * 9 * scale, CFrame.new())
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = SPARK_TEXTURE
+	sparks.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.9 * scale), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	sparks.LightEmission = 1
+	sparks.Lifetime = NumberRange.new(0.45, 0.7)
+	sparks.Speed = NumberRange.new(8 * scale, 12 * scale)
+	sparks.Shape = Enum.ParticleEmitterShape.Sphere
+	sparks.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+	sparks.ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward
+	sparks.Rate = 0
+	sparks.Parent = intake
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = 40
+	light.Brightness = 0
+	light.Shadows = false
+	light.Parent = orb
+	fx.orb, fx.intake, fx.sparks, fx.light = orb, intake, sparks, light
+	fx.emitters = { sparks }
+	fx.glowParts = { orb }
+	fx.lights = { light }
+	fx.allParts = { orb, intake }
+	return fx
+end
+
+-- the ray: three nested glowing cylinders with dark smoke and sparks inside, an impact glow at the wall
+local function startBeamFx(model, color, scale)
+	local fx = { mode = "beam", color = color, scale = scale, soulNext = 0 }
+	local cyl = Enum.PartType.Cylinder
+	fx.core = glowPart("BeamCore", cyl, Vector3.one, Color3.fromRGB(235, 255, 242), 0.05)
+	fx.mid = glowPart("BeamMid", cyl, Vector3.one, color, 0.42)
+	fx.outer = glowPart("BeamOuter", cyl, Vector3.one, color:Lerp(Color3.fromRGB(10, 70, 40), 0.5), 0.8)
+
+	-- dark ghostly smoke and sparks drifting through the whole length of the ray
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Texture = FOG_TEXTURE
+	smoke.Color = ColorSequence.new(Color3.fromRGB(70, 150, 100), Color3.fromRGB(10, 30, 20))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.5 * scale), NumberSequenceKeypoint.new(1, 5 * scale) })
+	smoke.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.7),
+		NumberSequenceKeypoint.new(0.5, 0.55),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	smoke.Lifetime = NumberRange.new(0.7, 1.2)
+	smoke.Rate = 90
+	smoke.Speed = NumberRange.new(0.5, 3)
+	smoke.SpreadAngle = Vector2.new(180, 180)
+	smoke.Rotation = NumberRange.new(0, 360)
+	smoke.RotSpeed = NumberRange.new(-40, 40)
+	smoke.Shape = Enum.ParticleEmitterShape.Box
+	smoke.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	smoke.LightInfluence = 0
+	smoke.Parent = fx.outer
+	local glints = Instance.new("ParticleEmitter")
+	glints.Texture = SPARK_TEXTURE
+	glints.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	glints.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.9 * scale), NumberSequenceKeypoint.new(1, 0) })
+	glints.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	glints.LightEmission = 1
+	glints.Lifetime = NumberRange.new(0.4, 0.8)
+	glints.Rate = 110
+	glints.Speed = NumberRange.new(1, 6)
+	glints.SpreadAngle = Vector2.new(180, 180)
+	glints.Shape = Enum.ParticleEmitterShape.Box
+	glints.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	glints.Parent = fx.outer
+
+	-- impact on the wall: a pulsing glow, sparks thrown back at the army, green mist, light
+	fx.impactBall = glowPart("BeamImpact", Enum.PartType.Ball, Vector3.one * 4 * scale, color, 0.3)
+	fx.impact = invisiblePart("BeamImpactEmitter", Vector3.one * 0.3, CFrame.new())
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = SPARK_TEXTURE
+	sparks.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.0 * scale), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	sparks.LightEmission = 1
+	sparks.Lifetime = NumberRange.new(0.4, 0.9)
+	sparks.Speed = NumberRange.new(14 * scale, 30 * scale)
+	sparks.SpreadAngle = Vector2.new(70, 70)
+	sparks.EmissionDirection = Enum.NormalId.Front
+	sparks.Acceleration = Vector3.new(0, -30, 0)
+	sparks.Rate = 130
+	sparks.Parent = fx.impact
+	local mist = Instance.new("ParticleEmitter")
+	mist.Texture = FOG_TEXTURE
+	mist.Color = ColorSequence.new(color, Color3.fromRGB(15, 60, 35))
+	mist.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3 * scale), NumberSequenceKeypoint.new(1, 9 * scale) })
+	mist.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+	mist.Lifetime = NumberRange.new(0.8, 1.4)
+	mist.Speed = NumberRange.new(4, 12)
+	mist.SpreadAngle = Vector2.new(80, 80)
+	mist.EmissionDirection = Enum.NormalId.Front
+	mist.Rotation = NumberRange.new(0, 360)
+	mist.LightEmission = 0.5
+	mist.LightInfluence = 0
+	mist.Rate = 45
+	mist.Parent = fx.impact
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = 45
+	light.Brightness = 5
+	light.Shadows = false
+	light.Parent = fx.impact
+
+	fx.emitters = { smoke, glints, sparks, mist }
+	fx.glowParts = { fx.core, fx.mid, fx.outer, fx.impactBall }
+	fx.lights = { light }
+	fx.allParts = { fx.core, fx.mid, fx.outer, fx.impactBall, fx.impact }
+	return fx
+end
+
+-- a soul flowing from the muzzle to the wall along the ray, winding round it
+local function spawnSoul(fx, from, to)
+	if #souls >= MAX_SOULS then
+		return
+	end
+	local scale, color = fx.scale, fx.color
+	local dir = (to - from).Unit
+	local perp1 = dir:Cross(Vector3.yAxis)
+	if perp1.Magnitude < 0.1 then
+		perp1 = Vector3.xAxis
+	end
+	perp1 = perp1.Unit
+	local perp2 = dir:Cross(perp1).Unit
+	local orb = glowPart("Soul", Enum.PartType.Ball, Vector3.one * (0.6 + math.random() * 0.7) * scale, Color3.fromRGB(215, 255, 230), 0.2)
+	orb.CFrame = CFrame.new(from)
+	local wisp = Instance.new("ParticleEmitter")
+	wisp.Texture = FOG_TEXTURE
+	wisp.Color = ColorSequence.new(color, Color3.fromRGB(20, 80, 50))
+	wisp.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2 * scale), NumberSequenceKeypoint.new(1, 2.4 * scale) })
+	wisp.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+	wisp.Lifetime = NumberRange.new(0.4, 0.7)
+	wisp.Rate = 40
+	wisp.Speed = NumberRange.new(0, 1)
+	wisp.SpreadAngle = Vector2.new(180, 180)
+	wisp.LightEmission = 0.7
+	wisp.LightInfluence = 0
+	wisp.Parent = orb
+	table.insert(souls, {
+		orb = orb,
+		wisp = wisp,
+		from = from,
+		to = to,
+		perp1 = perp1,
+		perp2 = perp2,
+		t0 = os.clock(),
+		duration = 0.45 + math.random() * 0.15,
+		phase = math.random() * math.pi * 2,
+		spin = (math.random() < 0.5 and -1 or 1) * (1.5 + math.random() * 2),
+		radius = (1 + math.random() * 1.6) * scale,
+	})
+end
+
+local function updateBeamModel(model, now, serverNow, camera)
+	local mode = "idle"
+	local progress = 0
+	local muzzle, aim
+	if beamers[model] and model.Parent then
+		local near = not camera or (model:GetPivot().Position - camera.CFrame.Position).Magnitude <= BEAM_RENDER_DISTANCE
+		local start = model:GetAttribute("BeamStart")
+		aim = model:GetAttribute("AimPos")
+		muzzle = model:FindFirstChild(model:GetAttribute("CastPart") or "BeamMuzzle", true)
+		if near and model:GetAttribute("Beam") == true and start and typeof(aim) == "Vector3" and muzzle then
+			local period = model:GetAttribute("BeamPeriod") or 4
+			local duration = model:GetAttribute("BeamDuration") or 1
+			local t = serverNow - start
+			if t >= -BEAM_CHARGE then
+				local phase = t % period -- (a negative t lands in the last BEAM_CHARGE seconds of the cycle)
+				if phase < duration then
+					mode, progress = "beam", phase / duration
+				elseif phase >= period - BEAM_CHARGE then
+					mode, progress = "charge", (phase - (period - BEAM_CHARGE)) / BEAM_CHARGE
+				end
+			end
+		end
+	end
+
+	local fx = beamFx[model]
+	if fx and fx.mode ~= mode then
+		endBeamFx(model)
+		fx = nil
+	end
+	if mode == "idle" then
+		return
+	end
+
+	local color = model:GetAttribute("CastColor")
+	if typeof(color) ~= "Color3" then
+		color = DEFAULT_BEAM_COLOR
+	end
+	local scale = model:GetScale()
+	if not fx then
+		fx = (mode == "charge") and startCharge(model, color, scale) or startBeamFx(model, color, scale)
+		beamFx[model] = fx
+	end
+
+	local from = muzzle.Position
+	if mode == "charge" then
+		local p = clamp01(progress)
+		fx.orb.CFrame = CFrame.new(from)
+		fx.orb.Size = Vector3.one * (0.5 + 3.2 * p ^ 1.5) * scale
+		fx.orb.Transparency = 0.5 - 0.5 * p
+		fx.intake.CFrame = CFrame.new(from)
+		fx.sparks.Rate = 40 + 220 * p
+		fx.light.Brightness = 6 * p
+	else
+		local envelope = clamp01(math.min(progress / 0.12, (1 - progress) / 0.2))
+		local to = aim
+		local delta = to - from
+		local length = delta.Magnitude
+		local cf = CFrame.lookAt(from + delta / 2, to) * CFrame.Angles(0, math.rad(90), 0) -- cylinders lie along X
+		local pulse = 1 + 0.07 * math.sin(now * 38) + 0.04 * math.sin(now * 91)
+		local w = envelope * pulse
+		fx.core.Size = Vector3.new(length, 1.2 * scale * w, 1.2 * scale * w)
+		fx.mid.Size = Vector3.new(length, 3.0 * scale * w, 3.0 * scale * w)
+		fx.outer.Size = Vector3.new(length, 6.0 * scale * w, 6.0 * scale * w)
+		fx.core.CFrame, fx.mid.CFrame, fx.outer.CFrame = cf, cf, cf
+		-- impact: faces back along the ray, half in front of the wall
+		local normal = -Vector3.new(delta.X, 0, delta.Z).Unit
+		local at = to + normal * 0.5
+		fx.impact.CFrame = CFrame.lookAt(at, at + normal)
+		fx.impactBall.CFrame = CFrame.new(at)
+		fx.impactBall.Size = Vector3.one * (4 + 1.2 * math.sin(now * 30)) * scale * envelope
+		-- a stream of souls along the ray
+		if now >= fx.soulNext then
+			spawnSoul(fx, from, to)
+			fx.soulNext = now + 0.035
+		end
+	end
+end
+
+RunService.RenderStepped:Connect(function()
+	local now = os.clock()
+	local serverNow = Workspace:GetServerTimeNow()
+	local camera = Workspace.CurrentCamera
+	for model in pairs(beamers) do
+		updateBeamModel(model, now, serverNow, camera)
+		if not model.Parent then
+			beamers[model] = nil
+			endBeamFx(model)
+		end
+	end
+	for i = #souls, 1, -1 do
+		local sl = souls[i]
+		local t = (now - sl.t0) / sl.duration
+		if t >= 1 or not sl.orb.Parent then
+			if sl.orb.Parent then
+				sl.wisp.Enabled = false
+				sl.orb.Transparency = 1
+				Debris:AddItem(sl.orb, 0.8)
+			end
+			table.remove(souls, i)
+		else
+			local base = sl.from:Lerp(sl.to, t)
+			local ang = sl.phase + sl.spin * math.pi * 2 * t
+			sl.orb.Position = base + (sl.perp1 * math.cos(ang) + sl.perp2 * math.sin(ang)) * sl.radius
+		end
+	end
+end)
+
+-- Dust that a tower kicks up while it rises out of the ground (once, when the model appears)
+local function riseDust(model)
+	local riseStart = model:GetAttribute("RiseStart")
+	local riseTime = model:GetAttribute("RiseTime") or 3
+	local remaining = riseTime - (Workspace:GetServerTimeNow() - riseStart)
+	if remaining <= 0 then
+		return
+	end
+	local scale = model:GetScale()
+	local pivot = model:GetPivot().Position
+	local floorY = pivot.Y - (model:GetAttribute("RootHeight") or 2) * scale
+	local part = invisiblePart("RiseDust", Vector3.new(14 * scale, 1, 14 * scale), CFrame.new(pivot.X, floorY + 0.5, pivot.Z))
+	local dust = Instance.new("ParticleEmitter")
+	dust.Texture = FOG_TEXTURE
+	dust.Color = ColorSequence.new(Color3.fromRGB(150, 140, 125), Color3.fromRGB(90, 85, 80))
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3 * scale), NumberSequenceKeypoint.new(1, 9 * scale) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+	dust.Lifetime = NumberRange.new(1.2, 2.2)
+	dust.Speed = NumberRange.new(4, 12)
+	dust.SpreadAngle = Vector2.new(60, 60)
+	dust.Rotation = NumberRange.new(0, 360)
+	dust.RotSpeed = NumberRange.new(-30, 30)
+	dust.Drag = 1.5
+	dust.LightInfluence = 1
+	dust.Rate = 55
+	dust.Shape = Enum.ParticleEmitterShape.Box
+	dust.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	dust.Parent = part
+	task.delay(remaining, function()
+		dust.Enabled = false
+	end)
+	Debris:AddItem(part, remaining + 3)
+end
+
+-- ============================================================
 -- Tracking unit models
 -- ============================================================
 local function track(model)
-	if model:GetAttribute("AttackStyle") == "StaffCast" then
+	local style = model:GetAttribute("AttackStyle")
+	if style == "StaffCast" then
 		casters[model] = true
+	elseif style == "BeamCast" then
+		beamers[model] = true
+	end
+	if model:GetAttribute("RiseStart") then
+		riseDust(model)
 	end
 end
 
@@ -494,6 +874,8 @@ CollectionService:GetInstanceAddedSignal(TAG):Connect(track)
 CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(model)
 	casters[model] = nil
 	endSession(model)
+	beamers[model] = nil
+	endBeamFx(model)
 end)
 for _, model in ipairs(CollectionService:GetTagged(TAG)) do
 	track(model)

@@ -224,6 +224,20 @@ local UNITS = {
 		attackCD = 0.6,
 		regenReduction = 1.0,
 	},
+	-- ── Primordial ──────────────────────────────────────────────────────
+	-- The first artillery: a colossal tower that rises from the ground far behind the warband and burns the wall
+	-- with a ray of souls: one beam of about a second every attackCD seconds, each beam dealing `damage`
+	-- (160000 / 4 s = 40000 DPS). `static` units never walk: they rise straight at their formation slot.
+	-- attackRange 32 puts it 60 studs from the wall (see Army.standDistance).
+	LastLantern = {
+		color = BrickColor.new("Dark green"),
+		size = Vector3.new(4, 4, 4),
+		damage = 160000,
+		speed = 0,
+		attackRange = 32,
+		attackCD = 4.0,
+		static = true,
+	},
 }
 
 -- Which units belong to which rarity, each with a relative weight
@@ -270,6 +284,9 @@ local RARITY_UNITS = {
 		{ unit = "TheUndying", weight = 2 },
 		{ unit = "DeathIncarnate", weight = 1 },
 	},
+	Primordial = {
+		{ unit = "LastLantern", weight = 1 },
+	},
 }
 
 -- Reverse lookup: unitType → rarity string
@@ -314,6 +331,8 @@ local UNIT_EMOJIS = {
 	-- Eternal
 	TheUndying = "✨",
 	DeathIncarnate = "💀",
+	-- Primordial
+	LastLantern = "🏮",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)

@@ -7,6 +7,8 @@
 -- and optionally, set once on the model: Float (hover bob amplitude in studs, for floating units)
 -- Optional joints besides the humanoid ones: LWing/RWing (flapping wings, positive Z rotation raises the right wing)
 -- and RStaff (the staff in the right hand, so a caster can point it forward; see AttackStyle below).
+-- Optional joints named Spin... turn continuously around Y (rings, wheels): the Motor6D's attribute SpinSpeed is the speed in rad/s.
+-- Optional model attributes RiseStart (server time) and RiseTime (seconds): the model rises out of the ground, used for towers.
 -- Optional model attribute AttackStyle = "StaffCast": at the wall the unit holds its staff out in front of it for as
 -- long as it keeps attacking (a stance, not a per-attack swing) and SpellEffects streams projectiles from a circle.
 -- Every client animates the model's Motor6D joints locally each frame, so nothing is sent over the
@@ -29,13 +31,18 @@ local function register(model)
 		return
 	end
 	local joints = {}
+	local spinners = {} -- joints named Spin...: they turn around Y all the time
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("Motor6D") then
 			joints[d.Name] = d
+			if d.Name:sub(1, 4) == "Spin" then
+				table.insert(spinners, { joint = d, speed = d:GetAttribute("SpinSpeed") or 1 })
+			end
 		end
 	end
 	rigs[model] = {
 		joints = joints,
+		spinners = spinners,
 		phase = math.random() * math.pi * 2,
 		walk = 1, -- 0..1 blend between standing and walking
 		attackStart = nil,
@@ -132,7 +139,20 @@ local function animate(model, rig, dt, now)
 	local bob = math.abs(s) * 0.12 * w * scale
 	-- floating units (attribute Float = amplitude in studs) hover up and down instead of stepping
 	local float = (model:GetAttribute("Float") or 0) * math.sin(t * 2.2) * scale
-	set(rig, "Root", CFrame.new(0, bob + float, 0))
+	-- rising out of the ground (towers): sinks the whole model at first, eases up over RiseTime seconds, rumbling
+	local rise, shake = 0, 0
+	local riseStart = model:GetAttribute("RiseStart")
+	if riseStart then
+		local p = clamp01((workspace:GetServerTimeNow() - riseStart) / (model:GetAttribute("RiseTime") or 3))
+		if p < 1 then
+			rise = -(model:GetAttribute("Height") or 5) * scale * (1 - p) ^ 2.2
+			shake = math.sin(now * 55) * 0.22 * (1 - p) * scale
+		end
+	end
+	set(rig, "Root", CFrame.new(shake, bob + float + rise, shake * 0.7))
+	for _, spinner in ipairs(rig.spinners) do
+		spinner.joint.Transform = ANGLES(0, now * spinner.speed, 0)
+	end
 
 	-- arms (left arm swings with the right leg; the sword arm swings less)
 	local idleElbow = 0.25 + 0.15 * w
