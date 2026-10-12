@@ -150,9 +150,26 @@ rarityBtn.MouseButton1Click:Connect(function()
 	rarityBtn.Text = "Rarity: " .. (previewRarity or "any")
 end)
 
+-- preview the star summon cinematic
+local StarSummon = require(script.Parent.StarSummon)
+local starBtn = makeButton(panel, "Star x1", Color3.fromRGB(255, 240, 170))
+starBtn.Size = UDim2.new(0.3, -8, 0, 28)
+starBtn.Position = UDim2.fromOffset(8, 100)
+starBtn.MouseButton1Click:Connect(function()
+	panel.Visible = false
+	StarSummon.play(randomResults(1, previewRarity), { onDone = function() panel.Visible = true end })
+end)
+local starBtn10 = makeButton(panel, "Star x10", Color3.fromRGB(255, 240, 170))
+starBtn10.Size = UDim2.new(0.3, -8, 0, 28)
+starBtn10.Position = UDim2.new(0.3, 4, 0, 100)
+starBtn10.MouseButton1Click:Connect(function()
+	panel.Visible = false
+	StarSummon.play(randomResults(10, previewRarity), { onDone = function() panel.Visible = true end })
+end)
+
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -108)
-list.Position = UDim2.fromOffset(8, 102)
+list.Size = UDim2.new(1, -16, 1, -142)
+list.Position = UDim2.fromOffset(8, 136)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6
