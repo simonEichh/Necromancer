@@ -38,7 +38,7 @@ Remotes.DevSpawnUnit.OnServerEvent:Connect(function(player, unitType, atGraves)
 		Army.spawnUnit(unitType, nil, plotState)
 	else
 		local lateral = ((n - 1) % 7 - 3) * 4.5
-		local forward = plotState.wallTargetFwd - math.max(1.5, def.attackRange - 1.5)
+		local forward = plotState.wallTargetFwd - Army.standDistance(def)
 		Army.spawnUnit(unitType, PlotFrame.toWorld(plotState, lateral, forward), plotState)
 	end
 

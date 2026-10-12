@@ -400,11 +400,24 @@ local FORMATION_HALF_WIDTH = 16  -- units stay this close to the lane's centre l
 local ARRIVE_RADIUS = 1.2        -- how close a unit must get to its slot before it stops and attacks
 local STAY_RADIUS = 3            -- a unit that has arrived keeps attacking unless it is pushed further than this
 
+-- Where a unit stands: melee and short-range units (range up to FORMATION_SHORT_RANGE) just inside their range; beyond
+-- that every extra stud of range moves the unit FORMATION_LONG_SCALE studs further back, so mages and archers fight from
+-- far away and their projectiles have a long way to travel (range 15 -> 15, 20 -> 30, 25 -> 40, 30 -> 55 studs from the wall).
+local FORMATION_SHORT_RANGE = 12
+local FORMATION_LONG_SCALE = 2.5
+
+local function standDistance(def)
+	local range = def.attackRange - 1.5
+	if def.attackRange > FORMATION_SHORT_RANGE then
+		range = (FORMATION_SHORT_RANGE - 1.5) + (def.attackRange - FORMATION_SHORT_RANGE) * FORMATION_LONG_SCALE
+	end
+	return math.max(FORMATION_MIN_STAND, math.floor(range / FORMATION_BAND) * FORMATION_BAND)
+end
+
 local function layoutFormation(plotState)
 	local rows, stands = {}, {}
 	for _, u in ipairs(plotState.activeUnits) do
-		-- stand inside the attack range (1.5 studs of slack), rounded down to a row
-		local stand = math.max(FORMATION_MIN_STAND, math.floor((u.def.attackRange - 1.5) / FORMATION_BAND) * FORMATION_BAND)
+		local stand = standDistance(u.def)
 		if not rows[stand] then
 			rows[stand] = {}
 			table.insert(stands, stand)
@@ -548,5 +561,6 @@ return {
 	recallUnitFromSlot = recallUnitFromSlot,
 	placeInSlot = placeInSlot,
 	spawnUnit = spawnUnit,
+	standDistance = standDistance, -- (unit def) -> distance in front of the wall where the unit stands
 	update = update,
 }
