@@ -464,13 +464,13 @@ end
 -- the same shot schedule from them with the synced server clock (workspace:GetServerTimeNow(), see client SpellEffects):
 -- shot k (k = 0, 1, 2 ...) is fired at BarrageStart + k / BarrageRate and lands ShotTime seconds later.
 -- The server settles the damage on the same schedule: the damage of all shots that landed since the last tick is applied
--- to the wall in batches (BATCH_INTERVAL), and the floating damage numbers are merged (NUMBER_INTERVAL). The damage per
+-- to the wall in batches (BATCH_INTERVAL); the wall's HP bar shows the hits, so barrage shots have no floating damage
+-- numbers (DamageHit). The damage per
 -- second stays the unit's normal DPS (damage / attackCD), so this changes how it looks and feels, not the balance.
 local DEFAULT_SHOTS_PER_SECOND = 6 -- a unit def can override it with shotsPerSecond
 local SPELL_ORB_SPEED = 30         -- studs per second: sets the flight time of a shot
 local BARRAGE_LEAD = 0.4           -- the first shot is fired this long after the barrage starts, while the staff is raised
 local BATCH_INTERVAL = 0.1         -- wall damage of landed shots is applied in batches this often
-local NUMBER_INTERVAL = 0.5        -- floating damage numbers of barrage hits are merged into one per this long
 
 -- how many shots of the barrage have been fired by (server) time t
 local function shotsFiredBy(b, t)
@@ -547,18 +547,9 @@ local function settleBarrages(plotState, now)
 		local amount = plotState.barrageBuffer
 		plotState.barrageBuffer = 0
 		plotState.lastBatchAt = now
-		plotState.numberBuffer = (plotState.numberBuffer or 0) + amount
 		plotState.wallHP = math.max(0, plotState.wallHP - amount)
 		updateWallGui(plotState)
 		if plotState.wallHP <= 0 then breakWall(plotState) end
-	end
-	-- one merged floating damage number every NUMBER_INTERVAL
-	if (plotState.numberBuffer or 0) > 0 and now - (plotState.lastNumberAt or 0) >= NUMBER_INTERVAL then
-		local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
-			+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
-		Remotes.DamageHit:FireAllClients(plotState.numberBuffer, impactPos, false)
-		plotState.numberBuffer = 0
-		plotState.lastNumberAt = now
 	end
 end
 
