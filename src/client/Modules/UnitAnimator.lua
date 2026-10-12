@@ -5,7 +5,9 @@
 --   AttackCount             (incremented on every attack; the swing plays on each change)
 --   Speed, AttackCD         (walk speed in studs/s, seconds between attacks)
 -- and optionally, set once on the model: Float (hover bob amplitude in studs, for floating units)
--- Optional joints besides the humanoid ones: LWing/RWing (flapping wings, positive Z rotation raises the right wing).
+-- Optional joints besides the humanoid ones: LWing/RWing (flapping wings, positive Z rotation raises the right wing)
+-- and RStaff (the staff in the right hand, so a caster can point it forward; see AttackStyle below).
+-- Optional model attribute AttackStyle = "StaffCast": the attack lifts the staff forward and SpellEffects fires a volley.
 -- Every client animates the model's Motor6D joints locally each frame, so nothing is sent over the
 -- network per frame and no uploaded Animation assets are needed.
 --
@@ -63,6 +65,35 @@ local function attackPose(u)
 	return 0.4 * (1 - k), 0.2 + 0.3 * k, -0.45 * (1 - k), 0.1 * (1 - k)
 end
 
+-- How long one attack animation lasts (the cast style holds the pose for almost the whole cooldown so
+-- SpellEffects can shoot a volley while the staff is raised).
+local function attackDuration(model)
+	local cd = model:GetAttribute("AttackCD") or 1
+	if model:GetAttribute("AttackStyle") == "StaffCast" then
+		return math.min(1.2, cd * 0.95)
+	end
+	return math.min(0.55, cd * 0.85)
+end
+
+-- Staff cast: lift the staff arm forward (the left arm gestures), hold while the volley is fired with a
+-- small recoil per shot, then lower. Returns rShoulder, rElbow, lShoulder, lElbow, waist pitch and k (how far
+-- the arms are raised, 0..1). SpellEffects fires SHOTS = 6 projectiles between u = 0.22 and u = 0.82.
+local function castPose(u)
+	local k
+	if u < 0.22 then
+		k = 1 - (1 - u / 0.22) ^ 2
+	elseif u < 0.82 then
+		k = 1
+	else
+		k = 1 - (u - 0.82) / 0.18
+	end
+	local pulse = 0
+	if u >= 0.22 and u < 0.82 then
+		pulse = math.sin((u - 0.22) / 0.6 * math.pi * 12) * 0.05
+	end
+	return 1.35 * k + pulse, 0.35 * k, 0.9 * k, 0.9 * k, 0.12 * k + pulse * 0.5, k
+end
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -82,7 +113,7 @@ local function animate(model, rig, dt, now)
 		rig.lastCount = count
 		rig.attackStart = now
 	end
-	local attackDur = math.min(0.55, (model:GetAttribute("AttackCD") or 1) * 0.85)
+	local attackDur = attackDuration(model)
 	local u = rig.attackStart and (now - rig.attackStart) / attackDur
 	if u and u >= 1 then
 		rig.attackStart = nil
@@ -110,15 +141,27 @@ local function animate(model, rig, dt, now)
 	local waistRoll = s * 0.07 * w
 	local jaw = math.max(0, math.sin(t * 5)) * 0.06 * (1 - w)
 
+	local lShoulder = -s * 0.6 * w - breathe
+	local lElbow = idleElbow
+	local staffRot = 0 -- optional RStaff joint: turns the staff in the hand so it points forward while casting
+
 	if u then
-		local shoulder, elbow, lean, mouth = attackPose(u)
-		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
+		if model:GetAttribute("AttackStyle") == "StaffCast" then
+			local rs, re, ls, le, lean, k = castPose(u)
+			rShoulder, rElbow, lShoulder, lElbow, waistPitch = rs, re, ls, le, lean
+			-- the staff points up in the hand at rest; undo the arm rotation and pitch it to horizontal (slightly up)
+			staffRot = -(1.5708 * k + rs + re) + 0.15 * k
+		else
+			local shoulder, elbow, lean, mouth = attackPose(u)
+			rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
+		end
 	end
 
-	set(rig, "LShoulder", ANGLES(-s * 0.6 * w - breathe, 0, 0))
-	set(rig, "LElbow", ANGLES(idleElbow, 0, 0))
+	set(rig, "LShoulder", ANGLES(lShoulder, 0, 0))
+	set(rig, "LElbow", ANGLES(lElbow, 0, 0))
 	set(rig, "RShoulder", ANGLES(rShoulder, 0, 0))
 	set(rig, "RElbow", ANGLES(rElbow, 0, 0))
+	set(rig, "RStaff", ANGLES(staffRot, 0, 0))
 	set(rig, "Waist", ANGLES(waistPitch, 0, waistRoll))
 	set(rig, "Neck", ANGLES(-0.04 * w, math.sin(t * 0.8) * 0.12 * (1 - w), 0))
 
@@ -150,4 +193,6 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
-return {}
+return {
+	attackDuration = attackDuration,
+}

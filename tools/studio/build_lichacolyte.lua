@@ -10,6 +10,9 @@
 -- mantle and sash with a little skull trinket, wide sleeves and a skull-topped staff with a glowing orb
 -- in the right hand (the attack swing raises it like a cast). The robe is split into flaps welded to the
 -- legs, so it swings with the stride instead of clipping through it.
+-- Spellcaster: the staff hangs off its own RStaff joint (forearm -> StaffRoot) so UnitAnimator can point it forward,
+-- and the attributes AttackStyle/CastColor/CastPart make it fire a volley of orbs from a magic circle
+-- (see src/client/Modules/SpellEffects.lua).
 local ServerStorage = game:GetService("ServerStorage")
 local models = ServerStorage.Models
 
@@ -107,18 +110,22 @@ local function arm(side, x)
 	motor(side .. "Elbow", upper, fore, Vector3.new(x, 2.6, 0))
 	local hand = part(side .. "Hand", Vector3.new(0.28, 0.3, 0.28), Vector3.new(x, 1.58, 0), BONE)
 	weld(fore, hand)
-	return hand
+	return hand, fore
 end
 local lHand = arm("L", -1.05)
-local rHand = arm("R", 1.05)
+local _, rFore = arm("R", 1.05)
 
--- staff in the right hand: wooden shaft, skull on top and a glowing orb above it
-weld(rHand, part("StaffShaft", Vector3.new(0.14, 3.8, 0.14), Vector3.new(1.05, 2.0, -0.05), WOOD))
-weld(rHand, part("StaffSkull", Vector3.new(0.5, 0.5, 0.45), Vector3.new(1.05, 4.15, -0.05), BONE))
+-- staff in the right hand: wooden shaft, skull on top and a glowing orb above it. All its parts hang off an invisible
+-- StaffRoot that is joined to the forearm by the RStaff joint (pivot = the hand), so the animator can point it forward.
+local staffRoot = part("StaffRoot", Vector3.new(0.2, 0.2, 0.2), Vector3.new(1.05, 1.58, -0.05), WOOD)
+staffRoot.Transparency = 1
+motor("RStaff", rFore, staffRoot, Vector3.new(1.05, 1.58, -0.05))
+weld(staffRoot, part("StaffShaft", Vector3.new(0.14, 3.8, 0.14), Vector3.new(1.05, 2.0, -0.05), WOOD))
+weld(staffRoot, part("StaffSkull", Vector3.new(0.5, 0.5, 0.45), Vector3.new(1.05, 4.15, -0.05), BONE))
 for _, dx in ipairs({ -0.12, 0.12 }) do
-	weld(rHand, part("StaffSkullEye", Vector3.new(0.12, 0.12, 0.05), Vector3.new(1.05 + dx, 4.18, -0.3), GLOW, Enum.Material.Neon))
+	weld(staffRoot, part("StaffSkullEye", Vector3.new(0.12, 0.12, 0.05), Vector3.new(1.05 + dx, 4.18, -0.3), GLOW, Enum.Material.Neon))
 end
-weld(rHand, part("StaffOrb", Vector3.new(0.5, 0.5, 0.5), Vector3.new(1.05, 4.72, -0.05), GLOW, Enum.Material.Neon))
+weld(staffRoot, part("StaffOrb", Vector3.new(0.5, 0.5, 0.5), Vector3.new(1.05, 4.72, -0.05), GLOW, Enum.Material.Neon))
 
 -- a small violet wisp hovering over the left hand
 weld(lHand, part("Wisp", Vector3.new(0.3, 0.3, 0.3), Vector3.new(-1.05, 1.15, -0.3), GLOW, Enum.Material.Neon))
@@ -138,6 +145,9 @@ leg("R", 0.4)
 model:SetAttribute("Rig", "Procedural")
 model:SetAttribute("RootHeight", 2.2)
 model:SetAttribute("Height", 5.4)
+model:SetAttribute("AttackStyle", "StaffCast")
+model:SetAttribute("CastColor", GLOW)
+model:SetAttribute("CastPart", "StaffOrb")
 model.Parent = models
 
 local count = 0

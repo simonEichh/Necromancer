@@ -421,7 +421,14 @@ local function update(now, dt)
 				setState(u, "idle")
 				if now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
+					local casts = u.model and u.model:GetAttribute("AttackStyle") ~= nil
 					if u.model then
+						if casts then
+							-- tell the clients where the spell visuals should fly (the wall face in this unit's lane, mid-height);
+							-- set before AttackCount so the clients read it when they see the attack
+							local aim = PlotFrame.toWorld(plotState, u.lateral, plotState.wallFaceFwd)
+							u.model:SetAttribute("AimPos", aim + Vector3.new(0, 6, 0))
+						end
 						u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
 					end
 					if u.attackTrack then u.attackTrack:Play() end
@@ -433,7 +440,9 @@ local function update(now, dt)
 					else
 						local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
 							+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
-						flashAttack(u.def.transparent, impactPos, plotState)
+						if not casts then
+							flashAttack(u.def.transparent, impactPos, plotState) -- casters draw their own hit visuals
+						end
 						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
 						updateWallGui(plotState)
 						Remotes.DamageHit:FireAllClients(u.def.damage, impactPos, u.def.transparent)

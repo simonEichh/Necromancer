@@ -173,6 +173,7 @@ end
 -- ============================================================
 require(Modules.Effects)
 require(Modules.UnitAnimator)
+require(Modules.SpellEffects)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.UpgradePanel)
