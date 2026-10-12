@@ -7,7 +7,8 @@
 -- and optionally, set once on the model: Float (hover bob amplitude in studs, for floating units)
 -- Optional joints besides the humanoid ones: LWing/RWing (flapping wings, positive Z rotation raises the right wing)
 -- and RStaff (the staff in the right hand, so a caster can point it forward; see AttackStyle below).
--- Optional model attribute AttackStyle = "StaffCast": the attack lifts the staff forward and SpellEffects fires a volley.
+-- Optional model attribute AttackStyle = "StaffCast": at the wall the unit holds its staff out in front of it for as
+-- long as it keeps attacking (a stance, not a per-attack swing) and SpellEffects streams projectiles from a circle.
 -- Every client animates the model's Motor6D joints locally each frame, so nothing is sent over the
 -- network per frame and no uploaded Animation assets are needed.
 --
@@ -39,6 +40,8 @@ local function register(model)
 		walk = 1, -- 0..1 blend between standing and walking
 		attackStart = nil,
 		lastCount = model:GetAttribute("AttackCount") or 0,
+		lastAttackAt = nil, -- when the server last reported an attack (drives the casting stance)
+		cast = 0, -- 0..1 blend into the staff-cast stance
 		t0 = math.random() * 10,
 	}
 end
@@ -65,33 +68,31 @@ local function attackPose(u)
 	return 0.4 * (1 - k), 0.2 + 0.3 * k, -0.45 * (1 - k), 0.1 * (1 - k)
 end
 
--- How long one attack animation lasts (the cast style holds the pose for almost the whole cooldown so
--- SpellEffects can shoot a volley while the staff is raised).
 local function attackDuration(model)
-	local cd = model:GetAttribute("AttackCD") or 1
-	if model:GetAttribute("AttackStyle") == "StaffCast" then
-		return math.min(1.2, cd * 0.95)
-	end
-	return math.min(0.55, cd * 0.85)
+	return math.min(0.55, (model:GetAttribute("AttackCD") or 1) * 0.85)
 end
 
--- Staff cast: lift the staff arm forward (the left arm gestures), hold while the volley is fired with a
--- small recoil per shot, then lower. Returns rShoulder, rElbow, lShoulder, lElbow, waist pitch and k (how far
--- the arms are raised, 0..1). SpellEffects fires SHOTS = 6 projectiles between u = 0.22 and u = 0.82.
-local function castPose(u)
-	local k
-	if u < 0.22 then
-		k = 1 - (1 - u / 0.22) ^ 2
-	elseif u < 0.82 then
-		k = 1
-	else
-		k = 1 - (u - 0.82) / 0.18
+-- Staff cast stance (AttackStyle = "StaffCast"): while the unit stands at the wall and keeps attacking it holds
+-- the staff out in front of it (the left arm gestures) instead of swinging once per attack. k is the blend into
+-- the stance (0 = relaxed, 1 = staff held out), t is a time value for the small hovering motion of the held staff.
+-- Returns rShoulder, rElbow, lShoulder, lElbow and waist pitch. SpellEffects draws the circle and the projectiles.
+local function castPose(k, t)
+	local sway = math.sin(t * 5) * 0.03 * k
+	return 1.35 * k + sway, 0.35 * k, 0.9 * k, 0.9 * k, 0.12 * k + sway * 0.5
+end
+
+-- A casting unit is "in attack mode" while it is not walking and the server keeps reporting attacks. The stance
+-- ends a little after the last attack (a few cooldowns), e.g. when the wall is gone or the unit is recalled.
+local function castGrace(model)
+	return math.max(1.2, (model:GetAttribute("AttackCD") or 1) * 1.8)
+end
+
+local function isCasting(model, now)
+	local rig = rigs[model]
+	if not rig or not rig.lastAttackAt or model:GetAttribute("State") == "walk" then
+		return false
 	end
-	local pulse = 0
-	if u >= 0.22 and u < 0.82 then
-		pulse = math.sin((u - 0.22) / 0.6 * math.pi * 12) * 0.05
-	end
-	return 1.35 * k + pulse, 0.35 * k, 0.9 * k, 0.9 * k, 0.12 * k + pulse * 0.5, k
+	return (now or os.clock()) - rig.lastAttackAt < castGrace(model)
 end
 
 local function animate(model, rig, dt, now)
@@ -109,15 +110,23 @@ local function animate(model, rig, dt, now)
 
 	-- attack trigger
 	local count = model:GetAttribute("AttackCount") or 0
+	local casterStyle = model:GetAttribute("AttackStyle") == "StaffCast"
 	if count ~= rig.lastCount then
 		rig.lastCount = count
-		rig.attackStart = now
+		rig.lastAttackAt = now
+		if not casterStyle then
+			rig.attackStart = now
+		end
 	end
 	local attackDur = attackDuration(model)
 	local u = rig.attackStart and (now - rig.attackStart) / attackDur
 	if u and u >= 1 then
 		rig.attackStart = nil
 		u = nil
+	end
+	if casterStyle then
+		-- blend smoothly into / out of the casting stance
+		rig.cast += ((isCasting(model, now) and 1 or 0) - rig.cast) * clamp01(dt * 6)
 	end
 
 	-- legs
@@ -145,16 +154,22 @@ local function animate(model, rig, dt, now)
 	local lElbow = idleElbow
 	local staffRot = 0 -- optional RStaff joint: turns the staff in the hand so it points forward while casting
 
-	if u then
-		if model:GetAttribute("AttackStyle") == "StaffCast" then
-			local rs, re, ls, le, lean, k = castPose(u)
-			rShoulder, rElbow, lShoulder, lElbow, waistPitch = rs, re, ls, le, lean
+	if casterStyle then
+		if rig.cast > 0.001 then
+			local k = rig.cast
+			local rs, re, ls, le, lean = castPose(k, t)
+			-- blend with the relaxed pose while the stance is not fully up (e.g. just after walking)
+			rShoulder = rShoulder + (rs - rShoulder) * k
+			rElbow = rElbow + (re - rElbow) * k
+			lShoulder = lShoulder + (ls - lShoulder) * k
+			lElbow = lElbow + (le - lElbow) * k
+			waistPitch = waistPitch + (lean - waistPitch) * k
 			-- the staff points up in the hand at rest; undo the arm rotation and pitch it to horizontal (slightly up)
-			staffRot = -(1.5708 * k + rs + re) + 0.15 * k
-		else
-			local shoulder, elbow, lean, mouth = attackPose(u)
-			rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
+			staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 		end
+	elseif u then
+		local shoulder, elbow, lean, mouth = attackPose(u)
+		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
 
 	set(rig, "LShoulder", ANGLES(lShoulder, 0, 0))
@@ -194,5 +209,9 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 return {
-	attackDuration = attackDuration,
+	isCasting = isCasting, -- (model) -> true while a staff caster is in attack mode
+	castAmount = function(model) -- (model) -> 0..1, how far the staff is raised
+		local rig = rigs[model]
+		return rig and rig.cast or 0
+	end,
 }

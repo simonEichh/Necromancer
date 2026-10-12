@@ -1,12 +1,15 @@
 -- Client-side visuals for units that attack with a magic cast (model attribute AttackStyle = "StaffCast").
 --
--- The server only sets attributes on the unit model: AttackCount (incremented per attack) and AimPos (the
--- world position to hit on the wall). Everything you see here is drawn locally, so nothing is sent per frame:
---   1. While the staff is raised (see UnitAnimator.castPose) a turning magic circle fades in just in front of
---      the staff tip: two counter-rotating layers of rings, squares and dots drawn with a SurfaceGui.
---   2. A volley of orbs flies out of the circle one after another. Each orb weaves in its own spiral round
---      the straight line to the wall (so the volley swarms) and converges on the target, leaving a foggy,
---      glowing particle trail behind it. Every orb ends in a small burst.
+-- A caster walks to the wall, raises its staff in front of it (UnitAnimator's casting stance) and keeps it up
+-- as long as the server keeps reporting attacks (AttackCount keeps changing). For that whole time:
+--   1. a turning magic circle hangs just in front of the staff tip: two counter-rotating layers of rings, squares
+--      and dots drawn with a SurfaceGui;
+--   2. orbs flow out of the circle at a steady interval. Each orb weaves in its own spiral round the straight
+--      line to the wall (so the stream swarms) and converges on the target, leaving a foggy, glowing particle
+--      trail behind it, and ends in a small burst.
+-- When the attacks stop (or the unit walks again) the stance ends, the circle fades away and the firing stops.
+-- Nothing is sent over the network per frame: the server only sets the attributes AttackCount and AimPos (the
+-- world position to hit on the wall) on the unit model.
 -- Model attributes used (set in the model's build script): AttackStyle, CastColor (Color3, default violet),
 -- CastPart (name of the part at the staff tip that the circle follows, default "StaffOrb").
 local CollectionService = game:GetService("CollectionService")
@@ -21,15 +24,18 @@ local UnitAnimator = require(script.Parent.UnitAnimator)
 -- Settings
 -- ============================================================
 local TAG = "ProceduralUnit"
-local RENDER_DISTANCE = 220 -- casts further from the camera than this are not drawn
+local RENDER_DISTANCE = 220 -- casters further from the camera than this are not drawn
 local MAX_CIRCLES = 14
 local MAX_PROJECTILES = 90
-local SHOTS = 6 -- projectiles per cast (UnitAnimator.castPose pulses the arm once per shot)
-local ORB_SPEED = 52 -- studs per second
+local SHOT_INTERVAL = 0.16 -- seconds between two orbs of one caster
+local ORB_SPEED = 30 -- studs per second
+local STANCE_READY = 0.8 -- the circle appears once the staff is this far raised (0..1)
 local DEFAULT_COLOR = Color3.fromRGB(172, 112, 255)
 local FOG_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 
+local casters = {} -- [model] = true for every unit model with AttackStyle = "StaffCast"
+local sessions = {} -- [model] = the magic circle currently hanging in front of that caster
 local circles = {}
 local projectiles = {}
 local fxFolder = Instance.new("Folder")
@@ -121,12 +127,22 @@ local function buildCircle(part, color)
 	return layers
 end
 
-local function startCircle(model, muzzle, aim, color, scale, dur)
+-- Hangs a magic circle in front of the caster's staff tip and returns it (nil if it cannot be placed yet).
+local function startCircle(model, aim)
+	local muzzle = model:FindFirstChild(model:GetAttribute("CastPart") or "StaffOrb", true)
+	if not muzzle then
+		return nil
+	end
 	local from = muzzle.Position
 	local flat = Vector3.new(aim.X - from.X, 0, aim.Z - from.Z)
 	if flat.Magnitude < 1 then
-		return
+		return nil
 	end
+	local color = model:GetAttribute("CastColor")
+	if typeof(color) ~= "Color3" then
+		color = DEFAULT_COLOR
+	end
+	local scale = model:GetScale()
 	local dir = flat.Unit
 	local diameter = 4.8 * scale
 
@@ -166,19 +182,21 @@ local function startCircle(model, muzzle, aim, color, scale, dur)
 	sparks.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
 	sparks.Parent = part
 
-	local gap = dur * 0.55 / SHOTS
+	local now = os.clock()
 	local circle = {
 		part = part,
 		layers = layers,
 		light = light,
+		sparks = sparks,
 		model = model,
 		muzzle = muzzle,
 		dir = dir,
+		color = color,
 		scale = scale,
 		diameter = diameter,
-		born = os.clock(),
-		life = 0.05 + SHOTS * gap + 0.3,
-		alive = true,
+		born = now,
+		fadeStart = nil, -- set when the stance ends; the circle then fades out and is removed
+		nextShot = now + 0.2,
 	}
 	table.insert(circles, circle)
 	return circle
@@ -187,10 +205,11 @@ end
 -- ============================================================
 -- Projectiles (swarming orbs with a foggy trail)
 -- ============================================================
-local function spawnProjectile(circle, aim, color, scale)
+local function spawnProjectile(circle, aim)
 	if #projectiles >= MAX_PROJECTILES then
 		return
 	end
+	local color, scale = circle.color, circle.scale
 	local cf = circle.part.CFrame
 	local ang = math.random() * math.pi * 2
 	local radius = math.random() * circle.diameter * 0.3
@@ -294,7 +313,7 @@ local function spawnProjectile(circle, aim, color, scale)
 		perp1 = perp1,
 		perp2 = perp2,
 		t0 = os.clock(),
-		duration = math.max(0.4, dist / ORB_SPEED),
+		duration = math.max(0.5, dist / ORB_SPEED),
 		phase = math.random() * math.pi * 2,
 		spin = (math.random() < 0.5 and -1 or 1) * (1 + math.random()),
 		amp = (1.4 + math.random() * 1.2) * scale,
@@ -336,20 +355,65 @@ end
 -- ============================================================
 -- Per-frame update
 -- ============================================================
+local function endSession(model)
+	local circle = sessions[model]
+	if circle and not circle.fadeStart then
+		circle.fadeStart = os.clock()
+		circle.sparks.Enabled = false
+	end
+	sessions[model] = nil
+end
+
 RunService.RenderStepped:Connect(function()
 	local now = os.clock()
+	local camera = Workspace.CurrentCamera
 
+	-- 1. start / feed / end the casting sessions
+	for model in pairs(casters) do
+		if not model.Parent then
+			casters[model] = nil
+			endSession(model)
+		else
+			local near = true
+			if camera then
+				near = (model:GetPivot().Position - camera.CFrame.Position).Magnitude <= RENDER_DISTANCE
+			end
+			local casting = UnitAnimator.isCasting(model, now)
+			local amount = UnitAnimator.castAmount(model)
+			local circle = sessions[model]
+			if casting and near and amount >= STANCE_READY then
+				local aim = model:GetAttribute("AimPos")
+				if typeof(aim) == "Vector3" then
+					if not circle and #circles < MAX_CIRCLES then
+						circle = startCircle(model, aim)
+						sessions[model] = circle
+					end
+					if circle and now >= circle.nextShot then
+						spawnProjectile(circle, aim)
+						circle.nextShot = now + SHOT_INTERVAL * (0.8 + 0.4 * math.random())
+					end
+				end
+			elseif circle and (not casting or not near or amount < 0.5) then
+				endSession(model)
+			end
+		end
+	end
+
+	-- 2. spin / fade / follow the circles
 	for i = #circles, 1, -1 do
 		local c = circles[i]
-		local elapsed = now - c.born
-		if elapsed >= c.life or not c.model.Parent or not c.muzzle.Parent then
-			c.alive = false
+		local fadeIn = clamp01((now - c.born) / 0.25)
+		local vis = fadeIn
+		if c.fadeStart then
+			vis = math.min(fadeIn, clamp01(1 - (now - c.fadeStart) / 0.3))
+		end
+		if vis <= 0 and c.fadeStart or not c.model.Parent or not c.muzzle.Parent then
+			if sessions[c.model] == c then
+				sessions[c.model] = nil
+			end
 			c.part:Destroy()
 			table.remove(circles, i)
 		else
-			local fadeIn = clamp01(elapsed / 0.15)
-			local fadeOut = clamp01((c.life - elapsed) / 0.25)
-			local vis = math.min(fadeIn, fadeOut)
 			local grow = 0.4 + 0.6 * (1 - (1 - fadeIn) ^ 2)
 			local d = c.diameter * grow
 			c.part.Size = Vector3.new(d, d, 0.2)
@@ -357,6 +421,7 @@ RunService.RenderStepped:Connect(function()
 			local center = c.muzzle.Position + c.dir * 1.8 * c.scale
 			c.part.CFrame = CFrame.lookAt(center, center + c.dir)
 			c.light.Brightness = 3 * vis
+			local elapsed = now - c.born
 			for _, layer in ipairs(c.layers) do
 				layer.group.GroupTransparency = 1 - vis
 				layer.outer.Rotation = elapsed * 55
@@ -365,6 +430,7 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
+	-- 3. move the orbs
 	for i = #projectiles, 1, -1 do
 		local p = projectiles[i]
 		local t = (now - p.t0) / p.duration
@@ -384,79 +450,21 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================
--- Hooking up to unit models
+-- Tracking unit models
 -- ============================================================
-local function castStaff(model)
-	local camera = Workspace.CurrentCamera
-	if camera and (model:GetPivot().Position - camera.CFrame.Position).Magnitude > RENDER_DISTANCE then
-		return
+local function track(model)
+	if model:GetAttribute("AttackStyle") == "StaffCast" then
+		casters[model] = true
 	end
-	if #circles >= MAX_CIRCLES then
-		return
-	end
-	local aim = model:GetAttribute("AimPos")
-	if typeof(aim) ~= "Vector3" then
-		return
-	end
-	local muzzle = model:FindFirstChild(model:GetAttribute("CastPart") or "StaffOrb", true)
-	if not muzzle then
-		return
-	end
-	local color = model:GetAttribute("CastColor")
-	if typeof(color) ~= "Color3" then
-		color = DEFAULT_COLOR
-	end
-	local scale = model:GetScale()
-	local dur = UnitAnimator.attackDuration(model)
-
-	-- wait until the staff is up (the animator raises it during the first 22% of the attack)
-	task.delay(dur * 0.22, function()
-		if not model.Parent or not muzzle.Parent then
-			return
-		end
-		local circle = startCircle(model, muzzle, aim, color, scale, dur)
-		if circle then
-			local gap = dur * 0.55 / SHOTS
-			for i = 1, SHOTS do
-				task.delay((i - 1) * gap + 0.05, function()
-					if circle.alive then
-						spawnProjectile(circle, aim, color, scale)
-					end
-				end)
-			end
-		end
-	end)
 end
 
-local watched = {} -- [model] = connection
-
-local function watch(model)
-	if watched[model] then
-		return
-	end
-	local last = model:GetAttribute("AttackCount") or 0
-	watched[model] = model:GetAttributeChangedSignal("AttackCount"):Connect(function()
-		local count = model:GetAttribute("AttackCount") or 0
-		if count == last then
-			return
-		end
-		last = count
-		if model:GetAttribute("AttackStyle") == "StaffCast" then
-			castStaff(model)
-		end
-	end)
-end
-
-CollectionService:GetInstanceAddedSignal(TAG):Connect(watch)
+CollectionService:GetInstanceAddedSignal(TAG):Connect(track)
 CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(model)
-	local conn = watched[model]
-	if conn then
-		conn:Disconnect()
-		watched[model] = nil
-	end
+	casters[model] = nil
+	endSession(model)
 end)
 for _, model in ipairs(CollectionService:GetTagged(TAG)) do
-	watch(model)
+	track(model)
 end
 
 return {}
