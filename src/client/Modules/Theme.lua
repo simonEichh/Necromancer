@@ -47,10 +47,12 @@ end
 -- ============================================================
 -- Type, shape, motion
 -- ============================================================
+-- FredokaOne is the closest built-in match to Lilita One, the font of the Figma button design (Roblox cannot import font
+-- files, so Lilita One itself is not available). Titles and buttons use it; body text and numbers stay Gotham for readability.
 Theme.Font = {
-	Title = Enum.Font.Garamond, -- headings: engraved, gothic-leaning serif
-	Body = Enum.Font.GothamMedium, -- numbers and body text stay highly readable
-	Strong = Enum.Font.GothamBold, -- buttons and emphasis
+	Title = Enum.Font.FredokaOne,
+	Body = Enum.Font.GothamMedium,
+	Strong = Enum.Font.FredokaOne,
 }
 Theme.TextSize = { Small = 13, Body = 16, Heading = 22, Title = 30 }
 
@@ -83,6 +85,14 @@ function Theme.padding(inst, amount)
 	p.PaddingTop, p.PaddingBottom, p.PaddingLeft, p.PaddingRight = u, u, u, u
 	p.Parent = inst
 	return p
+end
+
+-- The chunky look of the button text: a thick dark outline (TextStrokeColor3 / TextStrokeTransparency on the label).
+Theme.TextStroke = { Color = Color3.fromRGB(8, 24, 16), Transparency = 0 }
+
+function Theme.outlineText(label)
+	label.TextStrokeColor3 = Theme.TextStroke.Color
+	label.TextStrokeTransparency = Theme.TextStroke.Transparency
 end
 
 -- A text label in the theme. opts: text, size ("Small"|"Body"|"Heading"|"Title"), color, font ("Title"|"Body"|"Strong"), align
@@ -122,8 +132,9 @@ function Theme.button(parent, opts)
 	b.BorderSizePixel = 0
 	b.Text = opts.text or ""
 	b.Font = Theme.Font.Strong
-	b.TextSize = Theme.TextSize.Body
+	b.TextSize = Theme.TextSize.Heading
 	b.TextColor3 = style.text
+	Theme.outlineText(b)
 	b.Size = opts.size or UDim2.fromOffset(120, 36)
 	if opts.position then
 		b.Position = opts.position
