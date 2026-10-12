@@ -90,7 +90,8 @@ end
 -- A staff caster is "in attack mode" while the server says it is firing a barrage (model attribute Barrage, set by Army
 -- when the unit stands in its slot and cleared when it stops attacking or walks again).
 local function isCasting(model)
-	return model:GetAttribute("AttackStyle") == "StaffCast"
+	local style = model:GetAttribute("AttackStyle")
+	return (style == "StaffCast" or style == "SigilCast")
 		and model:GetAttribute("Barrage") == true
 		and model:GetAttribute("State") ~= "walk"
 end
@@ -110,7 +111,8 @@ local function animate(model, rig, dt, now)
 
 	-- attack trigger
 	local count = model:GetAttribute("AttackCount") or 0
-	local casterStyle = model:GetAttribute("AttackStyle") == "StaffCast"
+	local style = model:GetAttribute("AttackStyle")
+	local casterStyle = style == "StaffCast" or style == "SigilCast"
 	if count ~= rig.lastCount then
 		rig.lastCount = count
 		if not casterStyle then
@@ -170,6 +172,10 @@ local function animate(model, rig, dt, now)
 		if rig.cast > 0.001 then
 			local k = rig.cast
 			local rs, re, ls, le, lean = castPose(k, t)
+			if style == "SigilCast" then
+				-- the right hand is lifted high (a rune circle opens above it) and the left hand gestures out to the side
+				rs, re, ls, le, lean = 2.85 * k + math.sin(t * 3) * 0.04 * k, 0.15 * k, 0.5 * k, 0.5 * k, -0.08 * k
+			end
 			-- blend with the relaxed pose while the stance is not fully up (e.g. just after walking)
 			rShoulder = rShoulder + (rs - rShoulder) * k
 			rElbow = rElbow + (re - rElbow) * k
@@ -177,7 +183,9 @@ local function animate(model, rig, dt, now)
 			lElbow = lElbow + (le - lElbow) * k
 			waistPitch = waistPitch + (lean - waistPitch) * k
 			-- the staff points up in the hand at rest; undo the arm rotation and pitch it to horizontal (slightly up)
-			staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
+			if style == "StaffCast" then
+				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
+			end
 		end
 	elseif u then
 		local shoulder, elbow, lean, mouth = attackPose(u)

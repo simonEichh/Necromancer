@@ -238,6 +238,20 @@ local UNITS = {
 		attackCD = 4.0,
 		static = true,
 	},
+	-- The Sigilwright walks with the army and fights from far back: it lifts a hand, a big rune circle opens flat above
+	-- it, and small sigil circles open in the air in a cone whose tip is on the wall (attack style "SigilCast", see
+	-- SpellEffects). Its darts leave the small circles and fly `shotFlight` seconds, slow at first and then accelerating.
+	-- DPS: 85000 / 1 s.
+	Sigilwright = {
+		color = BrickColor.new("Pastel yellow"),
+		size = Vector3.new(2.4, 2.4, 2.4),
+		damage = 85000,
+		speed = 10,
+		attackRange = 30,
+		attackCD = 1.0,
+		shotsPerSecond = 8,
+		shotFlight = 0.45,
+	},
 }
 
 -- Which units belong to which rarity, each with a relative weight
@@ -286,6 +300,7 @@ local RARITY_UNITS = {
 	},
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
+		{ unit = "Sigilwright", weight = 1 },
 	},
 }
 
@@ -333,6 +348,7 @@ local UNIT_EMOJIS = {
 	DeathIncarnate = "",
 	-- Primordial
 	LastLantern = "",
+	Sigilwright = "",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)

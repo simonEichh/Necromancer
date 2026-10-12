@@ -428,6 +428,9 @@ local FORMATION_MIN_STAND = 1.5  -- nearest a unit stands to the wall's target l
 local FORMATION_HALF_WIDTH = 16  -- units stay this close to the lane's centre line (the lane is 40 wide)
 local ARRIVE_RADIUS = 1.2        -- how close a unit must get to its slot before it stops and attacks
 local STAY_RADIUS = 3            -- a unit that has arrived keeps attacking unless it is pushed further than this
+RANGED_STAY_RADIUS = 10    -- ranged units (they stand 15+ studs back) re-march only when the front is this far off: the walls
+                           -- are only about 6 studs apart, so they do not have to walk after every single break
+RANGED_STAND = 15
 
 -- Where a unit stands: melee and short-range units (range up to FORMATION_SHORT_RANGE) just inside their range; beyond
 -- that every extra stud of range moves the unit FORMATION_LONG_SCALE studs further back, so mages and archers fight from
@@ -547,6 +550,9 @@ local function startBarrage(u, plotState, lat)
 	local flatFace = Vector3.new(face.X, 0, face.Z)
 	-- the orbs start a few studs in front of the caster
 	local flight = math.max(0.5, math.max(1, (flatUnit - flatFace).Magnitude - 4) / SPELL_ORB_SPEED)
+	if u.def.shotFlight then
+		flight = u.def.shotFlight -- sigil casters fire from small circles right next to the wall: a short flight
+	end
 	local start = workspace:GetServerTimeNow() + BARRAGE_LEAD
 	u.barrage = {
 		start = start,
@@ -719,7 +725,8 @@ local function update(now, dt)
 
 			-- arrived = stand in the slot and attack (units that are already in place stay put unless pushed away;
 			-- the arrival radius grows with speed so a fast unit cannot overshoot its slot forever)
-			u.arrived = dist <= (u.arrived and STAY_RADIUS or math.max(ARRIVE_RADIUS, u.def.speed * dt * 1.5))
+			local stayRadius = ((u.slotStand or 0) >= RANGED_STAND) and RANGED_STAY_RADIUS or STAY_RADIUS
+			u.arrived = dist <= (u.arrived and stayRadius or math.max(ARRIVE_RADIUS, u.def.speed * dt * 1.5))
 
 			if u.arrived then
 				u.bv.Velocity = Vector3.new(0, 0, 0)
@@ -735,10 +742,13 @@ local function update(now, dt)
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				setState(u, "idle")
 				local attackStyle = u.model and u.model:GetAttribute("AttackStyle")
-				if attackStyle == "StaffCast" then
+				if attackStyle == "StaffCast" or attackStyle == "SigilCast" then
 					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage)
 					if not u.barrage or u.barrage.endTime then
 						startBarrage(u, plotState, lat)
+					elseif u.model then
+						-- the front wall moves on when a wall breaks: keep the barrage aimed at the wall being fought
+						u.model:SetAttribute("AimPos", PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 6, 0))
 					end
 				elseif attackStyle == "BeamCast" then
 					-- artillery burns the wall with a beam on a fixed cycle (see startBeam)

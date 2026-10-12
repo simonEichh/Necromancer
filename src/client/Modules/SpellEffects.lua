@@ -312,9 +312,9 @@ local function spawnProjectile(circle, aim)
 	trail.Attachment1 = a1
 	trail.Lifetime = 0.3
 	trail.Color = ColorSequence.new(color, darker)
-	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
 	trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) })
-	trail.LightEmission = 1
+	trail.LightEmission = 0.8
 	trail.FaceCamera = true
 	trail.Parent = orb
 
@@ -475,15 +475,24 @@ RunService.RenderStepped:Connect(function()
 		local t = (now - p.t0) / p.duration
 		if t >= 1 or not p.orb.Parent then
 			if p.orb.Parent then
-				impact(p)
+				if p.kind == "bolt" then
+					boltImpact(p)
+				else
+					impact(p)
+				end
 			end
 			table.remove(projectiles, i)
 		else
-			local s = t ^ 1.25
-			local base = p.start:Lerp(p.target, s)
-			local ang = p.phase + p.spin * math.pi * 2 * t
-			local swirl = p.amp * math.sin(math.pi * t) ^ 0.8
-			p.orb.Position = base + (p.perp1 * math.cos(ang) + p.perp2 * math.sin(ang)) * swirl
+			if p.kind == "bolt" then
+				-- straight at the target, slow at first, then accelerating hard
+				p.orb.CFrame = CFrame.new(p.start:Lerp(p.target, t ^ BOLT_ACCEL)) * p.rot
+			else
+				local s = t ^ 1.25
+				local base = p.start:Lerp(p.target, s)
+				local ang = p.phase + p.spin * math.pi * 2 * t
+				local swirl = p.amp * math.sin(math.pi * t) ^ 0.8
+				p.orb.Position = base + (p.perp1 * math.cos(ang) + p.perp2 * math.sin(ang)) * swirl
+			end
 		end
 	end
 end)
@@ -856,12 +865,399 @@ local function riseDust(model)
 end
 
 -- ============================================================
+-- Sigil casts (AttackStyle = "SigilCast", the Sigilwright)
+-- ============================================================
+-- The unit lifts its hand (UnitAnimator) and a BIG rune circle opens above the palm (CastPart, default "SigilPoint"),
+-- lying flat and facing the sky like a platter held up. Then SIGIL_COUNT small sigil circles open one after another in the
+-- air high above and in front of the wall, spread out in a CONE whose tip is the target spot on the wall, every circle
+-- facing the tip. The barrage leaves from them: shot k comes out of small circle k mod SIGIL_COUNT and flies straight at
+-- the tip, slow at first and then accelerating hard (spawnBolt), ending in an explosion (boltImpact). Damage and timing
+-- are the usual barrage ones (Army "Spell barrages", the flight time is the unit's shotFlight); only the drawing differs.
+local SIGIL_COUNT = 6
+local SIGIL_BIG_DIAMETER = 6.5 -- studs, for a model of scale 1
+local SIGIL_SMALL_DIAMETER = 3.6
+local SIGIL_CONE_ANGLE = math.rad(38) -- half-angle of the cone of small circles (tip on the wall)
+local SIGIL_DISTANCES = { 21, 25, 22, 26, 23, 24 } -- studs from the tip to each circle
+local SIGIL_ARC_FROM, SIGIL_ARC_TO = math.rad(15), math.rad(165) -- the circles are spread over the upper half of the cone
+local SIGIL_TIP_JITTER = 1.3 -- the bolts hit within this many studs of the tip: a concentrated barrage
+local SIGIL_OPEN_DELAY = 0.6 -- the first small circle opens this long after the big one
+local SIGIL_OPEN_STEP = 0.12 -- ...and each following one this much later
+local BOLT_ACCEL = 2.2 -- a bolt's travelled fraction is t ^ BOLT_ACCEL: it starts slow and speeds up hard
+local MAX_SIGIL_SESSIONS = 4
+
+local sigilers = {} -- [model] = true for every unit model with AttackStyle = "SigilCast"
+local sigilSessions = {} -- [model] = the session being drawn
+local sigilList = {}
+
+-- A direct, fast bolt (no swirl): a bright core with a streak behind it, flying from a small circle at the tip of the cone.
+local function spawnBolt(circle, target)
+	if #projectiles >= MAX_PROJECTILES then
+		return
+	end
+	local color = circle.color
+	local cf = circle.part.CFrame
+	local ang = math.random() * math.pi * 2
+	local radius = math.random() * circle.diameter * 0.25
+	local start = cf.Position + cf.RightVector * math.cos(ang) * radius + cf.UpVector * math.sin(ang) * radius
+	local hit = target + Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * SIGIL_TIP_JITTER
+	-- one thin, long neon dart (a single part: no welds, they would not follow a part that is moved every frame)
+	local flight = hit - start
+	local rot = CFrame.lookAt(Vector3.zero, flight.Magnitude > 0.01 and flight.Unit or Vector3.zAxis)
+	local orb = Instance.new("Part")
+	orb.Name = "SpellOrb"
+	orb.Size = Vector3.new(0.12, 0.12, 2.2)
+	orb.Color = color:Lerp(Color3.new(1, 1, 1), 0.6)
+	orb.Material = Enum.Material.Neon
+	orb.Anchored = true
+	orb.CanCollide = false
+	orb.CanQuery = false
+	orb.CanTouch = false
+	orb.CastShadow = false
+	orb.CFrame = CFrame.new(start) * rot
+	orb.Parent = fxFolder
+
+	-- a streak of light behind it
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0.1, 0, 1.0)
+	a0.Parent = orb
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(-0.1, 0, 1.0)
+	a1.Parent = orb
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.25
+	trail.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) })
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Parent = orb
+
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Brightness = 1
+	light.Range = 6
+	light.Shadows = false
+	light.Parent = orb
+
+	table.insert(projectiles, {
+		kind = "bolt",
+		orb = orb,
+		light = light,
+		start = start,
+		target = hit,
+		rot = rot,
+		t0 = os.clock(),
+		duration = circle.shotTime or 0.45,
+		color = color,
+	})
+end
+
+-- the bolt hits the wall: a white flash, an expanding shell and a shock ring, a burst of sparks and a puff of dust
+local function boltImpact(p)
+	local pos = p.target
+	p.orb.Transparency = 1
+	for _, c in ipairs(p.orb:GetChildren()) do
+		if c:IsA("BasePart") then
+			c.Transparency = 1
+		end
+	end
+	p.light.Enabled = false
+	Debris:AddItem(p.orb, 0.5)
+
+	local function burst(size, endSize, color, life, transparency)
+		local ball = Instance.new("Part")
+		ball.Shape = Enum.PartType.Ball
+		ball.Size = Vector3.one * size
+		ball.Color = color
+		ball.Material = Enum.Material.Neon
+		ball.Transparency = transparency or 0
+		ball.Anchored = true
+		ball.CanCollide = false
+		ball.CanQuery = false
+		ball.CanTouch = false
+		ball.CastShadow = false
+		ball.CFrame = CFrame.new(pos)
+		ball.Parent = fxFolder
+		TweenService:Create(ball, TweenInfo.new(life, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = Vector3.one * endSize,
+			Transparency = 1,
+		}):Play()
+		Debris:AddItem(ball, life + 0.05)
+	end
+	burst(1.2, 3.4, Color3.new(1, 1, 1), 0.14) -- white flash
+	burst(1.5, 7.5, p.color, 0.32, 0.35) -- coloured shell
+
+	-- a shock ring on the wall (a flat disc that grows and fades)
+	local ring = Instance.new("Part")
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.12, 1, 1)
+	ring.Color = p.color
+	ring.Material = Enum.Material.Neon
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	ring.CastShadow = false
+	local toward = (p.target - p.start)
+	toward = toward.Magnitude > 0.01 and toward.Unit or Vector3.zAxis
+	ring.CFrame = CFrame.lookAt(pos, pos + toward) * CFrame.Angles(0, math.rad(90), 0)
+	ring.Parent = fxFolder
+	TweenService:Create(ring, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.12, 8, 8),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(ring, 0.33)
+
+	-- sparks and dust
+	local holder = Instance.new("Part")
+	holder.Transparency = 1
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.CastShadow = false
+	holder.Size = Vector3.one * 0.2
+	holder.CFrame = CFrame.new(pos)
+	holder.Parent = fxFolder
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = SPARK_TEXTURE
+	sparks.Color = ColorSequence.new(Color3.new(1, 1, 1), p.color)
+	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 0) })
+	sparks.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	sparks.LightEmission = 1
+	sparks.Lifetime = NumberRange.new(0.3, 0.6)
+	sparks.Speed = NumberRange.new(14, 34)
+	sparks.SpreadAngle = Vector2.new(180, 180)
+	sparks.Drag = 4
+	sparks.Rate = 0
+	sparks.Parent = holder
+	sparks:Emit(14)
+	local dust = Instance.new("ParticleEmitter")
+	dust.Texture = FOG_TEXTURE
+	dust.Color = ColorSequence.new(p.color:Lerp(Color3.new(1, 1, 1), 0.4), Color3.fromRGB(60, 50, 90))
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 4.5) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+	dust.LightEmission = 0.5
+	dust.LightInfluence = 0
+	dust.Lifetime = NumberRange.new(0.5, 0.9)
+	dust.Speed = NumberRange.new(2, 7)
+	dust.SpreadAngle = Vector2.new(180, 180)
+	dust.Drag = 3
+	dust.Rate = 0
+	dust.Parent = holder
+	dust:Emit(5)
+	Debris:AddItem(holder, 1.2)
+end
+
+-- one rune circle on its own part; the update loop spins and fades it
+local function newSigilCircle(color, diameter, scale)
+	local part = Instance.new("Part")
+	part.Name = "SigilCircle"
+	part.Size = Vector3.new(diameter * 0.4, diameter * 0.4, 0.2)
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Parent = fxFolder
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = diameter * 2
+	light.Brightness = 0
+	light.Shadows = false
+	light.Parent = part
+	return { part = part, layers = buildCircle(part, color), light = light, color = color, scale = scale, diameter = diameter, stride = 1, open = 0 }
+end
+
+local function startSigils(model, aim)
+	local muzzle = model:FindFirstChild(model:GetAttribute("CastPart") or "SigilPoint", true)
+	if not muzzle then
+		return nil
+	end
+	local flat = Vector3.new(aim.X - muzzle.Position.X, 0, aim.Z - muzzle.Position.Z)
+	if flat.Magnitude < 1 then
+		return nil
+	end
+	local color = model:GetAttribute("CastColor")
+	if typeof(color) ~= "Color3" then
+		color = DEFAULT_COLOR
+	end
+	local scale = model:GetScale()
+	local dir = flat.Unit
+	local right = Vector3.new(-dir.Z, 0, dir.X)
+
+	local session = {
+		model = model,
+		muzzle = muzzle,
+		dir = dir,
+		color = color,
+		scale = scale,
+		big = newSigilCircle(color, SIGIL_BIG_DIAMETER * scale, scale),
+		smalls = {},
+		born = os.clock(),
+		fadeStart = nil,
+		barrageStart = model:GetAttribute("BarrageStart") or Workspace:GetServerTimeNow(),
+		rate = model:GetAttribute("BarrageRate") or 6,
+		shotTime = model:GetAttribute("ShotTime"),
+		nextIndex = nil,
+	}
+	session.stride = math.max(1, math.ceil(session.rate / MAX_VISUAL_RATE))
+	-- the cone: tip on the wall (AimPos), opening back towards the unit and up; circle i sits on the cone's surface at its
+	-- own angle round the axis (upper half only, so none ends up under the floor), at its own distance from the tip
+	for i = 1, SIGIL_COUNT do
+		local sc = newSigilCircle(color, SIGIL_SMALL_DIAMETER, 1)
+		local phi = SIGIL_ARC_FROM + (i - 1) / (SIGIL_COUNT - 1) * (SIGIL_ARC_TO - SIGIL_ARC_FROM)
+		local around = right * math.cos(phi) + Vector3.yAxis * math.sin(phi)
+		sc.offset = (-dir * math.cos(SIGIL_CONE_ANGLE) + around * math.sin(SIGIL_CONE_ANGLE)) * SIGIL_DISTANCES[i]
+		sc.home = aim + sc.offset
+		sc.bobPhase = i * 1.7
+		sc.stride = session.stride
+		sc.shotTime = session.shotTime
+		table.insert(session.smalls, sc)
+	end
+	table.insert(sigilList, session)
+	return session
+end
+
+local function destroySigilSession(session)
+	session.big.part:Destroy()
+	for _, sc in ipairs(session.smalls) do
+		sc.part:Destroy()
+	end
+end
+
+local function updateSigilCircle(c, vis, elapsed)
+	c.light.Brightness = 2.5 * vis
+	for _, layer in ipairs(c.layers) do
+		layer.group.GroupTransparency = 1 - vis
+		layer.outer.Rotation = elapsed * 55
+		layer.inner.Rotation = -elapsed * 95
+	end
+end
+
+local function endSigils(model)
+	local session = sigilSessions[model]
+	if session and not session.fadeStart then
+		session.fadeStart = os.clock()
+	end
+	sigilSessions[model] = nil
+end
+
+RunService.RenderStepped:Connect(function()
+	local now = os.clock()
+	local camera = Workspace.CurrentCamera
+
+	-- 1. start / feed / end the sessions
+	for model in pairs(sigilers) do
+		if not model.Parent then
+			sigilers[model] = nil
+			endSigils(model)
+		else
+			local near = true
+			if camera then
+				near = (model:GetPivot().Position - camera.CFrame.Position).Magnitude <= RENDER_DISTANCE
+			end
+			local casting = UnitAnimator.isCasting(model)
+			local amount = UnitAnimator.castAmount(model)
+			local session = sigilSessions[model]
+			if casting and near and amount >= STANCE_READY then
+				local aim = model:GetAttribute("AimPos")
+				if typeof(aim) == "Vector3" then
+					if not session and #sigilList < MAX_SIGIL_SESSIONS then
+						session = startSigils(model, aim)
+						sigilSessions[model] = session
+					end
+					if session then
+						local serverNow = Workspace:GetServerTimeNow()
+						local due = 0
+						local fireTime = serverNow - IMPACT_DELAY
+						if fireTime >= session.barrageStart then
+							due = math.floor((fireTime - session.barrageStart) * session.rate) + 1
+						end
+						if not session.nextIndex or due - session.nextIndex > session.rate * 0.5 then
+							session.nextIndex = math.max(0, due - 1)
+						end
+						local fired = 0
+						while session.nextIndex < due and fired < 4 do
+							if session.nextIndex % session.stride == 0 then
+								-- the small circle this shot leaves from (only circles that are open fire)
+								local sc = session.smalls[(session.nextIndex // session.stride) % SIGIL_COUNT + 1]
+								if sc.open > 0.6 then
+									local tip = model:GetAttribute("AimPos")
+									if typeof(tip) == "Vector3" then
+										spawnBolt(sc, tip)
+									end
+								end
+							end
+							session.nextIndex += 1
+							fired += 1
+						end
+					end
+				end
+			elseif session and (not casting or not near or amount < 0.5) then
+				endSigils(model)
+			end
+		end
+	end
+
+	-- 2. open / spin / fade / place the circles
+	for i = #sigilList, 1, -1 do
+		local s = sigilList[i]
+		local elapsed = now - s.born
+		local fadeIn = clamp01(elapsed / 0.3)
+		local vis = fadeIn
+		if s.fadeStart then
+			vis = math.min(fadeIn, clamp01(1 - (now - s.fadeStart) / 0.3))
+		end
+		if (vis <= 0 and s.fadeStart) or not s.model.Parent or not s.muzzle.Parent then
+			if sigilSessions[s.model] == s then
+				sigilSessions[s.model] = nil
+			end
+			destroySigilSession(s)
+			table.remove(sigilList, i)
+		else
+			-- the big circle lies flat above the lifted palm, facing the sky
+			local d = s.big.diameter * (0.4 + 0.6 * (1 - (1 - fadeIn) ^ 2))
+			s.big.part.Size = Vector3.new(d, d, 0.2)
+			local center = s.muzzle.Position + Vector3.new(0, 0.9 * s.scale, 0)
+			s.big.part.CFrame = CFrame.lookAt(center, center + Vector3.yAxis, s.dir)
+			updateSigilCircle(s.big, vis, elapsed)
+			-- the cone follows the wall being fought (AimPos moves on when a wall breaks); every circle faces the tip
+			local aim = s.model:GetAttribute("AimPos")
+			if typeof(aim) == "Vector3" then
+				local follow = clamp01((now - (s.lastFrame or now)) * 8 + 0.02)
+				for _, sc in ipairs(s.smalls) do
+					sc.home = sc.home:Lerp(aim + sc.offset, follow)
+				end
+			end
+			s.lastFrame = now
+			s.tip = typeof(aim) == "Vector3" and aim or s.tip
+			-- the small circles open one after another and bob a little
+			for k, sc in ipairs(s.smalls) do
+				local openNow = clamp01((elapsed - SIGIL_OPEN_DELAY - (k - 1) * SIGIL_OPEN_STEP) / 0.3)
+				sc.open = openNow * vis
+				local size = sc.diameter * (0.3 + 0.7 * openNow)
+				sc.part.Size = Vector3.new(size, size, 0.2)
+				local pos = sc.home + Vector3.new(0, math.sin(now * 1.6 + sc.bobPhase) * 0.35, 0)
+				sc.part.CFrame = CFrame.lookAt(pos, s.tip or (pos + s.dir))
+				updateSigilCircle(sc, sc.open, elapsed + k)
+			end
+		end
+	end
+end)
+
+-- ============================================================
 -- Tracking unit models
 -- ============================================================
 local function track(model)
 	local style = model:GetAttribute("AttackStyle")
 	if style == "StaffCast" then
 		casters[model] = true
+	elseif style == "SigilCast" then
+		sigilers[model] = true
 	elseif style == "BeamCast" then
 		beamers[model] = true
 	end
@@ -874,6 +1270,8 @@ CollectionService:GetInstanceAddedSignal(TAG):Connect(track)
 CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(model)
 	casters[model] = nil
 	endSession(model)
+	sigilers[model] = nil
+	endSigils(model)
 	beamers[model] = nil
 	endBeamFx(model)
 end)
