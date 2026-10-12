@@ -457,6 +457,111 @@ local function formationSignature(units)
 	return sig
 end
 
+-- ── Spell barrages (AttackStyle = "StaffCast") ────────────────────
+-- A staff caster does not attack once per cooldown. While it stands in its slot it fires a continuous BARRAGE: shots at a
+-- fixed rate, each one a visible orb that flies to the wall. Nothing is sent per shot. When a barrage starts or stops the
+-- server sets a few attributes on the unit model (Barrage, BarrageStart, BarrageRate, ShotTime, AimPos) and every client works out
+-- the same shot schedule from them with the synced server clock (workspace:GetServerTimeNow(), see client SpellEffects):
+-- shot k (k = 0, 1, 2 ...) is fired at BarrageStart + k / BarrageRate and lands ShotTime seconds later.
+-- The server settles the damage on the same schedule: the damage of all shots that landed since the last tick is applied
+-- to the wall in batches (BATCH_INTERVAL), and the floating damage numbers are merged (NUMBER_INTERVAL). The damage per
+-- second stays the unit's normal DPS (damage / attackCD), so this changes how it looks and feels, not the balance.
+local DEFAULT_SHOTS_PER_SECOND = 6 -- a unit def can override it with shotsPerSecond
+local SPELL_ORB_SPEED = 30         -- studs per second: sets the flight time of a shot
+local BARRAGE_LEAD = 0.4           -- the first shot is fired this long after the barrage starts, while the staff is raised
+local BATCH_INTERVAL = 0.1         -- wall damage of landed shots is applied in batches this often
+local NUMBER_INTERVAL = 0.5        -- floating damage numbers of barrage hits are merged into one per this long
+
+-- how many shots of the barrage have been fired by (server) time t
+local function shotsFiredBy(b, t)
+	if t < b.start then
+		return 0
+	end
+	return math.floor((t - b.start) * b.rate) + 1
+end
+
+local function startBarrage(u, plotState, lat)
+	if not u.model then return end
+	-- shots of an earlier barrage that are still in the air land right away, so no damage is lost
+	local old = u.barrage
+	if old and old.endTime then
+		local remaining = math.max(0, shotsFiredBy(old, old.endTime) - old.landed)
+		plotState.barrageBuffer = (plotState.barrageBuffer or 0) + remaining * old.shotDamage
+	end
+
+	local rate = u.def.shotsPerSecond or DEFAULT_SHOTS_PER_SECOND
+	local face = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
+	local flatUnit = Vector3.new(u.block.Position.X, 0, u.block.Position.Z)
+	local flatFace = Vector3.new(face.X, 0, face.Z)
+	-- the orbs start a few studs in front of the caster
+	local flight = math.max(0.5, math.max(1, (flatUnit - flatFace).Magnitude - 4) / SPELL_ORB_SPEED)
+	local start = workspace:GetServerTimeNow() + BARRAGE_LEAD
+	u.barrage = {
+		start = start,
+		rate = rate,
+		flight = flight,
+		shotDamage = (u.def.damage / u.def.attackCD) / rate,
+		landed = 0, -- shots whose damage has been applied
+		endTime = nil, -- set when the barrage stops (shots already fired still land)
+	}
+	u.model:SetAttribute("AimPos", face + Vector3.new(0, 6, 0)) -- where the orbs fly to (wall face in this lane, mid-height)
+	u.model:SetAttribute("ShotTime", flight)
+	u.model:SetAttribute("BarrageRate", rate)
+	u.model:SetAttribute("BarrageStart", start)
+	u.model:SetAttribute("Barrage", true) -- last, so a client that sees it also sees the rest
+end
+
+local function stopBarrage(u)
+	local b = u.barrage
+	if not b or b.endTime then return end
+	b.endTime = workspace:GetServerTimeNow()
+	if u.model then
+		u.model:SetAttribute("Barrage", false)
+	end
+end
+
+-- Applies the damage of every shot that has landed (called once per plot per frame).
+local function settleBarrages(plotState, now)
+	local t = workspace:GetServerTimeNow()
+	local damage = 0
+	for _, u in ipairs(plotState.activeUnits) do
+		local b = u.barrage
+		if b then
+			local firedBy = b.endTime and math.min(t - b.flight, b.endTime) or (t - b.flight)
+			local landed = shotsFiredBy(b, firedBy)
+			if landed > b.landed then
+				damage += (landed - b.landed) * b.shotDamage
+				b.landed = landed
+			end
+			if b.endTime and b.landed >= shotsFiredBy(b, b.endTime) then
+				u.barrage = nil -- everything fired has landed
+			end
+		end
+	end
+	if damage > 0 then
+		plotState.barrageBuffer = (plotState.barrageBuffer or 0) + damage
+	end
+
+	-- apply the wall damage in small batches
+	if (plotState.barrageBuffer or 0) > 0 and now - (plotState.lastBatchAt or 0) >= BATCH_INTERVAL then
+		local amount = plotState.barrageBuffer
+		plotState.barrageBuffer = 0
+		plotState.lastBatchAt = now
+		plotState.numberBuffer = (plotState.numberBuffer or 0) + amount
+		plotState.wallHP = math.max(0, plotState.wallHP - amount)
+		updateWallGui(plotState)
+		if plotState.wallHP <= 0 then breakWall(plotState) end
+	end
+	-- one merged floating damage number every NUMBER_INTERVAL
+	if (plotState.numberBuffer or 0) > 0 and now - (plotState.lastNumberAt or 0) >= NUMBER_INTERVAL then
+		local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
+			+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
+		Remotes.DamageHit:FireAllClients(plotState.numberBuffer, impactPos, false)
+		plotState.numberBuffer = 0
+		plotState.lastNumberAt = now
+	end
+end
+
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
 local function update(now, dt)
 	-- Unit AI — iterate over every player's plot
@@ -504,16 +609,14 @@ local function update(now, dt)
 
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				setState(u, "idle")
-				if now - u.lastAttack >= u.def.attackCD then
+				if u.model and u.model:GetAttribute("AttackStyle") == "StaffCast" then
+					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage)
+					if not u.barrage or u.barrage.endTime then
+						startBarrage(u, plotState, lat)
+					end
+				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
-					local casts = u.model and u.model:GetAttribute("AttackStyle") ~= nil
 					if u.model then
-						if casts then
-							-- tell the clients where the spell visuals should fly (the wall face in this unit's lane, mid-height);
-							-- set before AttackCount so the clients read it when they see the attack
-							local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
-							u.model:SetAttribute("AimPos", aim + Vector3.new(0, 6, 0))
-						end
 						u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
 					end
 					if u.attackTrack then u.attackTrack:Play() end
@@ -525,9 +628,7 @@ local function update(now, dt)
 					else
 						local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
 							+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
-						if not casts then
-							flashAttack(u.def.transparent, impactPos, plotState) -- casters draw their own hit visuals
-						end
+						flashAttack(u.def.transparent, impactPos, plotState)
 						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
 						updateWallGui(plotState)
 						Remotes.DamageHit:FireAllClients(u.def.damage, impactPos, u.def.transparent)
@@ -535,6 +636,7 @@ local function update(now, dt)
 					end
 				end
 			else
+				if u.barrage and not u.barrage.endTime then stopBarrage(u) end
 				if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
 				setState(u, "walk")
 				local dir = (flatTarget - flatPos).Unit
@@ -542,6 +644,8 @@ local function update(now, dt)
 				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
 			end
 		end
+
+		settleBarrages(plotState, now)
 	end
 end
 

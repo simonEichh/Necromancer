@@ -40,7 +40,6 @@ local function register(model)
 		walk = 1, -- 0..1 blend between standing and walking
 		attackStart = nil,
 		lastCount = model:GetAttribute("AttackCount") or 0,
-		lastAttackAt = nil, -- when the server last reported an attack (drives the casting stance)
 		cast = 0, -- 0..1 blend into the staff-cast stance
 		t0 = math.random() * 10,
 	}
@@ -81,18 +80,12 @@ local function castPose(k, t)
 	return 1.35 * k + sway, 0.35 * k, 0.9 * k, 0.9 * k, 0.12 * k + sway * 0.5
 end
 
--- A casting unit is "in attack mode" while it is not walking and the server keeps reporting attacks. The stance
--- ends a little after the last attack (a few cooldowns), e.g. when the wall is gone or the unit is recalled.
-local function castGrace(model)
-	return math.max(1.2, (model:GetAttribute("AttackCD") or 1) * 1.8)
-end
-
-local function isCasting(model, now)
-	local rig = rigs[model]
-	if not rig or not rig.lastAttackAt or model:GetAttribute("State") == "walk" then
-		return false
-	end
-	return (now or os.clock()) - rig.lastAttackAt < castGrace(model)
+-- A staff caster is "in attack mode" while the server says it is firing a barrage (model attribute Barrage, set by Army
+-- when the unit stands in its slot and cleared when it stops attacking or walks again).
+local function isCasting(model)
+	return model:GetAttribute("AttackStyle") == "StaffCast"
+		and model:GetAttribute("Barrage") == true
+		and model:GetAttribute("State") ~= "walk"
 end
 
 local function animate(model, rig, dt, now)
@@ -113,9 +106,8 @@ local function animate(model, rig, dt, now)
 	local casterStyle = model:GetAttribute("AttackStyle") == "StaffCast"
 	if count ~= rig.lastCount then
 		rig.lastCount = count
-		rig.lastAttackAt = now
 		if not casterStyle then
-			rig.attackStart = now
+			rig.attackStart = now -- (casters hold a stance while the server reports a barrage instead of swinging per attack)
 		end
 	end
 	local attackDur = attackDuration(model)
@@ -126,7 +118,7 @@ local function animate(model, rig, dt, now)
 	end
 	if casterStyle then
 		-- blend smoothly into / out of the casting stance
-		rig.cast += ((isCasting(model, now) and 1 or 0) - rig.cast) * clamp01(dt * 6)
+		rig.cast += ((isCasting(model) and 1 or 0) - rig.cast) * clamp01(dt * 6)
 	end
 
 	-- legs

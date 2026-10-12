@@ -1,15 +1,22 @@
 -- Client-side visuals for units that attack with a magic cast (model attribute AttackStyle = "StaffCast").
 --
 -- A caster walks to the wall, raises its staff in front of it (UnitAnimator's casting stance) and keeps it up
--- as long as the server keeps reporting attacks (AttackCount keeps changing). For that whole time:
+-- while the server says it is firing a barrage (model attribute Barrage). For that whole time:
 --   1. a turning magic circle hangs just in front of the staff tip: two counter-rotating layers of rings, squares
 --      and dots drawn with a SurfaceGui;
---   2. orbs flow out of the circle at a steady interval. Each orb weaves in its own spiral round the straight
---      line to the wall (so the stream swarms) and converges on the target, leaving a foggy, glowing particle
---      trail behind it, and ends in a small burst.
--- When the attacks stop (or the unit walks again) the stance ends, the circle fades away and the firing stops.
--- Nothing is sent over the network per frame: the server only sets the attributes AttackCount and AimPos (the
--- world position to hit on the wall) on the unit model.
+--   2. orbs flow out of the circle. Each orb weaves in its own spiral round the straight line to the wall (so the
+--      stream swarms) and converges on the target, leaving a foggy, glowing particle trail behind it, and ends in a
+--      small burst.
+-- When the barrage stops (or the unit walks again) the stance ends, the circle fades away and the firing stops.
+--
+-- The orbs are real shots: the server deals their damage to the wall when they land (see Army "Spell barrages").
+-- Nothing is sent per shot. The server sets the attributes Barrage, BarrageStart (server time of the first shot),
+-- BarrageRate (shots per second), ShotTime (flight time in seconds) and AimPos (target on the wall) on the unit model,
+-- and this module derives the same schedule from them with the synced server clock: shot k is fired at
+-- BarrageStart + k / BarrageRate and lands ShotTime seconds later, exactly when the server applies its damage
+-- (the impact is drawn IMPACT_DELAY later, about when the wall's HP bar update reaches this client).
+-- A high shot rate does not mean more orbs: at most MAX_VISUAL_RATE orbs per second are drawn per caster (every
+-- stride-th shot, drawn a bit bigger), while the damage still counts every shot.
 -- Model attributes used (set in the model's build script): AttackStyle, CastColor (Color3, default violet),
 -- CastPart (name of the part at the staff tip that the circle follows, default "StaffOrb").
 local CollectionService = game:GetService("CollectionService")
@@ -27,8 +34,9 @@ local TAG = "ProceduralUnit"
 local RENDER_DISTANCE = 220 -- casters further from the camera than this are not drawn
 local MAX_CIRCLES = 14
 local MAX_PROJECTILES = 90
-local SHOT_INTERVAL = 0.16 -- seconds between two orbs of one caster
-local ORB_SPEED = 30 -- studs per second
+local MAX_VISUAL_RATE = 8 -- most orbs drawn per second per caster (higher shot rates draw every stride-th shot, bigger)
+local IMPACT_DELAY = 0.1 -- visual impacts lag the server's damage by this much (about the latency of the HP bar update)
+local ORB_SPEED = 30 -- studs per second; only used when the server did not send a ShotTime
 local STANCE_READY = 0.8 -- the circle appears once the staff is this far raised (0..1)
 local DEFAULT_COLOR = Color3.fromRGB(172, 112, 255)
 local FOG_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
@@ -145,6 +153,8 @@ local function startCircle(model, aim)
 	local scale = model:GetScale()
 	local dir = flat.Unit
 	local diameter = 4.8 * scale
+	local rate = model:GetAttribute("BarrageRate") or 6
+	local stride = math.max(1, math.ceil(rate / MAX_VISUAL_RATE))
 
 	local part = Instance.new("Part")
 	part.Name = "MagicCircle"
@@ -196,7 +206,12 @@ local function startCircle(model, aim)
 		diameter = diameter,
 		born = now,
 		fadeStart = nil, -- set when the stance ends; the circle then fades out and is removed
-		nextShot = now + 0.2,
+		-- the shot schedule published by the server (see the header comment)
+		barrageStart = model:GetAttribute("BarrageStart") or Workspace:GetServerTimeNow(),
+		rate = rate,
+		stride = stride, -- only every stride-th shot is drawn
+		shotTime = model:GetAttribute("ShotTime"),
+		nextIndex = nil, -- index of the next shot to consider (set on the first frame)
 	}
 	table.insert(circles, circle)
 	return circle
@@ -231,7 +246,7 @@ local function spawnProjectile(circle, aim)
 	local orb = Instance.new("Part")
 	orb.Name = "SpellOrb"
 	orb.Shape = Enum.PartType.Ball
-	orb.Size = Vector3.one * 0.55 * scale
+	orb.Size = Vector3.one * 0.55 * scale * circle.stride ^ 0.4 -- a drawn orb stands for stride shots: a bit bigger
 	orb.Color = color
 	orb.Material = Enum.Material.Neon
 	orb.Anchored = true
@@ -313,7 +328,8 @@ local function spawnProjectile(circle, aim)
 		perp1 = perp1,
 		perp2 = perp2,
 		t0 = os.clock(),
-		duration = math.max(0.5, dist / ORB_SPEED),
+		-- the flight time is the server's ShotTime, so the orb lands when the server applies the shot's damage
+		duration = circle.shotTime or math.max(0.5, dist / ORB_SPEED),
 		phase = math.random() * math.pi * 2,
 		spin = (math.random() < 0.5 and -1 or 1) * (1 + math.random()),
 		amp = (1.4 + math.random() * 1.2) * scale,
@@ -378,7 +394,7 @@ RunService.RenderStepped:Connect(function()
 			if camera then
 				near = (model:GetPivot().Position - camera.CFrame.Position).Magnitude <= RENDER_DISTANCE
 			end
-			local casting = UnitAnimator.isCasting(model, now)
+			local casting = UnitAnimator.isCasting(model)
 			local amount = UnitAnimator.castAmount(model)
 			local circle = sessions[model]
 			if casting and near and amount >= STANCE_READY then
@@ -388,9 +404,25 @@ RunService.RenderStepped:Connect(function()
 						circle = startCircle(model, aim)
 						sessions[model] = circle
 					end
-					if circle and now >= circle.nextShot then
-						spawnProjectile(circle, aim)
-						circle.nextShot = now + SHOT_INTERVAL * (0.8 + 0.4 * math.random())
+					if circle then
+						-- fire every shot of the server's schedule that is due (shots of the past are not made up for)
+						local serverNow = Workspace:GetServerTimeNow()
+						local due = 0 -- number of shots fired by now: shots 0 .. due - 1
+						local fireTime = serverNow - IMPACT_DELAY
+						if fireTime >= circle.barrageStart then
+							due = math.floor((fireTime - circle.barrageStart) * circle.rate) + 1
+						end
+						if not circle.nextIndex or due - circle.nextIndex > circle.rate * 0.5 then
+							circle.nextIndex = math.max(0, due - 1) -- first frame (or a long hitch): join the schedule now
+						end
+						local fired = 0
+						while circle.nextIndex < due and fired < 4 do
+							if circle.nextIndex % circle.stride == 0 then
+								spawnProjectile(circle, aim)
+							end
+							circle.nextIndex += 1
+							fired += 1
+						end
 					end
 				end
 			elseif circle and (not casting or not near or amount < 0.5) then
