@@ -15,7 +15,6 @@ local Rarities = require(ReplicatedStorage.Shared.Rarities)
 
 local UNITS = SharedUnits.Stats
 local UNIT_RARITY = SharedUnits.Rarity
-local UNIT_EMOJIS = SharedUnits.Emoji
 local getBaseOneIn = SharedUnits.getBaseOneIn
 local RARITY_COLOR = Rarities.Color
 local playerPlots = PlotRegistry.playerPlots
@@ -239,7 +238,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	local nameLbl = Instance.new("TextLabel", gui)
 	nameLbl.Size = UDim2.new(1, 0, 0.55, 0)
 	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = (UNIT_EMOJIS[unitType] or "💀") .. " " .. unitType
+	nameLbl.Text = unitType -- (no emojis: the UI overhaul replaces them with real icons, see the UI roadmap)
 	nameLbl.TextColor3 = RARITY_COLOR[unitRarity] or Color3.fromRGB(235, 235, 235)
 	nameLbl.TextStrokeTransparency = 0.35
 	nameLbl.TextScaled = true
@@ -277,7 +276,7 @@ local function placeInSlot(plotState, slotIndex, unitType)
 	slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
 	local dps = math.floor(UNITS[unitType].damage / UNITS[unitType].attackCD)
 	local rarity = UNIT_RARITY[unitType] or "Common"
-	slot.label.Text = "⚔️ " .. unitType
+	slot.label.Text = unitType
 	slot.rarityLabel.Text = rarity
 	slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
 	slot.dpsLabel.Text = dps .. " DPS"
