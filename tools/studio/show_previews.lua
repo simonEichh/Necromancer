@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Units = require(ReplicatedStorage.Shared.Units)
 
 local FLOOR_Y = -1.7 -- top of Workspace.HubFloor
-local SPACING = 4.6
+local GAP = 0.8 -- between neighbouring models
 
 local old = workspace:FindFirstChild("ModelPreviews")
 if old then
@@ -28,6 +28,16 @@ for _, m in ipairs(ServerStorage.Models:GetChildren()) do
 end
 table.sort(names)
 
+-- models are spaced by their (rough) width, so big ones like the BoneColossus don't overlap their neighbours
+local function widthOf(name)
+	return 4 * (Units.Stats[name].size.X / 2) * 0.9
+end
+local total = 0
+for i, name in ipairs(names) do
+	total += widthOf(name) + (i < #names and GAP or 0)
+end
+local cursor = hubSpawn.X - total / 2
+
 for i, name in ipairs(names) do
 	local c = ServerStorage.Models[name]:Clone()
 	local def = Units.Stats[name]
@@ -40,7 +50,8 @@ for i, name in ipairs(names) do
 	c.Name = name
 	c.Parent = folder
 	c:ScaleTo(scale)
-	local x = (i - (#names + 1) / 2) * SPACING
+	local x = cursor + widthOf(name) / 2 - hubSpawn.X
+	cursor += widthOf(name) + GAP
 	-- units face -Z, so a viewer standing nearer the centre (smaller Z) sees the front
 	c:PivotTo(CFrame.new(hubSpawn.X + x, FLOOR_Y + c:GetAttribute("RootHeight") * scale, rowZ))
 
