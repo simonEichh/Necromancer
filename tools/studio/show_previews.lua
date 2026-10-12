@@ -10,8 +10,8 @@ local Units = require(ReplicatedStorage.Shared.Units)
 
 local FLOOR_Y = -1.7 -- top of Workspace.HubFloor
 local GAP = 0.8 -- between neighbouring models
-local MAX_ROW = 46 -- a row wraps to a new one behind it when it gets wider than this
-local ROW_DEPTH = 9 -- distance between rows
+local MAX_ROW = 56 -- a row wraps to a new one behind it when it gets wider than this
+local ROW_DEPTH = 8 -- distance between rows
 
 local old = workspace:FindFirstChild("ModelPreviews")
 if old then
