@@ -4,6 +4,8 @@
 --   GravesDock.init(screenGui, ownedGraves, GRAVE_DATA, openGrave)
 --   GravesDock.refresh()  -- call whenever ownedGraves changes
 
+local Theme = require(script.Parent.Theme)
+
 local GravesDock = {}
 
 -- ── Private state ────────────────────────────────────────────
@@ -17,6 +19,7 @@ local mainSlotCount, mainSlotName, arrowBtn, otherGravesPanel
 
 -- ── Injected deps ────────────────────────────────────────────
 local ownedGraves, GRAVE_DATA, GRAVE_INFO, openGraveFn
+local openManyBtn -- the "Open x10" stone button next to the main grave
 
 -- ── Forward declare ──────────────────────────────────────────
 local refresh
@@ -107,6 +110,18 @@ function GravesDock.init(screenGui, ownedGravesRef, graveData, openGrave)
 	mainSlotName.Font = Enum.Font.GothamBold
 	mainSlotName.ZIndex = 5
 
+	-- ── Open x10 (gold stone button right of the main grave; opens up to 10 graves in one reveal) ──
+	local MAX_PULL = 10
+	openManyBtn = Theme.stoneButton(dock, {
+		text = "Open x" .. MAX_PULL, color = "gold", size = UDim2.fromOffset(128, 38),
+		position = UDim2.new(0.5, 62, 0, 30), zIndex = 5,
+		onClick = function()
+			if selectedGraveType then
+				openGraveFn(selectedGraveType, math.min(MAX_PULL, ownedGraves[selectedGraveType] or 0))
+			end
+		end,
+	})
+
 	-- ── Arrow button ─────────────────────────────────────────
 	arrowBtn = Instance.new("TextButton")
 	arrowBtn.AnchorPoint = Vector2.new(1, 0)
@@ -184,6 +199,11 @@ refresh = function()
 
 	dock.Visible = hasAny
 	if not selectedGraveType then return end
+
+	-- the multi-open button: shown when at least 2 graves of the selected type are owned
+	local owned = ownedGraves[selectedGraveType] or 0
+	openManyBtn.root.Visible = owned >= 2
+	openManyBtn.label.Text = "Open x" .. math.min(10, owned)
 
 	-- Update main slot
 	local info = GRAVE_INFO[selectedGraveType]
