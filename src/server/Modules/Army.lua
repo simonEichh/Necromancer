@@ -59,6 +59,10 @@ end
 
 local nextUnitId = 0 -- ever-growing id of spawned units (orders the units inside a formation row)
 local RISE_TIME = 3.5 -- seconds a static unit (a tower) takes to rise out of the ground when it is placed
+-- Units with infiniteRange (the Sigilwright) shoot the wall from any distance, so they do not march after the front:
+-- they stand at a fixed post this far down the lane (the plot's Base ends at 24, the first wall is at 105) in a row of their own.
+local INFINITE_RANGE_POST_FWD = 62
+local INFINITE_STAND = 1000
 local standDistance -- (unit def) -> distance in front of the wall where the unit stands; defined with the formation code below
 
 -- Ascensions multiply the damage of every unit (Economy.damageMultiplier). Each spawned unit gets its own copy of its
@@ -439,6 +443,9 @@ local FORMATION_SHORT_RANGE = 12
 local FORMATION_LONG_SCALE = 2.5
 
 standDistance = function(def)
+	if def.infiniteRange then
+		return INFINITE_STAND
+	end
 	local range = def.attackRange - 1.5
 	if def.attackRange > FORMATION_SHORT_RANGE then
 		range = (FORMATION_SHORT_RANGE - 1.5) + (def.attackRange - FORMATION_SHORT_RANGE) * FORMATION_LONG_SCALE
@@ -714,6 +721,9 @@ local function update(now, dt)
 			-- the front wall advances down the lane as walls break and the army marches after it; a static unit (a tower)
 			-- cannot march, so it keeps the spot it rose at
 			local standFwd = plotState.wallTargetFwd - (u.slotStand or FORMATION_MIN_STAND)
+			if u.def.infiniteRange then
+				standFwd = INFINITE_RANGE_POST_FWD
+			end
 			if u.def.static then
 				u.staticFwd = u.staticFwd or standFwd
 				standFwd = u.staticFwd
@@ -815,5 +825,11 @@ return {
 	spawnUnit = spawnUnit,
 	setDamageMultiplier = setDamageMultiplier,
 	standDistance = standDistance, -- (unit def) -> distance in front of the wall where the unit stands
+	standForward = function(plotState, def) -- (plotState, unit def) -> forward position (along the lane) where the unit stands
+		if def.infiniteRange then
+			return INFINITE_RANGE_POST_FWD
+		end
+		return plotState.wallTargetFwd - standDistance(def)
+	end,
 	update = update,
 }

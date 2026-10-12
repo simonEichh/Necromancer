@@ -43,6 +43,7 @@ local MAX_CIRCLES = 14
 local MAX_PROJECTILES = 90
 local MAX_VISUAL_RATE = 8 -- most orbs drawn per second per caster (higher shot rates draw every stride-th shot, bigger)
 local IMPACT_DELAY = 0.1 -- visual impacts lag the server's damage by this much (about the latency of the HP bar update)
+local BOLT_ACCEL = 2.2 -- a bolt's travelled fraction is t ^ BOLT_ACCEL: it starts slow and speeds up hard
 local ORB_SPEED = 30 -- studs per second; only used when the server did not send a ShotTime
 local STANCE_READY = 0.8 -- the circle appears once the staff is this far raised (0..1)
 local DEFAULT_COLOR = Color3.fromRGB(172, 112, 255)
@@ -53,6 +54,7 @@ local casters = {} -- [model] = true for every unit model with AttackStyle = "St
 local sessions = {} -- [model] = the magic circle currently hanging in front of that caster
 local circles = {}
 local projectiles = {}
+local boltImpact -- defined with the sigil effects below (the projectile loop above calls it)
 local fxFolder = Instance.new("Folder")
 fxFolder.Name = "SpellFX"
 fxFolder.Parent = Workspace
@@ -877,12 +879,13 @@ local SIGIL_COUNT = 6
 local SIGIL_BIG_DIAMETER = 6.5 -- studs, for a model of scale 1
 local SIGIL_SMALL_DIAMETER = 3.6
 local SIGIL_CONE_ANGLE = math.rad(38) -- half-angle of the cone of small circles (tip on the wall)
-local SIGIL_DISTANCES = { 21, 25, 22, 26, 23, 24 } -- studs from the tip to each circle
+local SIGIL_DISTANCES = { 26, 31, 28, 32, 29, 30 } -- studs from the cone's tip to each circle
+local SIGIL_APEX_AHEAD = 52 -- the cone's tip hangs this far in front of the unit, fixed in space (it does not follow the wall)
+local SIGIL_APEX_HEIGHT = 5 -- ...and this high above the floor
 local SIGIL_ARC_FROM, SIGIL_ARC_TO = math.rad(15), math.rad(165) -- the circles are spread over the upper half of the cone
 local SIGIL_TIP_JITTER = 1.3 -- the bolts hit within this many studs of the tip: a concentrated barrage
 local SIGIL_OPEN_DELAY = 0.6 -- the first small circle opens this long after the big one
 local SIGIL_OPEN_STEP = 0.12 -- ...and each following one this much later
-local BOLT_ACCEL = 2.2 -- a bolt's travelled fraction is t ^ BOLT_ACCEL: it starts slow and speeds up hard
 local MAX_SIGIL_SESSIONS = 4
 
 local sigilers = {} -- [model] = true for every unit model with AttackStyle = "SigilCast"
@@ -955,7 +958,7 @@ local function spawnBolt(circle, target)
 end
 
 -- the bolt hits the wall: a white flash, an expanding shell and a shock ring, a burst of sparks and a puff of dust
-local function boltImpact(p)
+function boltImpact(p)
 	local pos = p.target
 	p.orb.Transparency = 1
 	for _, c in ipairs(p.orb:GetChildren()) do
@@ -1105,14 +1108,17 @@ local function startSigils(model, aim)
 		nextIndex = nil,
 	}
 	session.stride = math.max(1, math.ceil(session.rate / MAX_VISUAL_RATE))
-	-- the cone: tip on the wall (AimPos), opening back towards the unit and up; circle i sits on the cone's surface at its
+	-- the cone: its tip hangs fixed in the air in front of the unit (the Sigilwright has unlimited range, so the circles
+	-- do not follow the wall: the bolts fly to the wall wherever it is), opening back towards the unit and up; circle i sits on the cone's surface at its
 	-- own angle round the axis (upper half only, so none ends up under the floor), at its own distance from the tip
+	local pivot = model:GetPivot().Position
+	local apex = Vector3.new(pivot.X, aim.Y - 6 + SIGIL_APEX_HEIGHT, pivot.Z) + dir * SIGIL_APEX_AHEAD
 	for i = 1, SIGIL_COUNT do
 		local sc = newSigilCircle(color, SIGIL_SMALL_DIAMETER, 1)
 		local phi = SIGIL_ARC_FROM + (i - 1) / (SIGIL_COUNT - 1) * (SIGIL_ARC_TO - SIGIL_ARC_FROM)
 		local around = right * math.cos(phi) + Vector3.yAxis * math.sin(phi)
 		sc.offset = (-dir * math.cos(SIGIL_CONE_ANGLE) + around * math.sin(SIGIL_CONE_ANGLE)) * SIGIL_DISTANCES[i]
-		sc.home = aim + sc.offset
+		sc.home = apex + sc.offset
 		sc.bobPhase = i * 1.7
 		sc.stride = session.stride
 		sc.shotTime = session.shotTime
@@ -1225,16 +1231,11 @@ RunService.RenderStepped:Connect(function()
 			local center = s.muzzle.Position + Vector3.new(0, 0.9 * s.scale, 0)
 			s.big.part.CFrame = CFrame.lookAt(center, center + Vector3.yAxis, s.dir)
 			updateSigilCircle(s.big, vis, elapsed)
-			-- the cone follows the wall being fought (AimPos moves on when a wall breaks); every circle faces the tip
+			-- the cone stays where it is; every circle faces the wall being fought (AimPos moves on when a wall breaks)
 			local aim = s.model:GetAttribute("AimPos")
 			if typeof(aim) == "Vector3" then
-				local follow = clamp01((now - (s.lastFrame or now)) * 8 + 0.02)
-				for _, sc in ipairs(s.smalls) do
-					sc.home = sc.home:Lerp(aim + sc.offset, follow)
-				end
+				s.tip = aim
 			end
-			s.lastFrame = now
-			s.tip = typeof(aim) == "Vector3" and aim or s.tip
 			-- the small circles open one after another and bob a little
 			for k, sc in ipairs(s.smalls) do
 				local openNow = clamp01((elapsed - SIGIL_OPEN_DELAY - (k - 1) * SIGIL_OPEN_STEP) / 0.3)

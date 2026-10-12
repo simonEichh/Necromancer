@@ -229,7 +229,7 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 		if u.block and u.block.Parent then
 			if u.def.static then
 				-- towers cannot walk: they rise again straight at their slot in front of the new first wall
-				local pos = PlotFrame.toWorld(plotState, u.slotLat or 0, plotState.wallTargetFwd - (u.slotStand or Army.standDistance(u.def)))
+				local pos = PlotFrame.toWorld(plotState, u.slotLat or 0, Army.standForward(plotState, u.def))
 					+ Vector3.new(0, u.def.size.Y / 2 + 1, 0)
 				u.block.CFrame = CFrame.lookAt(pos, pos + forward)
 				if u.model then

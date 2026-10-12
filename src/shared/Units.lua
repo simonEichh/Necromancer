@@ -239,8 +239,10 @@ local UNITS = {
 		static = true,
 	},
 	-- The Sigilwright walks with the army and fights from far back: it lifts a hand, a big rune circle opens flat above
-	-- it, and small sigil circles open in the air in a cone whose tip is on the wall (attack style "SigilCast", see
-	-- SpellEffects). Its darts leave the small circles and fly `shotFlight` seconds, slow at first and then accelerating.
+	-- it, and small sigil circles open in the air in a fixed cone far ahead (attack style "SigilCast", see SpellEffects).
+	-- It has unlimited range (`infiniteRange`): it never marches after the wall, it stands at a fixed post (Army
+	-- INFINITE_RANGE_POST_FWD) and its darts fly `shotFlight` seconds to the wall wherever it is, slow at first and then
+	-- accelerating.
 	-- DPS: 85000 / 1 s.
 	Sigilwright = {
 		color = BrickColor.new("Pastel yellow"),
@@ -251,6 +253,7 @@ local UNITS = {
 		attackCD = 1.0,
 		shotsPerSecond = 8,
 		shotFlight = 0.45,
+		infiniteRange = true, -- it stays at a fixed post far behind the front and shoots the wall wherever it is
 	},
 }
 
