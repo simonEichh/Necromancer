@@ -259,7 +259,7 @@ local STONE_TINTS = {
 }
 
 -- opts: text, color ("green" default | "red" | "gold" | "blue" | "purple"), size (UDim2 of the button SHAPE, offsets only,
--- default 150 x 44), position, anchor, onClick, disabled. Returns { root, button, label }: place and size `root`;
+-- default 150 x 44), position, anchor, zIndex, onClick, disabled. Returns { root, button, label }: place and size `root`;
 -- root:SetAttribute("Disabled", true/false) disables or enables it.
 function Theme.stoneButton(parent, opts)
 	opts = opts or {}
@@ -274,6 +274,7 @@ function Theme.stoneButton(parent, opts)
 	root.Size = size
 	root.Position = opts.position or UDim2.new()
 	root.AnchorPoint = opts.anchor or Vector2.new()
+	root.ZIndex = opts.zIndex or 1
 	root.Parent = parent
 
 	local button = Instance.new("ImageButton")
@@ -284,6 +285,7 @@ function Theme.stoneButton(parent, opts)
 	button.ScaleType = Enum.ScaleType.Slice
 	button.SliceCenter = STONE_SLICE
 	button.SliceScale = scale
+	button.ZIndex = opts.zIndex or 1
 	button.Parent = root
 
 	local label = Instance.new("TextLabel")
@@ -295,6 +297,7 @@ function Theme.stoneButton(parent, opts)
 	label.TextScaled = false
 	label.TextSize = math.floor(h * 0.52)
 	label.TextWrapped = false
+	label.ZIndex = (opts.zIndex or 1) + 1
 	label.Parent = button
 
 	local textColor = tint and Color3.fromRGB(255, 250, 240) or Color3.fromRGB(214, 255, 230)

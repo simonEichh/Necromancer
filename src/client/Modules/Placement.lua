@@ -5,23 +5,17 @@ local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
 
 -- ── Place Best button (top-center, just below HUD) ────────────
-local placeBestBtn = Instance.new("TextButton")
-placeBestBtn.Name = "PlaceBestBtn"
-placeBestBtn.Size = UDim2.new(0, 170, 0, 36)
-placeBestBtn.Position = UDim2.new(0.5, -85, 0, 72)
-placeBestBtn.BackgroundColor3 = Color3.fromRGB(130, 25, 25)
-placeBestBtn.Text = "Place Best"
-placeBestBtn.TextColor3 = Color3.fromRGB(255, 210, 210)
-placeBestBtn.TextScaled = true
-placeBestBtn.Font = Enum.Font.GothamBold
-placeBestBtn.BorderSizePixel = 0
-placeBestBtn.ZIndex = 10
-Instance.new("UICorner", placeBestBtn).CornerRadius = UDim.new(0, 10)
-placeBestBtn.Parent = screenGui
+local Theme = require(script.Parent.Theme)
+local placeBest = Theme.stoneButton(screenGui, {
+	text = "Place Best", color = "gold", size = UDim2.fromOffset(180, 40),
+	position = UDim2.new(0.5, -90, 0, 78), zIndex = 10,
+})
+placeBest.root.Name = "PlaceBestBtn"
+local placeBestBtn = placeBest.button
 
 local placeBestRemote = ReplicatedStorage:WaitForChild("PlaceBest", 5)
 
-placeBestBtn.MouseButton1Click:Connect(function()
+placeBestBtn.Activated:Connect(function()
 	if placeBestRemote then
 		placeBestRemote:FireServer() -- the server picks the best units from its own inventory
 	end

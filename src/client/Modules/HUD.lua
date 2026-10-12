@@ -1,4 +1,5 @@
 local HUD = {}
+local Theme = require(script.Parent.Theme)
 
 local RunService = game:GetService("RunService")
 
@@ -8,61 +9,20 @@ local goldLbl, gemsLbl, luckLbl, spinCountLbl, spinBadge
 -- ── Injected deps ────────────────────────────────────────────
 local getGold, getGems, getSpins, getLuckBuffEnd, getCountdown, fmtNumber
 
--- ── Helper: make a top teleport pill button ──────────────────
-local function makePillBtn(parent, text, bgColor, x, callback)
-	local btn = Instance.new("TextButton", parent)
-	btn.Size = UDim2.new(0, 160, 0, 50)
-	btn.Position = UDim2.new(0.5, x, 0, 10)
-	btn.BackgroundColor3 = bgColor
-	btn.Text = text
-	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.TextScaled = true
-	btn.Font = Enum.Font.GothamBold
-	btn.BorderSizePixel = 0
-	btn.ZIndex = 5
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 25)
-	Instance.new("UIStroke", btn).Color = Color3.fromRGB(255, 255, 255)
-	btn.MouseButton1Click:Connect(callback)
-	return btn
+-- ── Helper: make a top teleport button (stone button, see Theme) ──
+local function makePillBtn(parent, text, color, x, callback)
+	return Theme.stoneButton(parent, {
+		text = text, color = color, size = UDim2.fromOffset(150, 44),
+		position = UDim2.new(0.5, x, 0, 14), zIndex = 5, onClick = callback,
+	}).root
 end
 
--- ── Helper: make a side icon button ──────────────────────────
-local function makeIconBtn(parent, icon, label, yPos, bgColor, callback)
-	local frame = Instance.new("Frame", parent)
-	frame.Size = UDim2.new(0, 76, 0, 86)
-	frame.Position = UDim2.new(0, 0, 0, yPos)
-	frame.BackgroundColor3 = bgColor
-	frame.BackgroundTransparency = 0.15
-	frame.BorderSizePixel = 0
-	frame.ZIndex = 5
-	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 14)
-
-	local iconLbl = Instance.new("TextLabel", frame)
-	iconLbl.Size = UDim2.new(1, 0, 0, 52)
-	iconLbl.Position = UDim2.new(0, 0, 0, 4)
-	iconLbl.BackgroundTransparency = 1
-	iconLbl.Text = icon
-	iconLbl.TextScaled = true
-	iconLbl.ZIndex = 6
-
-	local nameLbl = Instance.new("TextLabel", frame)
-	nameLbl.Size = UDim2.new(1, 0, 0, 22)
-	nameLbl.Position = UDim2.new(0, 0, 0, 58)
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Text = label
-	nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-	nameLbl.TextScaled = true
-	nameLbl.Font = Enum.Font.GothamBold
-	nameLbl.ZIndex = 6
-
-	local btn = Instance.new("TextButton", frame)
-	btn.Size = UDim2.new(1, 0, 1, 0)
-	btn.BackgroundTransparency = 1
-	btn.Text = ""
-	btn.ZIndex = 7
-	btn.MouseButton1Click:Connect(callback)
-
-	return frame
+-- ── Helper: make a side button (stone button; the icon spot is gone until real icons exist) ──
+local function makeIconBtn(parent, icon, label, yPos, color, callback)
+	return Theme.stoneButton(parent, {
+		text = label, color = color, size = UDim2.fromOffset(112, 44),
+		position = UDim2.fromOffset(0, yPos), zIndex = 5, onClick = callback,
+	}).root
 end
 
 -- ── fmt helper (local copy for currency display) ─────────────
@@ -83,8 +43,8 @@ function HUD.init(screenGui, deps)
 	fmtNumber      = deps.fmtNumber
 
 	-- ── Top center teleport buttons ──────────────────────────
-	makePillBtn(screenGui, "SHOPS", Color3.fromRGB(40, 140, 60),  -170, deps.onShops)
-	makePillBtn(screenGui, "WALL",  Color3.fromRGB(140, 40, 40),   10,  deps.onWall)
+	makePillBtn(screenGui, "SHOPS", nil, -160, deps.onShops)
+	makePillBtn(screenGui, "WALL", "red", 10, deps.onWall)
 
 	-- ── Top right: spin wheel button ─────────────────────────
 	local spinFrame = Instance.new("Frame", screenGui)
@@ -138,23 +98,23 @@ function HUD.init(screenGui, deps)
 
 	-- ── Left side: icon buttons ──────────────────────────────
 	local leftPanel = Instance.new("Frame", screenGui)
-	leftPanel.Size = UDim2.new(0, 76, 0, 400)
+	leftPanel.Size = UDim2.new(0, 112, 0, 400)
 	leftPanel.Position = UDim2.new(0, 10, 0.5, -150)
 	leftPanel.BackgroundTransparency = 1
 	leftPanel.ZIndex = 5
 
-	makeIconBtn(leftPanel, "", "Ascend",    0,   Color3.fromRGB(80, 40, 140), deps.onAscend)
-	makeIconBtn(leftPanel, "", "Inventory", 96,  Color3.fromRGB(30, 70, 130), deps.onInventory)
+	makeIconBtn(leftPanel, "", "Ascend", 0, "purple", deps.onAscend)
+	makeIconBtn(leftPanel, "", "Inventory", 62, "blue", deps.onInventory)
 
 	-- ── Right side: icon buttons ─────────────────────────────
 	local rightPanel = Instance.new("Frame", screenGui)
-	rightPanel.Size = UDim2.new(0, 76, 0, 400)
-	rightPanel.Position = UDim2.new(1, -86, 0.5, -50)
+	rightPanel.Size = UDim2.new(0, 112, 0, 400)
+	rightPanel.Position = UDim2.new(1, -122, 0.5, -50)
 	rightPanel.BackgroundTransparency = 1
 	rightPanel.ZIndex = 5
 
-	makeIconBtn(rightPanel, "", "Quests",  0,  Color3.fromRGB(20, 60, 100), deps.onQuests)
-	makeIconBtn(rightPanel, "", "Friends", 96, Color3.fromRGB(30, 80, 50),  deps.onFriends or function() end)
+	makeIconBtn(rightPanel, "", "Quests", 0, "blue", deps.onQuests)
+	makeIconBtn(rightPanel, "", "Friends", 62, nil, deps.onFriends or function() end)
 
 	-- ── Bottom left: currency display ────────────────────────
 	local currencyFrame = Instance.new("Frame", screenGui)
