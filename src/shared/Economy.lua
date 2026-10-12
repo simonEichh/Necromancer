@@ -86,4 +86,69 @@ function Economy.sellGoldMultiplier(coinBoostLevel)
 	return 1 + coinBoostLevel * 0.5
 end
 
+-- ============================================================
+-- Unit upgrades (the Forge). Tuned with tools/sim/economy_sim.py (the "gate" preset models these rules).
+-- ============================================================
+-- Every rarity has its own material. A unit is upgraded with the material of ITS rarity; walls drop materials, spare units
+-- can be dismantled into them. A failed upgrade never lowers the level: it only costs materials, and every failure makes the
+-- next try more likely to succeed (pity).
+Economy.RARITIES_ASC = { "Common", "Uncommon", "Rare", "Cursed", "Legendary", "Abyssal", "Eldritch", "Eternal", "Primordial" }
+Economy.MATERIAL_NAMES = {
+	Common = "Stone Dust",
+	Uncommon = "Bone Shards",
+	Rare = "Grave Iron",
+	Cursed = "Hex Ash",
+	Legendary = "Gilded Relic",
+	Abyssal = "Abyssal Pearl",
+	Eldritch = "Eldritch Ichor",
+	Eternal = "Eternal Ember",
+	Primordial = "Primordial Core",
+}
+Economy.MAX_UNIT_LEVEL = 10
+local LEVEL_DAMAGE = 0.30 -- +30% damage per level
+local UPGRADE_BASE_COST, UPGRADE_COST_GROWTH = 4, 1.55
+local UPGRADE_FAIL_LOSS = 0.5 -- a failed attempt costs this share of the materials
+local UPGRADE_PITY = 0.10 -- +10% chance for every failed attempt in a row on that unit
+local DISMANTLE_BASE, DISMANTLE_GROWTH = 2, 1.8
+local BOSS_EVERY = 10 -- every 10th wall (and the gate) is a boss wall: it drops materials of a better tier
+
+-- Damage multiplier of a unit of the given level
+function Economy.levelMultiplier(level)
+	return 1 + LEVEL_DAMAGE * (level or 0)
+end
+
+-- Materials needed to take a unit from `level` to `level + 1`
+function Economy.upgradeCost(level)
+	return math.ceil(UPGRADE_BASE_COST * UPGRADE_COST_GROWTH ^ level)
+end
+
+-- Chance (0..1) that the next upgrade works, given the level and the failed attempts in a row
+function Economy.upgradeChance(level, fails)
+	return math.min(1, math.max(0.2, 1 - 0.08 * level) + UPGRADE_PITY * (fails or 0))
+end
+
+-- Materials lost when an attempt fails
+function Economy.upgradeFailLoss(cost)
+	return math.ceil(cost * UPGRADE_FAIL_LOSS)
+end
+
+-- Materials (of the unit's own rarity) a spare unit gives when dismantled; `rank` = 1 for Common ... 9 for Primordial
+function Economy.dismantleYield(rank)
+	return math.floor(DISMANTLE_BASE * DISMANTLE_GROWTH ^ (rank - 1) + 0.5)
+end
+
+-- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { rarity, amount }.
+-- Mostly the best tier the player has reached (one higher than their ascensions), sometimes the tier below; boss walls
+-- and the gate add three times as much of the tier above.
+function Economy.wallMaterials(layer, rebirthCount, roll)
+	local top = math.min(#Economy.RARITIES_ASC, rebirthCount + 2) -- index into RARITIES_ASC (1 = Common)
+	local amount = 1 + layer // 3
+	local tier = ((roll or math.random()) < 0.7) and top or math.max(1, top - 1)
+	local drops = { { rarity = Economy.RARITIES_ASC[tier], amount = amount } }
+	if layer % BOSS_EVERY == 0 or layer == Economy.WALLS_PER_RUN then
+		table.insert(drops, { rarity = Economy.RARITIES_ASC[math.min(#Economy.RARITIES_ASC, top + 1)], amount = amount * 3 })
+	end
+	return drops
+end
+
 return Economy

@@ -330,6 +330,10 @@ local function breakWall(plotState)
 			if profile then
 				local mult = Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost)
 				PlayerData.addGold(p, math.floor(goldReward * mult))
+				-- the wall drops upgrade materials (boss walls and the gate drop better ones)
+				for _, drop in ipairs(Economy.wallMaterials(brokenLayer, profile.rebirthCount)) do
+					PlayerData.addMaterial(p, drop.rarity, drop.amount)
+				end
 			end
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)
 			if Economy.isGate(brokenLayer) then

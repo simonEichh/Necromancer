@@ -177,6 +177,7 @@ require(Modules.SpellEffects)
 require(Modules.HitEffects)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
+require(Modules.ForgePanel)
 require(Modules.UpgradePanel)
 WheelPanel = require(Modules.WheelPanel)
 require(Modules.DevPanel) -- Studio only, drawn on top

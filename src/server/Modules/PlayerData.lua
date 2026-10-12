@@ -38,6 +38,7 @@ function PlayerData.create(player, saved)
 		gems = 0,
 		rebirthCount = 0,
 		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
+		materials = {}, -- [rarity] = amount of that rarity's upgrade material
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
@@ -65,6 +66,12 @@ function PlayerData.create(player, saved)
 			end
 		end
 
+		if type(saved.materials) == "table" then
+			for _, rarity in ipairs(Economy.RARITIES_ASC) do
+				profile.materials[rarity] = math.floor(clampNumber(saved.materials[rarity], 0, 0))
+			end
+		end
+
 		if type(saved.inventory) == "table" then
 			for _, entry in ipairs(saved.inventory) do
 				local slot = type(entry) == "table" and entry.slot
@@ -79,6 +86,8 @@ function PlayerData.create(player, saved)
 					profile.inventory[slot] = {
 						unitType = entry.unitType,
 						oneIn = clampNumber(entry.oneIn, Units.getBaseOneIn(entry.unitType), 1),
+						level = math.floor(clampNumber(entry.level, 0, 0)) <= Economy.MAX_UNIT_LEVEL and math.floor(clampNumber(entry.level, 0, 0)) or Economy.MAX_UNIT_LEVEL,
+						fails = math.floor(clampNumber(entry.fails, 0, 0)),
 					}
 				end
 			end
@@ -98,17 +107,24 @@ function PlayerData.remove(player)
 end
 
 -- ── Snapshot / sync ──────────────────────────────────────────
+-- Set by Army: function(player) -> the units standing on the graves as a list of { slot, unitType, level, fails }
+PlayerData.placedProvider = nil
+
 function PlayerData.snapshot(profile)
 	local inventory = {}
 	for slot = 1, INVENTORY_MAX do
 		local unit = profile.inventory[slot]
 		if unit then
-			table.insert(inventory, { slot = slot, unitType = unit.unitType, oneIn = unit.oneIn })
+			table.insert(inventory, { slot = slot, unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0 })
 		end
 	end
 	local owned = {}
 	for key, count in pairs(profile.ownedGraves) do
 		owned[key] = count
+	end
+	local materials = {}
+	for _, rarity in ipairs(Economy.RARITIES_ASC) do
+		materials[rarity] = profile.materials[rarity] or 0
 	end
 	return {
 		gold = profile.gold,
@@ -120,6 +136,8 @@ function PlayerData.snapshot(profile)
 		luckBoostLevel = profile.upgrades.luckBoost,
 		coinBoostLevel = profile.upgrades.coinBoost,
 		inventory = inventory,
+		materials = materials,
+		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}
 end
 
@@ -199,7 +217,7 @@ function PlayerData.hasFreeSlot(player)
 end
 
 -- Adds a unit to the first free slot. Returns the slot, or nil if the inventory is full.
-function PlayerData.addUnit(player, unitType, oneIn)
+function PlayerData.addUnit(player, unitType, oneIn, level, fails)
 	local profile = profiles[player.UserId]
 	if not profile or not Units.Stats[unitType] then
 		return nil
@@ -208,7 +226,7 @@ function PlayerData.addUnit(player, unitType, oneIn)
 	if not slot then
 		return nil
 	end
-	profile.inventory[slot] = { unitType = unitType, oneIn = oneIn or Units.getBaseOneIn(unitType) }
+	profile.inventory[slot] = { unitType = unitType, oneIn = oneIn or Units.getBaseOneIn(unitType), level = level or 0, fails = fails or 0 }
 	PlayerData.changed(player)
 	return slot
 end
@@ -262,7 +280,7 @@ function PlayerData.setInventoryList(player, list)
 		if i > INVENTORY_MAX then
 			break
 		end
-		profile.inventory[i] = { unitType = unit.unitType, oneIn = unit.oneIn }
+		profile.inventory[i] = { unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0 }
 	end
 	PlayerData.changed(player)
 end
@@ -278,6 +296,31 @@ function PlayerData.inventoryList(player)
 		end
 	end
 	return list
+end
+
+-- ── Materials (unit upgrades) ────────────────────────────────
+function PlayerData.addMaterial(player, rarity, amount)
+	local profile = profiles[player.UserId]
+	if not profile or Economy.MATERIAL_NAMES[rarity] == nil or type(amount) ~= "number" or amount ~= amount or amount <= 0 then
+		return false
+	end
+	profile.materials[rarity] = math.min((profile.materials[rarity] or 0) + math.floor(amount), MAX_CURRENCY)
+	PlayerData.changed(player)
+	return true
+end
+
+-- Takes materials; returns false (and takes nothing) when the player does not have that many.
+function PlayerData.spendMaterial(player, rarity, amount)
+	local profile = profiles[player.UserId]
+	if not profile or Economy.MATERIAL_NAMES[rarity] == nil or type(amount) ~= "number" or amount < 0 then
+		return false
+	end
+	if (profile.materials[rarity] or 0) < amount then
+		return false
+	end
+	profile.materials[rarity] -= amount
+	PlayerData.changed(player)
+	return true
 end
 
 -- ── Graves / upgrades / ascension ────────────────────────────

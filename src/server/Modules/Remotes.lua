@@ -16,6 +16,8 @@ local EVENTS = {
 	"RequestData",
 	"SellUnit",
 	"SwapInventory",
+	"UpgradeUnit", -- (kind "inv" | "grave", index): the Forge, see UnitUpgrades
+	"DismantleUnit", -- (inventory slot)
 	"WheelSpin",
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync
@@ -24,6 +26,7 @@ local EVENTS = {
 	"DataSync", -- full snapshot of the player's authoritative data
 	"DigRejected",
 	"Notice", -- short message to show the player
+	"UpgradeResult", -- (success, unitType, newLevel, chance) after an UpgradeUnit
 	"OpenGrave",
 	"OpenSell",
 	"OpenUpgrade",

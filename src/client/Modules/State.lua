@@ -9,8 +9,12 @@ local State = {
 	gateCleared = false, -- the gate fell: ascending is possible
 	goldMultiplier = 1.0,
 
-	-- Inventory: up to INVENTORY_MAX units; first 10 are shown in the toolbar
+	-- Inventory: up to INVENTORY_MAX units (each { unitType, oneIn, level, fails }); first 10 are shown in the toolbar
 	inventory = {},
+	-- Units standing on the graves: a list of { slot, unitType, level, fails }
+	placed = {},
+	-- Upgrade materials by rarity: { Common = 12, ... } (Economy.MATERIAL_NAMES has their names)
+	materials = {},
 	selectedSlot = 1,
 
 	-- Owned (bought, unopened) graves

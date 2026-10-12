@@ -10,6 +10,7 @@ local Wheel = require(script.Parent.Wheel)
 local Rolling = require(script.Parent.Rolling)
 local Army = require(script.Parent.Army)
 local PlotRegistry = require(script.Parent.PlotRegistry)
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local STORE_NAME = "PlayerData_v1"
 local SAVE_VERSION = 1
@@ -47,7 +48,7 @@ local function collect(player, profile)
 	if plotState then
 		for slotIndex, slot in pairs(plotState.graveSlots) do
 			if slot.occupied and slot.unitType then
-				table.insert(placed, { slot = slotIndex, unitType = slot.unitType })
+				table.insert(placed, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0 })
 			end
 		end
 	end
@@ -60,6 +61,7 @@ local function collect(player, profile)
 		ownedGraves = snapshot.ownedGraves,
 		upgrades = { luckBoost = profile.upgrades.luckBoost, coinBoost = profile.upgrades.coinBoost },
 		inventory = snapshot.inventory,
+		materials = snapshot.materials,
 		placed = placed,
 		pity = Rolling.exportPity(player),
 		wheelSpins = Wheel.getWheelData(player).spins,
@@ -111,7 +113,8 @@ function Persistence.restorePlaced(player)
 	end
 	for _, entry in ipairs(placed) do
 		if type(entry) == "table" and type(entry.slot) == "number" then
-			Army.placeInSlot(plotState, entry.slot, entry.unitType)
+			local level = math.clamp(math.floor(tonumber(entry.level) or 0), 0, Economy.MAX_UNIT_LEVEL)
+			Army.placeInSlot(plotState, entry.slot, entry.unitType, level, math.max(0, math.floor(tonumber(entry.fails) or 0)))
 		end
 	end
 end

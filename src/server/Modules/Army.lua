@@ -45,9 +45,10 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 			end
 		end
 	end
-	PlayerData.addUnit(player, slot.unitType, getBaseOneIn(slot.unitType))
+	PlayerData.addUnit(player, slot.unitType, getBaseOneIn(slot.unitType), slot.level, slot.fails)
 	slot.occupied = false
 	slot.unitType = nil
+	slot.level, slot.fails = nil, nil
 	slot.unitEntry = nil
 	slot.label.Text = "Empty"
 	slot.rarityLabel.Text = ""
@@ -77,7 +78,7 @@ local function setDamageMultiplier(plotState)
 	local mult = ownerDamageMultiplier(plotState)
 	for _, u in ipairs(plotState.activeUnits) do
 		if u.baseDamage then
-			u.def.damage = u.baseDamage * mult
+			u.def.damage = u.baseDamage * mult * Economy.levelMultiplier(u.level)
 			if u.dpsLbl then
 				u.dpsLbl.Text = math.floor(u.def.damage / u.def.attackCD) .. " DPS"
 			end
@@ -85,11 +86,11 @@ local function setDamageMultiplier(plotState)
 	end
 end
 
-local function spawnUnit(unitType, customPos, plotState)
+local function spawnUnit(unitType, customPos, plotState, level)
 	local baseDef = UNITS[unitType]
 	if not baseDef then return end
 	local def = table.clone(baseDef)
-	def.damage = baseDef.damage * ownerDamageMultiplier(plotState)
+	def.damage = baseDef.damage * ownerDamageMultiplier(plotState) * Economy.levelMultiplier(level)
 	nextUnitId += 1
 
 	-- "lateral" = which lane line across the plot the unit walks along; units face down the lane
@@ -169,6 +170,7 @@ local function spawnUnit(unitType, customPos, plotState)
 			modelClone:SetAttribute("AttackCount", 0)
 			modelClone:SetAttribute("AttackCD", def.attackCD)
 			modelClone:SetAttribute("Speed", def.speed)
+			modelClone:SetAttribute("Level", level or 0) -- (auras at level milestones read this)
 			if def.static then
 				-- the client lifts the model out of the ground over RiseTime seconds (see UnitAnimator)
 				modelClone:SetAttribute("RiseStart", workspace:GetServerTimeNow())
@@ -281,7 +283,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	dpsLbl.Font = Enum.Font.GothamBold
 
 	table.insert(plotState.activeUnits, {
-		block = block, bv = bv, bg = bg, def = def, baseDamage = baseDef.damage, dpsLbl = dpsLbl,
+		block = block, bv = bv, bg = bg, def = def, baseDamage = baseDef.damage, level = level or 0, dpsLbl = dpsLbl,
 		lastAttack = 0, lateral = lateral,
 		id = nextUnitId, -- stable order inside a formation row (see layoutFormation)
 		walkTrack = walkTrack, attackTrack = attackTrack,
@@ -291,17 +293,19 @@ end
 
 -- Spawns a unit on a grave slot and updates the slot's labels/prompt.
 -- Returns false if the slot is missing or already occupied.
-local function placeInSlot(plotState, slotIndex, unitType)
+local function placeInSlot(plotState, slotIndex, unitType, level, fails)
 	local slot = plotState.graveSlots[slotIndex]
 	local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. tostring(slotIndex))
 	if not slot or slot.occupied or not graveSpot or not UNITS[unitType] then
 		return false
 	end
-	spawnUnit(unitType, graveSpot.Position + Vector3.new(0, 2, 0), plotState)
+	spawnUnit(unitType, graveSpot.Position + Vector3.new(0, 2, 0), plotState, level)
 	slot.occupied = true
 	slot.unitType = unitType
+	slot.level = level or 0
+	slot.fails = fails or 0
 	slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
-	local dps = math.floor(UNITS[unitType].damage * ownerDamageMultiplier(plotState) / UNITS[unitType].attackCD)
+	local dps = math.floor(UNITS[unitType].damage * ownerDamageMultiplier(plotState) * Economy.levelMultiplier(level) / UNITS[unitType].attackCD)
 	local rarity = UNIT_RARITY[unitType] or "Common"
 	slot.label.Text = unitType
 	slot.rarityLabel.Text = rarity
@@ -312,6 +316,38 @@ local function placeInSlot(plotState, slotIndex, unitType)
 	return true
 end
 
+-- Sets the level (and the failed-upgrade streak) of the unit standing on a grave: its damage, DPS labels and model attribute.
+local function setUnitLevel(plotState, slotIndex, level, fails)
+	local slot = plotState.graveSlots[slotIndex]
+	if not slot or not slot.occupied then return false end
+	slot.level, slot.fails = level, fails or 0
+	local u = slot.unitEntry
+	if u then
+		u.level = level
+		u.def.damage = u.baseDamage * ownerDamageMultiplier(plotState) * Economy.levelMultiplier(level)
+		local dps = math.floor(u.def.damage / u.def.attackCD)
+		if u.dpsLbl then u.dpsLbl.Text = dps .. " DPS" end
+		slot.dpsLabel.Text = dps .. " DPS"
+		if u.model then u.model:SetAttribute("Level", level) end
+	end
+	return true
+end
+
+-- The units standing on the graves of a player's plot, for the data snapshot (PlayerData.snapshot): { slot, unitType, level, fails }
+PlayerData.placedProvider = function(player)
+	local plotState = getPlot(player)
+	local list = {}
+	if plotState then
+		for slotIndex, slot in pairs(plotState.graveSlots) do
+			if slot.occupied and slot.unitType then
+				table.insert(list, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0 })
+			end
+		end
+		table.sort(list, function(a, b) return a.slot < b.slot end)
+	end
+	return list
+end
+
 -- Client asks to place the unit from inventory slot `invIndex` on grave slot `slotIndex`.
 Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, invIndex, slotIndex)
 	local plotState = getPlot(player)
@@ -319,7 +355,7 @@ Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, invIndex, slotIndex)
 	local slot = plotState.graveSlots[slotIndex]
 	local unit = PlayerData.getUnit(player, invIndex)
 	if not slot or slot.occupied or not unit then return end
-	if not placeInSlot(plotState, slotIndex, unit.unitType) then return end
+	if not placeInSlot(plotState, slotIndex, unit.unitType, unit.level, unit.fails) then return end
 	PlayerData.takeUnit(player, invIndex)
 	print("🪦 " .. player.Name .. " placed " .. unit.unitType .. " at grave " .. slotIndex)
 end)
@@ -327,7 +363,7 @@ end)
 local function clearSlot(i, plotState)
 	local slot = plotState.graveSlots[i]
 	if not slot or not slot.occupied then return nil end
-	local unitType = slot.unitType
+	local unitType, level, fails = slot.unitType, slot.level, slot.fails
 	if slot.unitEntry then
 		for j = #plotState.activeUnits, 1, -1 do
 			if plotState.activeUnits[j] == slot.unitEntry then
@@ -341,13 +377,14 @@ local function clearSlot(i, plotState)
 	end
 	slot.occupied = false
 	slot.unitType = nil
+	slot.level, slot.fails = nil, nil
 	slot.unitEntry = nil
 	slot.label.Text = "Empty"
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"
 	slot.prompt.ObjectText = "Grave " .. i
-	return { unitType = unitType, oneIn = getBaseOneIn(unitType) }
+	return { unitType = unitType, oneIn = getBaseOneIn(unitType), level = level, fails = fails }
 end
 
 -- Re-deploys the strongest units (from the graves and the server-side inventory) onto the graves.
@@ -360,18 +397,18 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 		if item then table.insert(pool, item) end
 	end
 	for _, item in ipairs(PlayerData.inventoryList(player)) do
-		table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn })
+		table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn, level = item.level, fails = item.fails })
 	end
 	table.sort(pool, function(a, b)
-		local dA = UNITS[a.unitType] and (UNITS[a.unitType].damage / UNITS[a.unitType].attackCD) or 0
-		local dB = UNITS[b.unitType] and (UNITS[b.unitType].damage / UNITS[b.unitType].attackCD) or 0
+		local dA = UNITS[a.unitType] and (UNITS[a.unitType].damage / UNITS[a.unitType].attackCD * Economy.levelMultiplier(a.level)) or 0
+		local dB = UNITS[b.unitType] and (UNITS[b.unitType].damage / UNITS[b.unitType].attackCD * Economy.levelMultiplier(b.level)) or 0
 		return dA > dB
 	end)
 	local slotCount = #plotState.graveSlots
 	local remaining = {}
 	local deployed = 0
 	for i, item in ipairs(pool) do
-		if i <= slotCount and placeInSlot(plotState, i, item.unitType) then
+		if i <= slotCount and placeInSlot(plotState, i, item.unitType, item.level, item.fails) then
 			deployed += 1
 		else
 			table.insert(remaining, item)
@@ -824,6 +861,7 @@ return {
 	placeInSlot = placeInSlot,
 	spawnUnit = spawnUnit,
 	setDamageMultiplier = setDamageMultiplier,
+	setUnitLevel = setUnitLevel,
 	standDistance = standDistance, -- (unit def) -> distance in front of the wall where the unit stands
 	standForward = function(plotState, def) -- (plotState, unit def) -> forward position (along the lane) where the unit stands
 		if def.infiniteRange then
