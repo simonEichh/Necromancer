@@ -231,4 +231,116 @@ function Theme.panel(parent, opts)
 	}
 end
 
+-- ============================================================
+-- Stone button (image based: cut corners, double bevel, diamond ornaments)
+-- ============================================================
+-- The four green states and a grey master that is tinted for the other colours were drawn by
+-- tools/design/make_button_images.py (PNGs in design/buttons/) and uploaded. Each image is 512 x 160 with a 16 px margin
+-- round the 480 x 128 button shape (room for the hover glow) and is sliced 9-patch style: the corner pieces (cut corner,
+-- bevel, diamonds) stay fixed, the middle stretches. Keep SLICE in sync with the script.
+Theme.Image = {
+	StoneButton = {
+		Default = "rbxassetid://88492918328761",
+		Hover = "rbxassetid://106431478235715",
+		Pressed = "rbxassetid://122534593064384",
+		Disabled = "rbxassetid://84718582421395",
+		Neutral = "rbxassetid://127236828836350", -- grey master, tinted with ImageColor3
+	},
+}
+local STONE_SLICE = Rect.new(80, 56, 432, 104)
+local STONE_MARGIN, STONE_SHAPE_H = 16, 128
+
+-- Colour variants of the stone button. "green" uses the dedicated state images; the others tint the grey master.
+local STONE_TINTS = {
+	red = Color3.fromRGB(214, 78, 78),
+	gold = Color3.fromRGB(236, 190, 84),
+	blue = Color3.fromRGB(96, 168, 236),
+	purple = Color3.fromRGB(160, 100, 224),
+}
+
+-- opts: text, color ("green" default | "red" | "gold" | "blue" | "purple"), size (UDim2 of the button SHAPE, offsets only,
+-- default 150 x 44), position, anchor, onClick, disabled. Returns { root, button, label }: place and size `root`;
+-- root:SetAttribute("Disabled", true/false) disables or enables it.
+function Theme.stoneButton(parent, opts)
+	opts = opts or {}
+	local size = opts.size or UDim2.fromOffset(150, 44)
+	local w, h = size.X.Offset, size.Y.Offset
+	local scale = h / STONE_SHAPE_H -- one image pixel is this many UI pixels
+	local margin = STONE_MARGIN * scale
+	local tint = STONE_TINTS[opts.color or ""]
+
+	local root = Instance.new("Frame") -- exactly the button shape; the image hangs over its edge by the glow margin
+	root.BackgroundTransparency = 1
+	root.Size = size
+	root.Position = opts.position or UDim2.new()
+	root.AnchorPoint = opts.anchor or Vector2.new()
+	root.Parent = parent
+
+	local button = Instance.new("ImageButton")
+	button.AutoButtonColor = false
+	button.BackgroundTransparency = 1
+	button.Size = UDim2.new(1, margin * 2, 1, margin * 2)
+	button.Position = UDim2.fromOffset(-margin, -margin)
+	button.ScaleType = Enum.ScaleType.Slice
+	button.SliceCenter = STONE_SLICE
+	button.SliceScale = scale
+	button.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, -h * 1.1, 1, 0) -- keeps the text between the two diamonds
+	label.Position = UDim2.new(0, h * 0.55, 0, 0)
+	label.Font = Theme.Font.Strong
+	label.Text = opts.text or ""
+	label.TextScaled = false
+	label.TextSize = math.floor(h * 0.52)
+	label.TextWrapped = false
+	label.Parent = button
+
+	local textColor = tint and Color3.fromRGB(255, 250, 240) or Color3.fromRGB(214, 255, 230)
+	local textStroke = tint and tint:Lerp(Color3.new(0, 0, 0), 0.8) or Theme.TextStroke.Color
+
+	local function show(state)
+		local disabled = root:GetAttribute("Disabled") == true
+		if disabled then
+			state = "Disabled"
+		end
+		if tint then
+			button.Image = Theme.Image.StoneButton.Neutral
+			local c = tint
+			if state == "Hover" then
+				c = tint:Lerp(Color3.new(1, 1, 1), 0.25)
+			elseif state == "Pressed" then
+				c = tint:Lerp(Color3.new(0, 0, 0), 0.3)
+			elseif state == "Disabled" then
+				c = Color3.fromRGB(110, 118, 114)
+			end
+			button.ImageColor3 = c
+		else
+			button.Image = Theme.Image.StoneButton[state]
+			button.ImageColor3 = Color3.new(1, 1, 1)
+		end
+		label.TextColor3 = (state == "Disabled") and Color3.fromRGB(140, 156, 148) or textColor
+		label.TextStrokeColor3 = textStroke
+		label.TextStrokeTransparency = (state == "Disabled") and 0.35 or 0
+		label.Position = UDim2.new(0, h * 0.55, 0, (state == "Pressed") and math.max(1, h * 0.03) or 0)
+	end
+
+	root:SetAttribute("Disabled", opts.disabled == true)
+	root:GetAttributeChangedSignal("Disabled"):Connect(function()
+		show("Default")
+	end)
+	button.MouseEnter:Connect(function() show("Hover") end)
+	button.MouseLeave:Connect(function() show("Default") end)
+	button.MouseButton1Down:Connect(function() show("Pressed") end)
+	button.MouseButton1Up:Connect(function() show("Hover") end)
+	button.Activated:Connect(function()
+		if root:GetAttribute("Disabled") ~= true and opts.onClick then
+			opts.onClick()
+		end
+	end)
+	show("Default")
+	return { root = root, button = button, label = label }
+end
+
 return Theme
