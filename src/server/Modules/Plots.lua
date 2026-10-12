@@ -149,22 +149,22 @@ initPlotForPlayer = function(player)
 		return
 	end
 	local basePart       = plotModel:FindFirstChild("Base")
-	local wallOriginPart = plotModel:FindFirstChild("WallOrigin")
 	local spawnPart2     = plotModel:FindFirstChild("PlayerSpawn")
-	if not basePart or not wallOriginPart then
-		warn("Plot" .. plotIndex .. " missing Base or WallOrigin")
+	if not basePart then
+		warn("Plot" .. plotIndex .. " missing Base")
 		plotOccupied[plotIndex] = false
 		return
 	end
 	-- The plot frame: floor-level centre of the Base, LookVector = lane direction (the Base part's
-	-- local -Z points down the lane, towards the walls). WallOrigin marks where the front wall stands.
+	-- local -Z points down the lane, towards the walls). The front wall stands Walls.WALL_FWD studs down the lane
+	-- (the plot's WallOrigin part in the place file is no longer used).
 	local frame = basePart.CFrame * CFrame.new(0, basePart.Size.Y / 2, 0)
 	local plotState = {
 		plotModel        = plotModel,
 		plotIndex        = plotIndex,
 		ownerId          = tostring(player.UserId),
 		frame            = frame,
-		wallFwd          = (wallOriginPart.Position - frame.Position):Dot(frame.LookVector),
+		wallFwd          = Walls.WALL_FWD,
 		plotGroundY      = frame.Position.Y,
 		wall             = nil,
 		wallQueue        = {},

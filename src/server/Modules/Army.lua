@@ -57,9 +57,12 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 	print("↩️ " .. player.Name .. " recalled unit from grave " .. slotIndex)
 end
 
+local nextUnitId = 0 -- ever-growing id of spawned units (orders the units inside a formation row)
+
 local function spawnUnit(unitType, customPos, plotState)
 	local def = UNITS[unitType]
 	if not def then return end
+	nextUnitId += 1
 
 	-- "lateral" = which lane line across the plot the unit walks along; units face down the lane
 	local forward = PlotFrame.forwardFlat(plotState)
@@ -240,7 +243,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	table.insert(plotState.activeUnits, {
 		block = block, bv = bv, bg = bg, def = def,
 		lastAttack = 0, lateral = lateral,
-		standoff = (math.random() - 0.5) * 3, -- each unit stops a little nearer or further so they don't pile up
+		id = nextUnitId, -- stable order inside a formation row (see layoutFormation)
 		walkTrack = walkTrack, attackTrack = attackTrack,
 		model = rigModel, labelBase = labelBase,
 	})
@@ -385,11 +388,74 @@ local function setState(u, state)
 	end
 end
 
--- Advances every plot's units one frame: walk toward the wall, then attack it.
+-- ── Formation ─────────────────────────────────────────────────
+-- Units do not collide with each other, so without a plan they would all pile up on the same few spots. Each plot's
+-- army forms rows facing the wall: a unit's row follows from its attack range (melee at the wall, mages about 20 studs
+-- back, long-range artillery further), and inside a row the units spread across the lane, centre first and then
+-- alternating right/left, so a newly arrived unit never makes the ones already standing move.
+-- Every unit gets slotLat (across the lane) and slotStand (distance in front of the wall's target line).
+local FORMATION_BAND = 5         -- studs between two formation rows (a unit's stand distance is its range rounded down to this)
+local FORMATION_MIN_STAND = 1.5  -- nearest a unit stands to the wall's target line
+local FORMATION_HALF_WIDTH = 16  -- units stay this close to the lane's centre line (the lane is 40 wide)
+local ARRIVE_RADIUS = 1.2        -- how close a unit must get to its slot before it stops and attacks
+local STAY_RADIUS = 3            -- a unit that has arrived keeps attacking unless it is pushed further than this
+
+local function layoutFormation(plotState)
+	local rows, stands = {}, {}
+	for _, u in ipairs(plotState.activeUnits) do
+		-- stand inside the attack range (1.5 studs of slack), rounded down to a row
+		local stand = math.max(FORMATION_MIN_STAND, math.floor((u.def.attackRange - 1.5) / FORMATION_BAND) * FORMATION_BAND)
+		if not rows[stand] then
+			rows[stand] = {}
+			table.insert(stands, stand)
+		end
+		table.insert(rows[stand], u)
+	end
+	table.sort(stands)
+
+	for rowIndex, stand in ipairs(stands) do
+		local row = rows[stand]
+		table.sort(row, function(a, b) return a.id < b.id end)
+		-- wide units need more room; squeeze the row if it would not fit across the lane
+		local spacing = 0
+		for _, u in ipairs(row) do
+			spacing = math.max(spacing, u.def.size.X * 1.7)
+		end
+		local reach = math.ceil((#row - 1) / 2)
+		if reach > 0 and reach * spacing > FORMATION_HALF_WIDTH then
+			spacing = FORMATION_HALF_WIDTH / reach
+		end
+		local shift = (rowIndex % 2 == 0) and spacing / 2 or 0 -- stagger every other row, like a proper battle line
+		for i, u in ipairs(row) do
+			local k = i - 1 -- slot 0 is the centre, then +1, -1, +2, -2 ...
+			local side = (k % 2 == 1) and 1 or -1
+			local lat = (k == 0) and 0 or side * math.ceil(k / 2) * spacing
+			u.slotLat = math.clamp(lat + shift, -FORMATION_HALF_WIDTH, FORMATION_HALF_WIDTH)
+			u.slotStand = stand
+		end
+	end
+end
+
+local function formationSignature(units)
+	local sig = #units * 1000003
+	for _, u in ipairs(units) do
+		sig += u.id
+	end
+	return sig
+end
+
+-- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
 local function update(now, dt)
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
 		if not plotState.wall or not plotState.wall.Parent then continue end
+
+		-- (re)plan the formation whenever units were added or removed
+		local signature = formationSignature(plotState.activeUnits)
+		if signature ~= plotState.formationSignature then
+			plotState.formationSignature = signature
+			layoutFormation(plotState)
+		end
 
 		for i = #plotState.activeUnits, 1, -1 do
 			local u = plotState.activeUnits[i]
@@ -401,12 +467,18 @@ local function update(now, dt)
 
 			local pos = u.block.Position
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
-			local target     = PlotFrame.toWorld(plotState, u.lateral, plotState.wallTargetFwd + u.standoff)
+			-- the unit's slot in the formation (falls back to the lane it was placed in until the first layout)
+			local lat = u.slotLat or u.lateral
+			local target     = PlotFrame.toWorld(plotState, lat, plotState.wallTargetFwd - (u.slotStand or FORMATION_MIN_STAND))
 			local flatTarget = Vector3.new(target.X, 0, target.Z)
 			local dist = (flatPos - flatTarget).Magnitude
 			local forward = PlotFrame.forwardFlat(plotState)
 
-			if dist <= u.def.attackRange then
+			-- arrived = stand in the slot and attack (units that are already in place stay put unless pushed away;
+			-- the arrival radius grows with speed so a fast unit cannot overshoot its slot forever)
+			u.arrived = dist <= (u.arrived and STAY_RADIUS or math.max(ARRIVE_RADIUS, u.def.speed * dt * 1.5))
+
+			if u.arrived then
 				u.bv.Velocity = Vector3.new(0, 0, 0)
 				u.bg.CFrame = CFrame.lookAt(pos, pos + forward)
 
@@ -426,14 +498,14 @@ local function update(now, dt)
 						if casts then
 							-- tell the clients where the spell visuals should fly (the wall face in this unit's lane, mid-height);
 							-- set before AttackCount so the clients read it when they see the attack
-							local aim = PlotFrame.toWorld(plotState, u.lateral, plotState.wallFaceFwd)
+							local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
 							u.model:SetAttribute("AimPos", aim + Vector3.new(0, 6, 0))
 						end
 						u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
 					end
 					if u.attackTrack then u.attackTrack:Play() end
 					local fromPos = u.block.Position
-					local face = PlotFrame.toWorld(plotState, u.lateral, plotState.wallFaceFwd)
+					local face = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
 					local targetPos = Vector3.new(face.X, fromPos.Y + 0.5, face.Z)
 					if u.block.Name == "Goblin" then
 						shootArrow(fromPos, targetPos, u.def.damage, plotState)

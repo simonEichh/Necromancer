@@ -11,7 +11,17 @@ local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
 
-local WALL_SPACING = 45      -- distance between queued walls
+-- Lane layout, in "forward" studs along the lane measured from the plot centre (see PlotFrame):
+--   0 .. 24     the plot's Base (graves, spawn)
+--   24 .. 105   open battlefield: the army marches here and forms up (see Army: formation rows)
+--   105         the front wall (WALL_FWD); the queue of walls stands behind it, WALL_SPACING apart
+--   308         the lane ends at the gate tower of the outer ring (radius 392 minus the plot centre radius 84,
+--               see tools/studio/build_ring.lua). If you move the ring or the walls keep
+--               WALL_FWD + NUM_WALLS * WALL_SPACING (the slot a new wall slides in from) below LANE_END_FWD.
+local WALL_FWD = 105         -- distance of the front wall from the plot centre (the old WallOrigin part is no longer used)
+local LANE_START_FWD = 24    -- outer edge of the plot's Base
+local LANE_END_FWD = 308
+local WALL_SPACING = 36      -- distance between queued walls
 local NUM_WALLS = 5          -- walls in the queue (front wall + 4 behind it)
 local WALL_WIDTH = 40        -- across the lane
 local WALL_THICKNESS = 4
@@ -128,13 +138,14 @@ end
 
 -- Spawns the lane ground + the wall queue, activates the first wall
 local function initWallQueue(plotState)
-	-- lane long enough for every queued wall (plus the slot a new wall slides in from)
-	-- (ends exactly at the gate towers of the outer ring, radius 392: see tools/studio/build_ring.lua)
-	local groundLen = (NUM_WALLS + 1) * WALL_SPACING + 14
+	-- the whole lane from the plot's Base to the gate tower of the outer ring (radius 392): the battlefield in front
+	-- of the front wall plus the room behind it for every queued wall and the slot a new wall slides in from
+	local groundLen = LANE_END_FWD - LANE_START_FWD
+	local groundCentreFwd = LANE_START_FWD + groundLen / 2
 	local initGround = Instance.new("Part")
 	initGround.Name = "GroundExt"
 	initGround.Size = Vector3.new(WALL_WIDTH, 2, groundLen)
-	initGround.CFrame = CFrame.new(PlotFrame.toWorld(plotState, 0, plotState.wallFwd + groundLen / 2) - Vector3.new(0, 1, 0))
+	initGround.CFrame = CFrame.new(PlotFrame.toWorld(plotState, 0, groundCentreFwd) - Vector3.new(0, 1, 0))
 		* PlotFrame.rotation(plotState)
 	initGround.Anchored = true
 	initGround.Color = LANE_COLOR
@@ -145,7 +156,7 @@ local function initWallQueue(plotState)
 
 	-- low stone walls along both sides of the lane (so nobody falls into the water), with a lighter cap
 	for _, side in ipairs({ -1, 1 }) do
-		local centre = PlotFrame.toWorld(plotState, side * (WALL_WIDTH / 2 + 0.4), plotState.wallFwd + groundLen / 2)
+		local centre = PlotFrame.toWorld(plotState, side * (WALL_WIDTH / 2 + 0.4), groundCentreFwd)
 		local rot = PlotFrame.rotation(plotState)
 		local sideWall = Instance.new("Part")
 		sideWall.Name = "LaneWall"
@@ -289,6 +300,8 @@ local function regen(plotState)
 end
 
 return {
+	WALL_FWD = WALL_FWD,
+	WALL_WIDTH = WALL_WIDTH,
 	updateWallGui = updateWallGui,
 	initWallQueue = initWallQueue,
 	breakWall = breakWall,

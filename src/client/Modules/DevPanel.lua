@@ -83,9 +83,20 @@ title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = panel
 
-local clear = makeButton(panel, "Clear dev units", Color3.fromRGB(255, 130, 130))
-clear.Size = UDim2.new(1, -16, 0, 30)
-clear.Position = UDim2.fromOffset(8, 32)
+-- where spawned units start: right in front of the wall (attacking at once) or at the graves (they march to their
+-- formation slot, so you can watch the army form up)
+local atGraves = false
+local mode = makeButton(panel, "Spawn at: WALL (click to switch)", Color3.fromRGB(160, 220, 255))
+mode.Size = UDim2.new(0.62, -10, 0, 30)
+mode.Position = UDim2.fromOffset(8, 32)
+mode.MouseButton1Click:Connect(function()
+	atGraves = not atGraves
+	mode.Text = atGraves and "Spawn at: GRAVES (march in)" or "Spawn at: WALL (click to switch)"
+end)
+
+local clear = makeButton(panel, "Clear", Color3.fromRGB(255, 130, 130))
+clear.Size = UDim2.new(0.38, -10, 0, 30)
+clear.Position = UDim2.new(0.62, 4, 0, 32)
 clear.MouseButton1Click:Connect(function()
 	clearEvent:FireServer()
 end)
@@ -128,7 +139,7 @@ for i, name in ipairs(names) do
 	local button = makeButton(list, (Units.Emoji[name] or "💀") .. " " .. name, Rarities.Color[rarity])
 	button.LayoutOrder = i
 	button.MouseButton1Click:Connect(function()
-		spawnEvent:FireServer(name)
+		spawnEvent:FireServer(name, atGraves)
 	end)
 end
 
