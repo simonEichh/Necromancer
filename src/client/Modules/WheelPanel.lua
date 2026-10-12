@@ -15,49 +15,49 @@ local WHEEL_OUTCOMES = {
 	{
 		id = "gold_1k",
 		label = "+1k Gold",
-		emoji = "💰",
+		emoji = "",
 		chance = "50%",
 		color = Color3.fromRGB(220, 160, 10),
 	},
 	{
 		id = "luck_buff",
 		label = "2x Luck 5min",
-		emoji = "🍀",
+		emoji = "",
 		chance = "10%",
 		color = Color3.fromRGB(30, 150, 30),
 	},
 	{
 		id = "gems_50",
 		label = "+50 Gems",
-		emoji = "💎",
+		emoji = "",
 		chance = "16%",
 		color = Color3.fromRGB(50, 120, 220),
 	},
 	{
 		id = "graves_5",
 		label = "+5 Graves",
-		emoji = "🪦",
+		emoji = "",
 		chance = "10%",
 		color = Color3.fromRGB(120, 60, 200),
 	},
 	{
 		id = "gems_100",
 		label = "+100 Gems",
-		emoji = "💎",
+		emoji = "",
 		chance = "8%",
 		color = Color3.fromRGB(20, 70, 200),
 	},
 	{
 		id = "grave_rare",
 		label = "+1 Rare Grave",
-		emoji = "🌑",
+		emoji = "",
 		chance = "5%",
 		color = Color3.fromRGB(60, 20, 130),
 	},
 	{
 		id = "lucky_box",
 		label = "Lucky Box!",
-		emoji = "📦",
+		emoji = "",
 		chance = "1%",
 		color = Color3.fromRGB(200, 40, 40),
 	},
@@ -90,7 +90,7 @@ do
 	wTitle.Size = UDim2.new(1, 0, 0, 50)
 	wTitle.Position = UDim2.new(0, 0, 0, 0)
 	wTitle.BackgroundTransparency = 1
-	wTitle.Text = "🎡 Lucky Wheel"
+	wTitle.Text = "Lucky Wheel"
 	wTitle.TextColor3 = Color3.fromRGB(255, 220, 100)
 	wTitle.TextScaled = true
 	wTitle.Font = Enum.Font.GothamBold
@@ -328,7 +328,7 @@ do
 
 				-- Show result text
 				local label = outcome and outcome.label or "???"
-				resultLbl.Text = "✨ You got: " .. label .. "!"
+				resultLbl.Text = "You got: " .. label .. "!"
 
 				-- Re-enable spin button
 				refreshWheelUI()

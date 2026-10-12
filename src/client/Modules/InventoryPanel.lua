@@ -87,7 +87,7 @@ ensureInvSlots = function()
 			local u = inventory[invIdx]
 			if not u then tooltip.Visible = false return end
 			local ui = UNIT_INFO[u.unitType] or {}
-			ttName.Text   = (ui.emoji or "❓") .. " " .. u.unitType
+			ttName.Text   = u.unitType
 			ttRarity.Text = ui.rarity or ""
 			ttRarity.TextColor3 = RARITY_COLORS[ui.rarity] or Color3.fromRGB(200, 200, 200)
 			ttDps.Text    = (UNIT_DPS[u.unitType] or "?") .. " DPS"
@@ -147,7 +147,7 @@ refresh = function()
 	ensureInvSlots()
 	local sorted = getInventorySorted()
 	local count = #sorted
-	invTitle.Text = "📦 Inventory (" .. count .. " / " .. INVENTORY_MAX .. ")"
+	invTitle.Text = "Inventory (" .. count .. " / " .. INVENTORY_MAX .. ")"
 	for i = 1, INVENTORY_MAX do
 		local sd    = invSlots[i]
 		local entry = sorted[i]
@@ -162,7 +162,7 @@ refresh = function()
 				Color3.fromRGB(math.floor(ri*0.16+5), math.floor(gi*0.16+3), math.floor(bi*0.16+10))
 			sd.stroke.Color   = rc
 			sd.stroke.Enabled = true
-			sd.emoji.Text     = info.emoji or "❓"
+			sd.emoji.Text     = info.emoji or ""
 			sd.name.Text      = unit.unitType
 			sd.name.TextColor3 = Color3.fromRGB(210, 195, 235)
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
@@ -218,7 +218,7 @@ function InventoryPanel.init(sg, deps)
 		invTitle.Size = UDim2.new(1, -60, 0, 44)
 		invTitle.Position = UDim2.new(0, 14, 0, 4)
 		invTitle.BackgroundTransparency = 1
-		invTitle.Text = "📦 Inventory (0 / " .. INVENTORY_MAX .. ")"
+		invTitle.Text = "Inventory (0 / " .. INVENTORY_MAX .. ")"
 		invTitle.TextColor3 = Color3.fromRGB(220, 195, 255)
 		invTitle.TextScaled = true
 		invTitle.Font = Enum.Font.GothamBold
@@ -260,9 +260,9 @@ function InventoryPanel.init(sg, deps)
 		sortByLbl.ZIndex = 37
 
 		local SORT_DEFS = {
-			{ key = "DPS",    label = "⚔️ DPS",    color = Color3.fromRGB(100, 255, 130) },
-			{ key = "Chance", label = "⭐ Chance", color = Color3.fromRGB(255, 220, 80)  },
-			{ key = "Letter", label = "🔤 Letter", color = Color3.fromRGB(180, 170, 255) },
+			{ key = "DPS",    label = "DPS",    color = Color3.fromRGB(100, 255, 130) },
+			{ key = "Chance", label = "Chance", color = Color3.fromRGB(255, 220, 80)  },
+			{ key = "Letter", label = "Letter", color = Color3.fromRGB(180, 170, 255) },
 		}
 		local sortBtns = {}
 		for idx, sd in ipairs(SORT_DEFS) do

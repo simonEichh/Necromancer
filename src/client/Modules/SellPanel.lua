@@ -40,7 +40,7 @@ do -- sell panel header setup
 	sellTitle.Size = UDim2.new(1, -20, 0, 48)
 	sellTitle.Position = UDim2.new(0, 10, 0, 8)
 	sellTitle.BackgroundTransparency = 1
-	sellTitle.Text = "💰 Sell Units"
+	sellTitle.Text = "Sell Units"
 	sellTitle.TextColor3 = Color3.fromRGB(255, 220, 80)
 	sellTitle.TextScaled = true
 	sellTitle.Font = Enum.Font.GothamBold
@@ -91,7 +91,7 @@ local function refreshSellPanel()
 			local oneIn = unit.oneIn or UNIT_ONE_IN[unit.unitType] or 1
 			local sell = getSellValue(oneIn)
 			local rColor = (info and RARITY_COLORS[info.rarity]) or Color3.fromRGB(200, 200, 200)
-			local emoji = (info and info.emoji) or "💀"
+			local emoji = (info and info.emoji) or ""
 			local rarity = (info and info.rarity) or "?"
 
 			local row = Instance.new("Frame", sellScroll)
@@ -130,7 +130,7 @@ local function refreshSellPanel()
 			sellBtn.Size = UDim2.new(0, 110, 0, 36)
 			sellBtn.Position = UDim2.new(1, -120, 0.5, -18)
 			sellBtn.BackgroundColor3 = Color3.fromRGB(160, 100, 10)
-			sellBtn.Text = "Sell  💰" .. sell
+			sellBtn.Text = "Sell " .. sell .. " Gold"
 			sellBtn.TextColor3 = Color3.fromRGB(255, 230, 120)
 			sellBtn.TextScaled = true
 			sellBtn.Font = Enum.Font.GothamBold
@@ -174,7 +174,7 @@ local addGoldEvt = ReplicatedStorage:WaitForChild("AddGold", 5)
 if addGoldEvt then
 	addGoldEvt.OnClientEvent:Connect(function(amount, unitType)
 		showBigText(
-			"💰 SOLD!",
+			"SOLD!",
 			unitType .. "  +  " .. amount .. " Gold",
 			Color3.fromRGB(255, 220, 80),
 			Color3.fromRGB(200, 170, 60)

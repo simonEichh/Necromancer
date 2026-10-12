@@ -289,7 +289,7 @@ local RARITY_UNITS = {
 	},
 }
 
--- Reverse lookup: unitType → rarity string
+-- Reverse lookup: unitType  rarity string
 local UNIT_RARITY = {}
 for rarity, units in pairs(RARITY_UNITS) do
 	for _, entry in ipairs(units) do
@@ -299,40 +299,40 @@ end
 
 local UNIT_EMOJIS = {
 	-- Common
-	Skelly = "🦴",
-	Zombie = "🧟",
-	Ghoul = "🪦",
+	Skelly = "",
+	Zombie = "",
+	Ghoul = "",
 	-- Uncommon
-	Ghost = "👻",
-	Goblin = "🏹",
-	Wraith = "🌫️",
-	CryptBat = "🦇",
+	Ghost = "",
+	Goblin = "",
+	Wraith = "",
+	CryptBat = "",
 	-- Rare
-	BaronBone = "💀",
-	PlagueDoctor = "🧪",
-	ShadowHound = "🐺",
-	BoneColossus = "🗿",
+	BaronBone = "",
+	PlagueDoctor = "",
+	ShadowHound = "",
+	BoneColossus = "",
 	-- Cursed
-	Banshee = "👁️",
-	LichAcolyte = "🔮",
-	DreadKnight = "⚔️",
+	Banshee = "",
+	LichAcolyte = "",
+	DreadKnight = "",
 	-- Legendary
-	SkeletonKing = "👑",
-	LichLord = "🧙",
-	DeathReaper = "☠️",
-	VoidWalker = "🌑",
+	SkeletonKing = "",
+	LichLord = "",
+	DeathReaper = "",
+	VoidWalker = "",
 	-- Abyssal
-	SoulEater = "🔥",
-	AbyssalTitan = "🌋",
-	ShadeLord = "🕳️",
+	SoulEater = "",
+	AbyssalTitan = "",
+	ShadeLord = "",
 	-- Eldritch
-	EldritchFiend = "🐙",
-	MindShatterer = "🧠",
+	EldritchFiend = "",
+	MindShatterer = "",
 	-- Eternal
-	TheUndying = "✨",
-	DeathIncarnate = "💀",
+	TheUndying = "",
+	DeathIncarnate = "",
 	-- Primordial
-	LastLantern = "🏮",
+	LastLantern = "",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)

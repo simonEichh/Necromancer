@@ -118,7 +118,7 @@ local function makeQuestRow(parent, order, q)
 	claimBtn.Size = UDim2.new(0, 130, 0, 70)
 	claimBtn.Position = UDim2.new(1, -142, 0, 20)
 	claimBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
-	claimBtn.Text = "Claim\n💎 " .. q.reward
+	claimBtn.Text = "Claim\n" .. q.reward .. " Gems"
 	claimBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
 	claimBtn.TextScaled = true
 	claimBtn.Font = Enum.Font.GothamBold
@@ -131,7 +131,7 @@ local function makeQuestRow(parent, order, q)
 	claimedLbl.Size = UDim2.new(0, 130, 0, 70)
 	claimedLbl.Position = UDim2.new(1, -142, 0, 20)
 	claimedLbl.BackgroundTransparency = 1
-	claimedLbl.Text = "✓ Claimed"
+	claimedLbl.Text = "Claimed"
 	claimedLbl.TextColor3 = Color3.fromRGB(100, 150, 100)
 	claimedLbl.TextScaled = true
 	claimedLbl.Font = Enum.Font.GothamBold
@@ -202,7 +202,7 @@ function QuestsPanel.init(screenGui, deps)
 		title.Size = UDim2.new(0, 160, 0, 40)
 		title.Position = UDim2.new(0, 12, 0, 8)
 		title.BackgroundTransparency = 1
-		title.Text = "📋 Quests"
+		title.Text = "Quests"
 		title.TextColor3 = Color3.fromRGB(255, 220, 100)
 		title.TextXAlignment = Enum.TextXAlignment.Left
 		title.TextScaled = true

@@ -29,7 +29,7 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType)
 		return
 	end
 	if not PlayerData.hasFreeSlot(player) then
-		Remotes.Notice:FireClient(player, "⚠️ Inventory full!")
+		Remotes.Notice:FireClient(player, "Inventory full!")
 		Remotes.DigRejected:FireClient(player)
 		return
 	end

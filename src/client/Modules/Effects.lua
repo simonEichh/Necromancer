@@ -107,7 +107,7 @@ if wallBreakEvt then
 		screenShake(0.35, 0.6)
 		spawnConfetti()
 		showBigText(
-			"🎉 WALL CLEARED!",
+			"WALL CLEARED!",
 			"Layer " .. (clearedLayer or "?") .. " destroyed!   +" .. goldReward .. " Gold",
 			Color3.fromRGB(255, 220, 80),
 			Color3.fromRGB(200, 170, 255)

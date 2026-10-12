@@ -54,7 +54,7 @@ toggle.Name = "DevToggle"
 toggle.Size = UDim2.fromOffset(64, 34)
 toggle.Position = UDim2.new(0, 8, 0.62, 0)
 toggle.BackgroundColor3 = Color3.fromRGB(120, 60, 200)
-toggle.Text = "🛠 DEV"
+toggle.Text = "DEV"
 toggle.TextColor3 = Color3.new(1, 1, 1)
 toggle.Font = Enum.Font.GothamBold
 toggle.TextSize = 14
@@ -136,7 +136,7 @@ end)
 
 for i, name in ipairs(names) do
 	local rarity = Units.Rarity[name]
-	local button = makeButton(list, (Units.Emoji[name] or "💀") .. " " .. name, Rarities.Color[rarity])
+	local button = makeButton(list, name, Rarities.Color[rarity])
 	button.LayoutOrder = i
 	button.MouseButton1Click:Connect(function()
 		spawnEvent:FireServer(name, atGraves)

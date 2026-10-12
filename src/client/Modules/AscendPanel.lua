@@ -31,7 +31,7 @@ local ascendTitle = Instance.new("TextLabel", ascendPanel)
 ascendTitle.Size = UDim2.new(1, -20, 0, 50)
 ascendTitle.Position = UDim2.new(0, 10, 0, 10)
 ascendTitle.BackgroundTransparency = 1
-ascendTitle.Text = "⬆️ ASCEND"
+ascendTitle.Text = "ASCEND"
 ascendTitle.TextColor3 = Color3.fromRGB(255, 190, 80)
 ascendTitle.TextScaled = true
 ascendTitle.Font = Enum.Font.GothamBold
@@ -41,7 +41,7 @@ local ascendWarning = Instance.new("TextLabel", ascendPanel)
 ascendWarning.Size = UDim2.new(1, -20, 0, 36)
 ascendWarning.Position = UDim2.new(0, 10, 0, 62)
 ascendWarning.BackgroundTransparency = 1
-ascendWarning.Text = "⚠️ You will lose all your Gold!"
+ascendWarning.Text = "You will lose all your Gold!"
 ascendWarning.TextColor3 = Color3.fromRGB(255, 120, 80)
 ascendWarning.TextScaled = true
 ascendWarning.Font = Enum.Font.GothamBold
@@ -61,7 +61,7 @@ local ascendConfirmBtn = Instance.new("TextButton", ascendPanel)
 ascendConfirmBtn.Size = UDim2.new(0, 170, 0, 44)
 ascendConfirmBtn.Position = UDim2.new(0, 20, 1, -60)
 ascendConfirmBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 10)
-ascendConfirmBtn.Text = "✅ Confirm Ascend"
+ascendConfirmBtn.Text = "Confirm Ascend"
 ascendConfirmBtn.TextColor3 = Color3.fromRGB(255, 230, 150)
 ascendConfirmBtn.TextScaled = true
 ascendConfirmBtn.Font = Enum.Font.GothamBold
@@ -92,7 +92,7 @@ updateAscendPanel = function()
 	local unlockText = ASCEND_UNLOCKS[tier] or "No new unlocks — gold multiplier only"
 	local newMult = 1.0 + (State.rebirthCount + 1)
 	ascendInfoLbl.Text =
-		string.format("Cost: 💰 %s Gold\n%s\nNew gold multiplier: %.0fx", fmt(cost), unlockText, newMult)
+		string.format("Cost: %s Gold\n%s\nNew gold multiplier: %.0fx", fmt(cost), unlockText, newMult)
 	local canAfford = State.gold >= cost
 	ascendConfirmBtn.BackgroundColor3 = canAfford and Color3.fromRGB(140, 60, 10) or Color3.fromRGB(50, 25, 10)
 	ascendConfirmBtn.TextColor3 = canAfford and Color3.fromRGB(255, 230, 150) or Color3.fromRGB(130, 100, 60)
@@ -120,7 +120,7 @@ Sync.onApplied(function(ascended)
 	end
 	if ascended then
 		showBigText(
-			"⬆️ ASCENDED!",
+			"ASCENDED!",
 			"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.0fx", State.goldMultiplier) .. " Gold Multiplier",
 			Color3.fromRGB(255, 190, 80),
 			Color3.fromRGB(255, 220, 150)

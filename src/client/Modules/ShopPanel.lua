@@ -62,7 +62,7 @@ updateGraveyard = function()
 		local maxBtn = graveBuyMaxBtns[gd.key]
 		if maxBtn then
 			if qty > 1 then
-				maxBtn.Text = "Buy x" .. qty .. "\n💰 " .. fmtGold(gd.cost * qty)
+				maxBtn.Text = "Buy x" .. qty .. "\n" .. fmtGold(gd.cost * qty) .. " Gold"
 				maxBtn.BackgroundColor3 = Color3.fromRGB(40, 110, 40)
 				maxBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
 			else
@@ -155,7 +155,7 @@ local function makeGraveRow(parent, order, gd)
 	luckLbl.Size = UDim2.new(0, 260, 0, 28)
 	luckLbl.Position = UDim2.new(0, 126, 0, 57)
 	luckLbl.BackgroundTransparency = 1
-	luckLbl.Text = "🍀 " .. gd.luck .. "% Luck"
+	luckLbl.Text = gd.luck .. "% Luck"
 	luckLbl.TextColor3 = luckColor
 	luckLbl.TextXAlignment = Enum.TextXAlignment.Left
 	luckLbl.TextScaled = true
@@ -188,7 +188,7 @@ local function makeGraveRow(parent, order, gd)
 	buy1Btn.Size = UDim2.new(0, 130, 0, 54)
 	buy1Btn.Position = UDim2.new(1, -142, 0, 12)
 	buy1Btn.BackgroundColor3 = Color3.fromRGB(80, 40, 150)
-	buy1Btn.Text = "Buy 1\n💰 " .. fmtGold(gd.cost)
+	buy1Btn.Text = "Buy 1\n" .. fmtGold(gd.cost) .. " Gold"
 	buy1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	buy1Btn.TextScaled = true
 	buy1Btn.Font = Enum.Font.GothamBold
@@ -219,7 +219,7 @@ local function makeGraveRow(parent, order, gd)
 	local rotLbl = Instance.new("TextLabel", rotOverlay)
 	rotLbl.Size = UDim2.new(1, 0, 1, 0)
 	rotLbl.BackgroundTransparency = 1
-	rotLbl.Text = "🚫 Not in stock this rotation"
+	rotLbl.Text = "Not in stock this rotation"
 	rotLbl.TextColor3 = Color3.fromRGB(180, 140, 200)
 	rotLbl.TextScaled = true
 	rotLbl.Font = Enum.Font.GothamBold
@@ -287,7 +287,7 @@ function ShopPanel.init(screenGui, deps)
 		title.Size = UDim2.new(1, -50, 0, 44)
 		title.Position = UDim2.new(0, 10, 0, 8)
 		title.BackgroundTransparency = 1
-		title.Text = "🛒 SHOP"
+		title.Text = "SHOP"
 		title.TextColor3 = Color3.fromRGB(230, 200, 255)
 		title.TextXAlignment = Enum.TextXAlignment.Left
 		title.TextScaled = true
@@ -366,7 +366,7 @@ function ShopPanel.init(screenGui, deps)
 	restockLabel = Instance.new("TextLabel")
 	restockLabel.Size = UDim2.new(1, 0, 0, 28)
 	restockLabel.BackgroundTransparency = 1
-	restockLabel.Text = "🔄 Restocks in: --:--"
+	restockLabel.Text = "Restocks in: --:--"
 	restockLabel.TextColor3 = Color3.fromRGB(180, 160, 220)
 	restockLabel.TextScaled = true
 	restockLabel.Font = Enum.Font.Gotham
@@ -396,7 +396,7 @@ function ShopPanel.init(screenGui, deps)
 			local lockLbl = Instance.new("TextLabel", lockFrame)
 			lockLbl.Size = UDim2.new(1, 0, 1, 0)
 			lockLbl.BackgroundTransparency = 1
-			lockLbl.Text = "🔒  Unlock at Ascension " .. gd.unlockAscension
+			lockLbl.Text = "Unlock at Ascension " .. gd.unlockAscension
 			lockLbl.TextColor3 = Color3.fromRGB(200, 180, 255)
 			lockLbl.TextScaled = true
 			lockLbl.Font = Enum.Font.GothamBold
@@ -444,7 +444,7 @@ function ShopPanel.init(screenGui, deps)
 		shopRestockSecs = math.max(0, shopRestockSecs - dt)
 		local mins = math.floor(shopRestockSecs / 60)
 		local secs = math.floor(shopRestockSecs % 60)
-		restockLabel.Text = string.format("🔄 Restocks in: %d:%02d", mins, secs)
+		restockLabel.Text = string.format("Restocks in: %d:%02d", mins, secs)
 		updateGraveyard()
 	end)
 end

@@ -148,7 +148,7 @@ for i = 1, 10 do
 			return
 		end
 		local info = UNIT_INFO[unit.unitType] or {}
-		ttName.Text = (info.emoji or "❓") .. " " .. unit.unitType
+		ttName.Text = unit.unitType
 		ttRarity.Text = info.rarity or ""
 		ttRarity.TextColor3 = RARITY_COLORS[info.rarity] or Color3.fromRGB(200, 200, 200)
 		ttDps.Text = (UNIT_DPS[unit.unitType] or "?") .. " DPS"
@@ -216,7 +216,7 @@ local function refreshToolbar()
 			local info = UNIT_INFO[unit.unitType] or {}
 			local rc = RARITY_COLORS[info.rarity] or Color3.fromRGB(80, 40, 120)
 			local ri, gi, bi = rc.R * 255, rc.G * 255, rc.B * 255
-			sf.emoji.Text = info.emoji or "❓"
+			sf.emoji.Text = info.emoji or ""
 			sf.name.Text = unit.unitType
 			sf.frame.BackgroundColor3 = isSel
 					and Color3.fromRGB(
@@ -239,7 +239,7 @@ function selectSlot(n)
 	updateCarriedUnit()
 end
 
--- Key 1-0 → select slot
+-- Key 1-0  select slot
 local KEY_TO_SLOT = {
 	[Enum.KeyCode.One] = 1,
 	[Enum.KeyCode.Two] = 2,

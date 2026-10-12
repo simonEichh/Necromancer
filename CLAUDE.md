@@ -77,7 +77,7 @@ Plots point in different directions, so **never use world X/Z for lane math**. E
 
 ## UI roadmap (planned, not started)
 
-Dark gothic restyle, no emojis anywhere, 3D rendered unit portraits (ViewportFrame) for the inventory and a new gacha reveal, built on one `Theme` module + small UI kit, restyled panel by panel (HUD/hotbar first). World name tags and grave labels already have no emojis; `Units.Emoji`/`GameData` emoji tables and the HUD/buttons still do. Details are in the memory note `ui-roadmap`.
+Dark gothic restyle, no emojis anywhere, 3D rendered unit portraits (ViewportFrame) for the inventory and a new gacha reveal, built on one `Theme` module + small UI kit, restyled panel by panel (HUD/hotbar first). **All emojis have been removed from the UI** (the `Units.Emoji` / `GameData` emoji tables and the wheel/upgrade icon lists are now empty strings; the icon spots on the HUD side buttons, hotbar slots, grave dock, wheel cards and upgrade rows are empty until real icons / portraits exist; currencies are written as words: Gold, Gems). Server `print` log lines still contain emojis, they are not UI. Do not add emojis again. Details are in the memory note `ui-roadmap`.
 
 ## Known issues
 

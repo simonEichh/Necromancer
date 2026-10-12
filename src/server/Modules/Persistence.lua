@@ -85,7 +85,7 @@ function Persistence.load(player)
 		warn("Could not load data for " .. player.Name .. "; their progress will not be saved this session.")
 		task.delay(6, function()
 			if player.Parent then
-				Remotes.Notice:FireClient(player, "⚠️ Your saved data couldn't be loaded. Progress won't be saved this session.")
+				Remotes.Notice:FireClient(player, "Your saved data couldn't be loaded. Progress won't be saved this session.")
 			end
 		end)
 	end

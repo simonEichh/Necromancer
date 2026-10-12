@@ -130,7 +130,7 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 
 		local info = UNIT_INFO[unitType] or {}
 		local rc = RARITY_COLORS[rarity] or Color3.fromRGB(255, 255, 255)
-		rollingLbl.Text = (info.emoji or "❓") .. "  " .. unitType
+		rollingLbl.Text = unitType
 		rollingLbl.TextColor3 = rc
 		subLbl.TextColor3 = rc
 		subLbl.Text = rarity:upper()
@@ -182,7 +182,7 @@ local function playRollAnimation(unitType, rarity, pity, oneIn)
 		cycles += 1
 		local rand = ALL_UNIT_KEYS[math.random(#ALL_UNIT_KEYS)]
 		local info = UNIT_INFO[rand] or {}
-		rollingLbl.Text = (info.emoji or "❓") .. "  " .. rand
+		rollingLbl.Text = rand
 		rollingLbl.TextColor3 = RARITY_COLORS[info.rarity] or Color3.fromRGB(220, 200, 255)
 		subLbl.TextColor3 = Color3.fromRGB(170, 150, 210)
 		subLbl.Text = (info.rarity or "?") .. "   •   1 in " .. (UNIT_ONE_IN[rand] or "?")
@@ -218,7 +218,7 @@ local function openGrave(graveType)
 		warn.Position = UDim2.new(0.5, -130, 1, -310)
 		warn.BackgroundColor3 = Color3.fromRGB(120, 30, 30)
 		warn.BackgroundTransparency = 0.2
-		warn.Text = "⚠️ Inventory full!"
+		warn.Text = "Inventory full!"
 		warn.TextColor3 = Color3.fromRGB(255, 180, 180)
 		warn.TextScaled = true
 		warn.Font = Enum.Font.GothamBold

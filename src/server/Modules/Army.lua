@@ -30,7 +30,7 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 	if not slot or not slot.occupied then return end
 	-- Refuse (and keep the unit on the grave) when there is nowhere to put it
 	if not PlayerData.hasFreeSlot(player) then
-		Remotes.Notice:FireClient(player, "⚠️ Inventory full — can't recall " .. slot.unitType)
+		Remotes.Notice:FireClient(player, "Inventory full — can't recall ".. slot.unitType)
 		return
 	end
 	if slot.unitEntry then

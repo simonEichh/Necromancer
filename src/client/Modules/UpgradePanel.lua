@@ -32,7 +32,7 @@ do -- upgrade panel header setup
 	upTitle.Size = UDim2.new(1, -20, 0, 48)
 	upTitle.Position = UDim2.new(0, 10, 0, 6)
 	upTitle.BackgroundTransparency = 1
-	upTitle.Text = "⚗️ Upgrades"
+	upTitle.Text = "Upgrades"
 	upTitle.TextColor3 = Color3.fromRGB(100, 255, 240)
 	upTitle.TextScaled = true
 	upTitle.Font = Enum.Font.GothamBold
@@ -123,7 +123,7 @@ local function makeUpgradeRow(parent, yPos, icon, title, getLevel, getMax, getCo
 		effectLbl.Text = getEffectText(level)
 
 		if maxed then
-			nextLbl.Text = "✨ Maxed out!"
+			nextLbl.Text = "Maxed out!"
 			buyBtn.Text = "MAX"
 			buyBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 50)
 			buyBtn.TextColor3 = Color3.fromRGB(100, 160, 140)
@@ -131,7 +131,7 @@ local function makeUpgradeRow(parent, yPos, icon, title, getLevel, getMax, getCo
 		else
 			nextLbl.Text = "Next: " .. getEffectText(level + 1)
 			local canAfford = State.gold >= cost
-			buyBtn.Text = "Buy\n💰 " .. fmtGold(cost)
+			buyBtn.Text = "Buy\n" .. fmtGold(cost) .. " Gold"
 			buyBtn.BackgroundColor3 = canAfford and Color3.fromRGB(20, 120, 110) or Color3.fromRGB(15, 50, 50)
 			buyBtn.TextColor3 = canAfford and Color3.fromRGB(180, 255, 240) or Color3.fromRGB(80, 130, 120)
 			buyBtn.Active = true
@@ -145,7 +145,7 @@ end
 local luckBuyBtn, refreshLuckRow = makeUpgradeRow(
 	upgradePanel,
 	62,
-	"🍀",
+	"",
 	"Luck Boost",
 	function()
 		return State.luckBoostLevel
@@ -163,7 +163,7 @@ local luckBuyBtn, refreshLuckRow = makeUpgradeRow(
 local coinBuyBtn, refreshCoinRow = makeUpgradeRow(
 	upgradePanel,
 	172,
-	"💰",
+	"",
 	"Coin Boost",
 	function()
 		return State.coinBoostLevel

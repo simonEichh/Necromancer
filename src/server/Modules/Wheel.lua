@@ -25,13 +25,13 @@ end
 
 -- Wheel outcomes (7 segments matching the client display order)
 local WHEEL_OUTCOMES = {
-	{ id = "gold_1k",    weight = 50, label = "+1k Gold",          emoji = "💰" },
-	{ id = "luck_buff",  weight = 10, label = "2x Luck 5min",      emoji = "🍀" },
-	{ id = "gems_50",    weight = 16, label = "+50 Gems",          emoji = "💎" },
-	{ id = "graves_5",   weight = 10, label = "+5 Ancient Graves", emoji = "🪦", graveType = "Ancient", count = 5 },
-	{ id = "gems_100",   weight = 8,  label = "+100 Gems",         emoji = "💎" },
-	{ id = "grave_rare", weight = 5,  label = "+1 Shadow Grave",   emoji = "🌑", graveType = "Shadow",  count = 1 },
-	{ id = "lucky_box",  weight = 1,  label = "Lucky Box!",        emoji = "📦" },
+	{ id = "gold_1k",    weight = 50, label = "+1k Gold",          emoji = "" },
+	{ id = "luck_buff",  weight = 10, label = "2x Luck 5min",      emoji = "" },
+	{ id = "gems_50",    weight = 16, label = "+50 Gems",          emoji = "" },
+	{ id = "graves_5",   weight = 10, label = "+5 Ancient Graves", emoji = "", graveType = "Ancient", count = 5 },
+	{ id = "gems_100",   weight = 8,  label = "+100 Gems",         emoji = "" },
+	{ id = "grave_rare", weight = 5,  label = "+1 Shadow Grave",   emoji = "", graveType = "Shadow",  count = 1 },
+	{ id = "lucky_box",  weight = 1,  label = "Lucky Box!",        emoji = "" },
 }
 local WHEEL_TOTAL_WEIGHT = 0
 for _, o in ipairs(WHEEL_OUTCOMES) do
@@ -103,7 +103,7 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player)
 			local oneIn = getBaseOneIn(unitType)
 			table.insert(boxUnits, { unitType = unitType, oneIn = oneIn })
 			if not PlayerData.addUnit(player, unitType, oneIn) then
-				Remotes.Notice:FireClient(player, "⚠️ Inventory full — " .. unitType .. " lost!")
+				Remotes.Notice:FireClient(player, "Inventory full — ".. unitType .. "lost!")
 			end
 		end
 		rewardData.boxUnits = boxUnits

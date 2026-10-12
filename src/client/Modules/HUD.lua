@@ -83,8 +83,8 @@ function HUD.init(screenGui, deps)
 	fmtNumber      = deps.fmtNumber
 
 	-- ── Top center teleport buttons ──────────────────────────
-	makePillBtn(screenGui, "🛒  SHOPS", Color3.fromRGB(40, 140, 60),  -170, deps.onShops)
-	makePillBtn(screenGui, "🏰  WALL",  Color3.fromRGB(140, 40, 40),   10,  deps.onWall)
+	makePillBtn(screenGui, "SHOPS", Color3.fromRGB(40, 140, 60),  -170, deps.onShops)
+	makePillBtn(screenGui, "WALL",  Color3.fromRGB(140, 40, 40),   10,  deps.onWall)
 
 	-- ── Top right: spin wheel button ─────────────────────────
 	local spinFrame = Instance.new("Frame", screenGui)
@@ -100,7 +100,7 @@ function HUD.init(screenGui, deps)
 	spinIcon.Size = UDim2.new(1, 0, 0, 50)
 	spinIcon.Position = UDim2.new(0, 0, 0, 4)
 	spinIcon.BackgroundTransparency = 1
-	spinIcon.Text = "🎡"
+	spinIcon.Text = ""
 	spinIcon.TextScaled = true
 	spinIcon.ZIndex = 6
 
@@ -143,8 +143,8 @@ function HUD.init(screenGui, deps)
 	leftPanel.BackgroundTransparency = 1
 	leftPanel.ZIndex = 5
 
-	makeIconBtn(leftPanel, "⬆️",  "Ascend",    0,   Color3.fromRGB(80, 40, 140), deps.onAscend)
-	makeIconBtn(leftPanel, "📦",  "Inventory", 96,  Color3.fromRGB(30, 70, 130), deps.onInventory)
+	makeIconBtn(leftPanel, "", "Ascend",    0,   Color3.fromRGB(80, 40, 140), deps.onAscend)
+	makeIconBtn(leftPanel, "", "Inventory", 96,  Color3.fromRGB(30, 70, 130), deps.onInventory)
 
 	-- ── Right side: icon buttons ─────────────────────────────
 	local rightPanel = Instance.new("Frame", screenGui)
@@ -153,8 +153,8 @@ function HUD.init(screenGui, deps)
 	rightPanel.BackgroundTransparency = 1
 	rightPanel.ZIndex = 5
 
-	makeIconBtn(rightPanel, "📋", "Quests",  0,  Color3.fromRGB(20, 60, 100), deps.onQuests)
-	makeIconBtn(rightPanel, "👥", "Friends", 96, Color3.fromRGB(30, 80, 50),  deps.onFriends or function() end)
+	makeIconBtn(rightPanel, "", "Quests",  0,  Color3.fromRGB(20, 60, 100), deps.onQuests)
+	makeIconBtn(rightPanel, "", "Friends", 96, Color3.fromRGB(30, 80, 50),  deps.onFriends or function() end)
 
 	-- ── Bottom left: currency display ────────────────────────
 	local currencyFrame = Instance.new("Frame", screenGui)
@@ -170,7 +170,7 @@ function HUD.init(screenGui, deps)
 	goldLbl.Size = UDim2.new(1, -10, 0.5, 0)
 	goldLbl.Position = UDim2.new(0, 8, 0, 0)
 	goldLbl.BackgroundTransparency = 1
-	goldLbl.Text = "💰 0"
+	goldLbl.Text = "Gold 0"
 	goldLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
 	goldLbl.TextXAlignment = Enum.TextXAlignment.Left
 	goldLbl.TextScaled = true
@@ -181,7 +181,7 @@ function HUD.init(screenGui, deps)
 	gemsLbl.Size = UDim2.new(1, -10, 0.5, 0)
 	gemsLbl.Position = UDim2.new(0, 8, 0.5, 0)
 	gemsLbl.BackgroundTransparency = 1
-	gemsLbl.Text = "💎 0"
+	gemsLbl.Text = "Gems 0"
 	gemsLbl.TextColor3 = Color3.fromRGB(100, 200, 255)
 	gemsLbl.TextXAlignment = Enum.TextXAlignment.Left
 	gemsLbl.TextScaled = true
@@ -228,10 +228,10 @@ end
 
 function HUD.update()
 	if goldLbl then
-		goldLbl.Text = "💰 " .. fmtCurrency(getGold())
+		goldLbl.Text = "Gold " .. fmtCurrency(getGold())
 	end
 	if gemsLbl then
-		gemsLbl.Text = "💎 " .. tostring(getGems())
+		gemsLbl.Text = "Gems " .. tostring(getGems())
 	end
 	if spinCountLbl then
 		local n = getSpins()
@@ -242,7 +242,7 @@ function HUD.update()
 		local buffEnd = getLuckBuffEnd()
 		if buffEnd and tick() < buffEnd then
 			local secs = math.ceil(buffEnd - tick())
-			luckLbl.Text = "🍀 2× Luck (" .. secs .. "s)"
+			luckLbl.Text = "2× Luck (" .. secs .. "s)"
 		else
 			luckLbl.Text = ""
 		end
