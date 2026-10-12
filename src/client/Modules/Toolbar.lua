@@ -1,6 +1,7 @@
--- Bottom toolbar (first 10 inventory slots), hover tooltip, carried unit block, inventory helpers.
+-- Bottom toolbar (first 10 inventory slots), hover tooltip, the unit held in the hand, inventory helpers.
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
@@ -172,7 +173,52 @@ end
 -- ============================================================
 --  TOOLBAR / INVENTORY FUNCTIONS
 -- ============================================================
-local heldBlock = nil
+local heldBlock = nil -- what the character is holding: the unit's own model (or a plain block if it has none)
+
+local HELD_HEIGHT = 2.2 -- studs: the held unit is scaled to this height
+local HELD_OFFSET = CFrame.new(1.7, -0.3, -1.1) -- centre of the held unit relative to the character's root part
+
+-- A small copy of the unit's real 3D model (ReplicatedStorage.UnitModels, the same models the portraits use), frozen in
+-- its rest pose and welded next to the character. Returns nil when the unit has no model.
+local function makeHeldModel(unitType, hrp)
+	local folder = ReplicatedStorage:FindFirstChild("UnitModels")
+	local template = folder and folder:FindFirstChild(unitType)
+	if not template then
+		return nil
+	end
+	local model = template:Clone()
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BaseScript") or d:IsA("Humanoid") or d:IsA("Sound") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = false
+			d.CanCollide = false
+			d.CanTouch = false
+			d.CanQuery = false
+			d.CastShadow = false
+			d.Massless = true
+		elseif d:IsA("PointLight") or d:IsA("SpotLight") then
+			d.Shadows = false
+		end
+	end
+	local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart", true)
+	if not root then
+		model:Destroy()
+		return nil
+	end
+	-- scale to the held height, then centre the bounding box on the hand spot
+	local _, size = model:GetBoundingBox()
+	model:ScaleTo(model:GetScale() * HELD_HEIGHT / math.max(size.Y, 0.1))
+	local boxCFrame = model:GetBoundingBox()
+	local pivotToBox = model:GetPivot():ToObjectSpace(boxCFrame)
+	model:PivotTo(hrp.CFrame * HELD_OFFSET * pivotToBox:Inverse())
+	model.Parent = player.Character
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = hrp
+	weld.Part1 = root
+	weld.Parent = root
+	return model
+end
 
 local function updateCarriedUnit()
 	if heldBlock then
@@ -194,6 +240,12 @@ local function updateCarriedUnit()
 		return
 	end
 
+	heldBlock = makeHeldModel(unit.unitType, hrp)
+	if heldBlock then
+		return
+	end
+
+	-- no model for this unit: fall back to a coloured block
 	heldBlock = Instance.new("Part")
 	heldBlock.Size = Vector3.new(0.9, 0.9, 0.9)
 	heldBlock.BrickColor = UNIT_COLORS[unit.unitType] or BrickColor.new("Medium stone grey")
