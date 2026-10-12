@@ -101,9 +101,58 @@ clear.MouseButton1Click:Connect(function()
 	clearEvent:FireServer()
 end)
 
+-- preview the gacha reveal without rolling (random units; the rarity picks how dramatic it is)
+local GachaReveal = require(script.Parent.GachaReveal)
+local function randomResults(count, rarityName)
+	local results = {}
+	for _ = 1, count do
+		local pool = {}
+		for name in pairs(Units.Stats) do
+			if not rarityName or Units.Rarity[name] == rarityName then
+				table.insert(pool, name)
+			end
+		end
+		local unit = pool[math.random(#pool)]
+		table.insert(results, { unitType = unit, rarity = Units.Rarity[unit], pity = math.random(0, 59), oneIn = Units.getBaseOneIn(unit) })
+	end
+	return results
+end
+local previewRarity = nil -- nil = any
+local previewBtn = makeButton(panel, "Reveal x1", Color3.fromRGB(200, 255, 210))
+previewBtn.Size = UDim2.new(0.3, -8, 0, 28)
+previewBtn.Position = UDim2.fromOffset(8, 66)
+previewBtn.MouseButton1Click:Connect(function()
+	GachaReveal.play(randomResults(1, previewRarity), { graveType = "Mossy" })
+end)
+local previewBtn10 = makeButton(panel, "Reveal x10", Color3.fromRGB(200, 255, 210))
+previewBtn10.Size = UDim2.new(0.3, -8, 0, 28)
+previewBtn10.Position = UDim2.new(0.3, 4, 0, 66)
+previewBtn10.MouseButton1Click:Connect(function()
+	GachaReveal.play(randomResults(10, previewRarity), { graveType = "Mossy" })
+end)
+local rarityBtn = makeButton(panel, "Rarity: any", Color3.fromRGB(255, 230, 160))
+rarityBtn.Size = UDim2.new(0.4, -8, 0, 28)
+rarityBtn.Position = UDim2.new(0.6, 4, 0, 66)
+rarityBtn.MouseButton1Click:Connect(function()
+	-- cycle: any, then every rarity from the lowest to the highest
+	local order = {}
+	for r in pairs(Rarities.Rank) do
+		table.insert(order, r)
+	end
+	table.sort(order, function(a, b) return Rarities.Rank[a] < Rarities.Rank[b] end)
+	local nextIndex = 1
+	for i, r in ipairs(order) do
+		if r == previewRarity then
+			nextIndex = i + 1
+		end
+	end
+	previewRarity = order[nextIndex] -- nil after the last one: back to "any"
+	rarityBtn.Text = "Rarity: " .. (previewRarity or "any")
+end)
+
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -74)
-list.Position = UDim2.fromOffset(8, 68)
+list.Size = UDim2.new(1, -16, 1, -108)
+list.Position = UDim2.fromOffset(8, 102)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6
