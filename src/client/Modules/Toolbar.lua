@@ -6,6 +6,8 @@ local player = Players.LocalPlayer
 local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
 local UnitPortrait = require(script.Parent.UnitPortrait)
+local LevelBadge = require(script.Parent.LevelBadge)
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 local InventoryPanel = require(script.Parent.InventoryPanel)
 local GameData = require(script.Parent.GameData)
 local UNIT_INFO = GameData.UNIT_INFO
@@ -132,7 +134,8 @@ for i = 1, 10 do
 
 	-- the unit's 3D portrait replaces the old emoji spot
 	local portrait = UnitPortrait.attach(slot, { position = UDim2.new(0, 2, 0, 4), size = UDim2.new(1, -4, 1, -18), zIndex = 2 })
-	slotFrames[i] = { frame = slot, emoji = emojiLbl, name = nameLbl, portrait = portrait }
+	local badge = LevelBadge.attach(slot, 4)
+	slotFrames[i] = { frame = slot, emoji = emojiLbl, name = nameLbl, portrait = portrait, badge = badge }
 
 	-- Click to select
 	local btn = Instance.new("TextButton", slot)
@@ -152,10 +155,10 @@ for i = 1, 10 do
 			return
 		end
 		local info = UNIT_INFO[unit.unitType] or {}
-		ttName.Text = unit.unitType
+		ttName.Text = unit.unitType .. ((unit.level or 0) > 0 and ("  Lv " .. unit.level) or "")
 		ttRarity.Text = info.rarity or ""
 		ttRarity.TextColor3 = RARITY_COLORS[info.rarity] or Color3.fromRGB(200, 200, 200)
-		ttDps.Text = (UNIT_DPS[unit.unitType] or "?") .. " DPS"
+		ttDps.Text = (UNIT_DPS[unit.unitType] and math.floor(UNIT_DPS[unit.unitType] * Economy.levelMultiplier(unit.level)) or "?") .. " DPS"
 		ttOneIn.Text = "1 in " .. (unit.oneIn or UNIT_ONE_IN[unit.unitType] or "?")
 		local abs = slot.AbsolutePosition
 		local sz = slot.AbsoluteSize
@@ -272,6 +275,7 @@ local function refreshToolbar()
 			local rc = RARITY_COLORS[info.rarity] or Color3.fromRGB(80, 40, 120)
 			local ri, gi, bi = rc.R * 255, rc.G * 255, rc.B * 255
 			sf.portrait.set(unit.unitType)
+			sf.badge.set(unit.level)
 			sf.name.Text = unit.unitType
 			sf.frame.BackgroundColor3 = isSel
 					and Color3.fromRGB(
@@ -282,6 +286,7 @@ local function refreshToolbar()
 				or Color3.fromRGB(math.floor(ri * 0.18 + 6), math.floor(gi * 0.18 + 3), math.floor(bi * 0.18 + 12))
 		else
 			sf.portrait.set(nil)
+			sf.badge.set(0)
 			sf.name.Text = ""
 			sf.frame.BackgroundColor3 = isSel and Color3.fromRGB(55, 30, 90) or Color3.fromRGB(22, 10, 45)
 		end

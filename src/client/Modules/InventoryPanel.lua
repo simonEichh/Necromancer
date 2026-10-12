@@ -2,6 +2,8 @@ local InventoryPanel = {}
 local Theme = require(script.Parent.Theme)
 local C = Theme.Color
 local UnitPortrait = require(script.Parent.UnitPortrait)
+local LevelBadge = require(script.Parent.LevelBadge)
+local LevelEconomy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 -- ── Private state ────────────────────────────────────────────
 local invSortMode   = "DPS"
@@ -79,7 +81,7 @@ ensureInvSlots = function()
 		btn.ZIndex = 39
 
 		local sd = {
-			frame = slot, emoji = eLbl, name = nLbl, portrait = nil,
+			frame = slot, emoji = eLbl, name = nLbl, portrait = nil, badge = LevelBadge.attach(slot, 40),
 			ind = indLbl, btn = btn, stroke = stroke,
 			currentInvIdx = nil,
 		}
@@ -91,10 +93,10 @@ ensureInvSlots = function()
 			local u = inventory[invIdx]
 			if not u then tooltip.Visible = false return end
 			local ui = UNIT_INFO[u.unitType] or {}
-			ttName.Text   = u.unitType
+			ttName.Text   = u.unitType .. ((u.level or 0) > 0 and ("  Lv " .. u.level) or "")
 			ttRarity.Text = ui.rarity or ""
 			ttRarity.TextColor3 = RARITY_COLORS[ui.rarity] or Color3.fromRGB(200, 200, 200)
-			ttDps.Text    = (UNIT_DPS[u.unitType] or "?") .. " DPS"
+			ttDps.Text    = (UNIT_DPS[u.unitType] and math.floor(UNIT_DPS[u.unitType] * LevelEconomy.levelMultiplier(u.level)) or "?") .. " DPS"
 			ttOneIn.Text  = "1 in " .. (u.oneIn or UNIT_ONE_IN[u.unitType] or "?")
 			local abs = slot.AbsolutePosition
 			local sz  = slot.AbsoluteSize
@@ -130,7 +132,10 @@ getInventorySorted = function()
 	end
 	if invSortMode == "DPS" then
 		table.sort(list, function(a, b)
-			return (UNIT_DPS[a.unit.unitType] or 0) > (UNIT_DPS[b.unit.unitType] or 0)
+			-- DPS including the unit's level
+			local da = (UNIT_DPS[a.unit.unitType] or 0) * LevelEconomy.levelMultiplier(a.unit.level)
+			local db = (UNIT_DPS[b.unit.unitType] or 0) * LevelEconomy.levelMultiplier(b.unit.level)
+			return da > db
 		end)
 	elseif invSortMode == "Chance" then
 		table.sort(list, function(a, b)
@@ -169,6 +174,7 @@ refresh = function()
 				sd.portrait = UnitPortrait.attach(sd.frame, { position = UDim2.new(0, 2, 0, 2), size = UDim2.new(1, -4, 1, -18), zIndex = 38 })
 			end
 			sd.portrait.set(unit.unitType)
+			sd.badge.set(unit.level)
 			sd.name.Text      = unit.unitType
 			sd.name.TextColor3 = C.Bone
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
@@ -180,6 +186,7 @@ refresh = function()
 			if sd.portrait then
 				sd.portrait.set(nil)
 			end
+			sd.badge.set(0)
 			sd.name.Text      = ""
 			sd.ind.Text       = ""
 		end
