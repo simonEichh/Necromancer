@@ -5,6 +5,7 @@
 --   AttackCount             (incremented on every attack; the swing plays on each change)
 --   Speed, AttackCD         (walk speed in studs/s, seconds between attacks)
 -- and optionally, set once on the model: Float (hover bob amplitude in studs, for floating units)
+-- Optional joints besides the humanoid ones: LWing/RWing (flapping wings, positive Z rotation raises the right wing).
 -- Every client animates the model's Motor6D joints locally each frame, so nothing is sent over the
 -- network per frame and no uploaded Animation assets are needed.
 --
@@ -120,6 +121,13 @@ local function animate(model, rig, dt, now)
 	set(rig, "RElbow", ANGLES(rElbow, 0, 0))
 	set(rig, "Waist", ANGLES(waistPitch, 0, waistRoll))
 	set(rig, "Neck", ANGLES(-0.04 * w, math.sin(t * 0.8) * 0.12 * (1 - w), 0))
+
+	-- wings (bats and other fliers): LWing/RWing flap up and down around Z; they flap faster while moving
+	if rig.joints.LWing or rig.joints.RWing then
+		local flap = math.sin(t * (9 + 5 * w)) * 0.55 + 0.15
+		set(rig, "RWing", ANGLES(0, 0, flap))
+		set(rig, "LWing", ANGLES(0, 0, -flap))
+	end
 	set(rig, "Jaw", ANGLES(jaw, 0, 0))
 end
 
