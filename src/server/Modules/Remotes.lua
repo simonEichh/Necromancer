@@ -7,6 +7,8 @@ local EVENTS = {
 	"BuyGraveRequest",
 	"BuyUpgrade",
 	"ClaimQuest",
+	"DevClearUnits", -- Studio-only dev tools (see DevTools / client DevPanel)
+	"DevSpawnUnit",
 	"DigGrave",
 	"PlaceAtGrave",
 	"PlaceBest",

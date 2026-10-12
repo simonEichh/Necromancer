@@ -178,6 +178,7 @@ AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.UpgradePanel)
 WheelPanel = require(Modules.WheelPanel)
+require(Modules.DevPanel) -- Studio only, drawn on top
 
 -- ============================================================
 --  SERVER DATA

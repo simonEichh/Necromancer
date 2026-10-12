@@ -28,7 +28,7 @@ Roblox idle/gacha game ("Necro Buddies"). Players dig graves to roll undead unit
 - `Remotes` (creates every remote), `PlotRegistry` (shared `playerPlots`/`getPlot`)
 - **`PlayerData`** (authoritative gold/gems/inventory/graves/upgrades/ascension per player, with `changed` -> coalesced `DataSync` snapshot to the client), **`Persistence`** (DataStore load/save/autosave/BindToClose), `Inventory` (SellUnit/SwapInventory/RequestData handlers)
 - `Plots` (claiming, grave slots, ascend), `Walls` (HP bar, preview queue, break/reset), `Army` (spawn/recall/placement handlers + unit AI)
-- `Rolling` (rarity/unit rolls, pity), `Digging` (DigGrave handler), `Wheel`, `Quests`, `Upgrades` (purchases), `GraveShop` (stock rotation + purchases), `ShopNpcs` (NPC prompts)
+- `Rolling` (rarity/unit rolls, pity), `Digging` (DigGrave handler), `Wheel`, `Quests`, `Upgrades` (purchases), `GraveShop` (stock rotation + purchases), `ShopNpcs` (NPC prompts), `DevTools` (Studio-only: spawn any unit at your wall for testing, see below)
 - Dependency order (no cycles): Remotes -> PlayerData -> PlotRegistry/Quests/Upgrades/Rolling/Wheel/GraveShop -> Walls -> Army -> Plots/Persistence. Modules attach their own remote handlers when required.
 
 **Shared data** (`src/shared`, `ReplicatedStorage.Shared`): `Units` (stats, rarity pools, emojis, `getBaseOneIn`), `Graves`, `Rarities`, `Economy` (costs, sell value, multipliers, caps). Both server and client read these; add or change a unit/grave there only. The only client-only grave data is the image/emoji/color in `GameData.GRAVE_UI`.
@@ -71,6 +71,7 @@ Plots point in different directions, so **never use world X/Z for lane math**. E
 - Testing saves in Studio: the Stop button ends the session before the leave-save finishes, so only the 60s autosave (or `Player:Kick()` from a server `execute_luau`) is reliable there. Save logs `💾 saved data for <name>`.
 - New players start with `START_GOLD = 50000` in `PlayerData` (a testing value; Notes.txt wants 300).
 - `/give <Unit>` debug chat command only works in Studio.
+- **Dev panel (Studio only)**: the purple `🛠 DEV` button on the left of the screen opens a list of every unit (client `Modules/DevPanel`); clicking one fires `DevSpawnUnit` and the server (`Modules/DevTools`, checks `RunService:IsStudio()`) spawns it inside its attack range of your wall, spread across the lane, so it attacks right away. `Clear dev units` (`DevClearUnits`) removes them. Dev units are flagged `entry.dev`, are not tied to graves or the inventory and are never saved. Neither module does anything outside Studio.
 
 ## Known issues
 
@@ -96,4 +97,4 @@ Plots point in different directions, so **never use world X/Z for lane math**. E
 
 ## Remotes
 
-Created in `Modules/Remotes.lua` (a list; add new names there). Client -> server: BuyGraveRequest, BuyUpgrade, ClaimQuest, DigGrave, PlaceAtGrave, PlaceBest, PlayerAscend, RequestData, SellUnit, SwapInventory, WheelSpin. Server -> client: AddGold (sell banner only), BuyGraveResult, DamageHit, DataSync, DigRejected, Notice, OpenGrave/OpenSell/OpenUpgrade, QuestUpdate, RollResult, SelectGrave, ShopStockUpdate, WallBreak, WheelResult, WheelSpinsUpdate; RemoteFunction GetWallPos.
+Created in `Modules/Remotes.lua` (a list; add new names there). Client -> server: BuyGraveRequest, BuyUpgrade, ClaimQuest, DevClearUnits, DevSpawnUnit (Studio only), DigGrave, PlaceAtGrave, PlaceBest, PlayerAscend, RequestData, SellUnit, SwapInventory, WheelSpin. Server -> client: AddGold (sell banner only), BuyGraveResult, DamageHit, DataSync, DigRejected, Notice, OpenGrave/OpenSell/OpenUpgrade, QuestUpdate, RollResult, SelectGrave, ShopStockUpdate, WallBreak, WheelResult, WheelSpinsUpdate; RemoteFunction GetWallPos.

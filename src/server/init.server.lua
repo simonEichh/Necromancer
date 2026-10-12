@@ -25,6 +25,7 @@ require(Modules.Upgrades)
 require(Modules.Inventory)
 require(Modules.ShopNpcs)
 require(Modules.Digging)
+require(Modules.DevTools)
 
 local playerPlots = PlotRegistry.playerPlots
 
