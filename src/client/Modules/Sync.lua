@@ -30,6 +30,7 @@ local function apply(snap)
 	State.gold = snap.gold
 	State.gems = snap.gems
 	State.rebirthCount = snap.rebirthCount
+	State.gateCleared = snap.gateCleared == true
 	State.goldMultiplier = snap.goldMultiplier
 	State.luckBoostLevel = snap.luckBoostLevel
 	State.coinBoostLevel = snap.coinBoostLevel

@@ -4,9 +4,10 @@ local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local Graves = require(ReplicatedStorage.Shared.Graves)
 
+-- Tuned with tools/sim/economy_sim.py: cheap graves are limited too, so pulls come from gold earned, not from spam.
 local GRAVE_STOCK_BASE = {
-	Mossy = 999, Stone = 50, Ancient = 30, Cursed = 20,
-	Shadow = 15, Abyssal = 10, Eldritch = 5,
+	Mossy = 40, Stone = 25, Ancient = 20, Cursed = 15,
+	Shadow = 12, Abyssal = 8, Eldritch = 5,
 	Void = 3, Eternal = 2, Celestial = 1,
 }
 local GRAVE_ROTATION_CHANCE = {

@@ -155,7 +155,7 @@ local function makeGraveRow(parent, order, gd)
 	luckLbl.Size = UDim2.new(0, 260, 0, 28)
 	luckLbl.Position = UDim2.new(0, 126, 0, 57)
 	luckLbl.BackgroundTransparency = 1
-	luckLbl.Text = gd.luck .. "% Luck"
+	luckLbl.Text = "Best: " .. gd.bestRarity .. " " .. string.format("%.2f", gd.bestPercent) .. "%"
 	luckLbl.TextColor3 = luckColor
 	luckLbl.TextXAlignment = Enum.TextXAlignment.Left
 	luckLbl.TextScaled = true

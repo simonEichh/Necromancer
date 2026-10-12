@@ -2,9 +2,7 @@
 local Rarities = require(game:GetService("ReplicatedStorage").Shared.Rarities)
 local Units = require(game:GetService("ReplicatedStorage").Shared.Units)
 
-local BASE_ODDS = Rarities.BaseOdds
 local RARITY_RANK = Rarities.Rank
-local RARITY_ORDER = Rarities.Order
 local RARITY_UNITS = Units.Pools
 
 -- Per-player pity counters
@@ -33,48 +31,42 @@ local function resetPity(player, graveType)
 	end
 end
 
--- Single roll against BASE_ODDS (no luck applied)
--- Uses 10000-point scale to support fractional % like Eldritch (0.75%) and Eternal (0.25%)
-local function rollBaseRarity()
-	local roll = math.random(1, 10000)
-	local cumulative = 0
-	for _, rarity in ipairs(RARITY_ORDER) do
-		cumulative += BASE_ODDS[rarity] * 100
-		if roll <= cumulative then
-			return rarity
-		end
-	end
-	return "Common"
-end
+-- Roll the rarity from the grave's own odds table. `grave` = { odds, pityRarity, luckFactor }: luckFactor (the luck
+-- upgrade, +10% per level, times the wheel's 2x buff) multiplies the weights of Rare and better, so luck makes good
+-- units more likely without ever making a grave give rarities outside its table.
+local LUCK_FROM_RANK = 3
+local PITY_ROLLS = 60
 
--- Roll rarity using grave luck (best-of-N: N = grave.luck / 100)
 local function rollRarity(grave, player, graveType)
 	local pity = getPity(player, graveType)
-	if pity >= 60 then
+	if pity >= PITY_ROLLS then
 		resetPity(player, graveType)
 		return grave.pityRarity
 	end
 
-	local luckMult = math.max(1, grave.luck / 100)
-	local rolls = math.floor(luckMult)
-	if math.random() < (luckMult % 1) then
-		rolls += 1
+	local factor = grave.luckFactor or 1
+	local entries, total = {}, 0
+	for rarity, weight in pairs(grave.odds) do
+		local w = weight * ((RARITY_RANK[rarity] >= LUCK_FROM_RANK) and factor or 1)
+		table.insert(entries, { rarity = rarity, weight = w })
+		total += w
 	end
-
-	local best = "Common"
-	for _ = 1, rolls do
-		local r = rollBaseRarity()
-		if RARITY_RANK[r] > RARITY_RANK[best] then
-			best = r
+	local roll = math.random() * total
+	local picked = entries[#entries].rarity
+	for _, e in ipairs(entries) do
+		roll -= e.weight
+		if roll <= 0 then
+			picked = e.rarity
+			break
 		end
 	end
 
-	if best == grave.pityRarity then
+	if RARITY_RANK[picked] >= RARITY_RANK[grave.pityRarity] then
 		resetPity(player, graveType)
 	else
 		incrementPity(player, graveType)
 	end
-	return best
+	return picked
 end
 
 -- Pick a weighted random unit from a rarity pool

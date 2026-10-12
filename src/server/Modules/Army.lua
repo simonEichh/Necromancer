@@ -11,6 +11,7 @@ local PlotFrame = require(script.Parent.PlotFrame)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 
 local UNITS = SharedUnits.Stats
@@ -60,9 +61,31 @@ local nextUnitId = 0 -- ever-growing id of spawned units (orders the units insid
 local RISE_TIME = 3.5 -- seconds a static unit (a tower) takes to rise out of the ground when it is placed
 local standDistance -- (unit def) -> distance in front of the wall where the unit stands; defined with the formation code below
 
+-- Ascensions multiply the damage of every unit (Economy.damageMultiplier). Each spawned unit gets its own copy of its
+-- stats so the multiplier can change when the owner ascends (see setDamageMultiplier).
+local function ownerDamageMultiplier(plotState)
+	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
+	local profile = owner and PlayerData.get(owner)
+	return Economy.damageMultiplier(profile and profile.rebirthCount or 0)
+end
+
+local function setDamageMultiplier(plotState)
+	local mult = ownerDamageMultiplier(plotState)
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.baseDamage then
+			u.def.damage = u.baseDamage * mult
+			if u.dpsLbl then
+				u.dpsLbl.Text = math.floor(u.def.damage / u.def.attackCD) .. " DPS"
+			end
+		end
+	end
+end
+
 local function spawnUnit(unitType, customPos, plotState)
-	local def = UNITS[unitType]
-	if not def then return end
+	local baseDef = UNITS[unitType]
+	if not baseDef then return end
+	local def = table.clone(baseDef)
+	def.damage = baseDef.damage * ownerDamageMultiplier(plotState)
 	nextUnitId += 1
 
 	-- "lateral" = which lane line across the plot the unit walks along; units face down the lane
@@ -254,7 +277,7 @@ local function spawnUnit(unitType, customPos, plotState)
 	dpsLbl.Font = Enum.Font.GothamBold
 
 	table.insert(plotState.activeUnits, {
-		block = block, bv = bv, bg = bg, def = def,
+		block = block, bv = bv, bg = bg, def = def, baseDamage = baseDef.damage, dpsLbl = dpsLbl,
 		lastAttack = 0, lateral = lateral,
 		id = nextUnitId, -- stable order inside a formation row (see layoutFormation)
 		walkTrack = walkTrack, attackTrack = attackTrack,
@@ -274,7 +297,7 @@ local function placeInSlot(plotState, slotIndex, unitType)
 	slot.occupied = true
 	slot.unitType = unitType
 	slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
-	local dps = math.floor(UNITS[unitType].damage / UNITS[unitType].attackCD)
+	local dps = math.floor(UNITS[unitType].damage * ownerDamageMultiplier(plotState) / UNITS[unitType].attackCD)
 	local rarity = UNIT_RARITY[unitType] or "Common"
 	slot.label.Text = unitType
 	slot.rarityLabel.Text = rarity
@@ -668,7 +691,14 @@ local function update(now, dt)
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
 			-- the unit's slot in the formation (falls back to the lane it was placed in until the first layout)
 			local lat = u.slotLat or u.lateral
-			local target     = PlotFrame.toWorld(plotState, lat, plotState.wallTargetFwd - (u.slotStand or FORMATION_MIN_STAND))
+			-- the front wall advances down the lane as walls break and the army marches after it; a static unit (a tower)
+			-- cannot march, so it keeps the spot it rose at
+			local standFwd = plotState.wallTargetFwd - (u.slotStand or FORMATION_MIN_STAND)
+			if u.def.static then
+				u.staticFwd = u.staticFwd or standFwd
+				standFwd = u.staticFwd
+			end
+			local target     = PlotFrame.toWorld(plotState, lat, standFwd)
 			local flatTarget = Vector3.new(target.X, 0, target.Z)
 			local dist = (flatPos - flatTarget).Magnitude
 			local forward = PlotFrame.forwardFlat(plotState)
@@ -700,6 +730,10 @@ local function update(now, dt)
 					-- artillery burns the wall with a beam on a fixed cycle (see startBeam)
 					if not u.beam or u.beam.endTime then
 						startBeam(u, plotState, lat)
+					elseif u.model then
+						-- the front wall moves on when a wall breaks: keep the beam aimed at the wall being fought
+						u.model:SetAttribute("AimPos", PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
+							+ Vector3.new(0, BEAM_AIM_HEIGHT, 0))
 					end
 				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
@@ -755,6 +789,7 @@ return {
 	recallUnitFromSlot = recallUnitFromSlot,
 	placeInSlot = placeInSlot,
 	spawnUnit = spawnUnit,
+	setDamageMultiplier = setDamageMultiplier,
 	standDistance = standDistance, -- (unit def) -> distance in front of the wall where the unit stands
 	update = update,
 }

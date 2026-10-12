@@ -29,11 +29,12 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 	end
 	count = math.clamp(math.floor(tonumber(count) or 1), 1, MAX_PULLS)
 
-	-- Apply luck boost upgrade (each level = +10% to grave luck) + wheel luck buff
+	-- Luck: each luckBoost level = +10% and the wheel buff doubles it; it multiplies the weights of Rare and better
 	local wd = getWheelData(player)
 	local buffMult = (tick() < wd.luckBuffEnd) and 2 or 1
 	local boostedGrave = {
-		luck = grave.luck * (1 + profile.upgrades.luckBoost * 0.1) * buffMult,
+		odds = grave.odds,
+		luckFactor = (1 + profile.upgrades.luckBoost * 0.1) * buffMult,
 		pityRarity = grave.pityRarity,
 	}
 

@@ -1,5 +1,6 @@
 -- Plot claiming/assignment, physical grave slots, ascension.
 local ServerStorage = game:GetService("ServerStorage")
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local Army = require(script.Parent.Army)
@@ -21,7 +22,7 @@ local initPlotForPlayer -- forward declared; defined below
 Remotes.GetWallPos.OnServerInvoke = function(player)
 	local plotState = getPlot(player)
 	if plotState then
-		-- the front wall never moves; return a spot 12 studs in front of it, facing the wall
+		-- a spot 12 studs in front of the wall being fought (the front advances as walls break), facing the wall
 		local pos = PlotFrame.toWorld(plotState, 0, plotState.wallFwd - 12)
 		return CFrame.lookAt(pos, pos + PlotFrame.forwardFlat(plotState))
 	end
@@ -159,6 +160,8 @@ initPlotForPlayer = function(player)
 	-- local -Z points down the lane, towards the walls). The front wall stands Walls.WALL_FWD studs down the lane
 	-- (the plot's WallOrigin part in the place file is no longer used).
 	local frame = basePart.CFrame * CFrame.new(0, basePart.Size.Y / 2, 0)
+	local startProfile = PlayerData.get(player)
+	local startHp = Economy.wallHp(1, startProfile and startProfile.rebirthCount or 0)
 	local plotState = {
 		plotModel        = plotModel,
 		plotIndex        = plotIndex,
@@ -168,9 +171,9 @@ initPlotForPlayer = function(player)
 		plotGroundY      = frame.Position.Y,
 		wall             = nil,
 		wallQueue        = {},
-		wallHP           = 500,
+		wallHP           = startHp,
 		wallLayer        = 1,
-		WALL_MAX_HP      = 500,
+		WALL_MAX_HP      = startHp,
 		wallRegen        = 1,
 		goldMultiplier   = 1.0,
 		hpFill           = nil,
@@ -215,12 +218,14 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 		end
 	end
 	resetWall(plotState)
+	Army.setDamageMultiplier(plotState)
 	-- put the units back behind the graves (10 studs towards the plaza), in their own lanes
 	local graveSpot1 = plotState.plotModel:FindFirstChild("GraveSpot1")
 	local nearFwd = graveSpot1 and (select(2, PlotFrame.toLocal(plotState, graveSpot1.Position)) - 10)
 		or (plotState.wallFwd - 60)
 	local forward = PlotFrame.forwardFlat(plotState)
 	for _, u in ipairs(plotState.activeUnits) do
+		u.staticFwd = nil -- towers rise again at the new first wall
 		if u.block and u.block.Parent then
 			local pos = PlotFrame.toWorld(plotState, u.lateral, nearFwd + math.random(-5, 5)) + Vector3.new(0, 7.7, 0)
 			u.block.CFrame = CFrame.lookAt(pos, pos + forward)

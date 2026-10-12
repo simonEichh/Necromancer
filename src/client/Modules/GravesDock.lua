@@ -86,7 +86,7 @@ function GravesDock.updateButtons()
 	elseif count == 0 then
 		hintLbl.Text = "You have no " .. gd.name .. " left. Buy more in the shop."
 	else
-		hintLbl.Text = gd.name .. "   Luck " .. gd.luck .. "%"
+		hintLbl.Text = gd.name .. "   Best: " .. gd.bestRarity .. " " .. string.format("%.2f", gd.bestPercent) .. "%"
 	end
 end
 

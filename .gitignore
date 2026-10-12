@@ -8,3 +8,4 @@
 sourcemap.json
 Packages/
 ServerPackages/
+__pycache__/

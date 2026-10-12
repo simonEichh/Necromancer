@@ -9,7 +9,7 @@ local Units = require(ReplicatedStorage.Shared.Units)
 
 local INVENTORY_MAX = Economy.INVENTORY_MAX
 local MAX_CURRENCY = 9e15 -- keep values exactly representable
-local START_GOLD = 50000 -- TODO: Notes.txt says new players should start with 300
+local START_GOLD = 300
 
 local PlayerData = {}
 local profiles = {} -- [UserId] = profile
@@ -37,6 +37,7 @@ function PlayerData.create(player, saved)
 		gold = START_GOLD,
 		gems = 0,
 		rebirthCount = 0,
+		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
@@ -113,6 +114,7 @@ function PlayerData.snapshot(profile)
 		gold = profile.gold,
 		gems = profile.gems,
 		rebirthCount = profile.rebirthCount,
+		gateCleared = profile.gateCleared,
 		goldMultiplier = Economy.goldMultiplier(profile.rebirthCount),
 		ownedGraves = owned,
 		luckBoostLevel = profile.upgrades.luckBoost,
@@ -314,20 +316,30 @@ function PlayerData.incrementUpgrade(player, upgradeType)
 	PlayerData.changed(player)
 end
 
--- Spends the ascension cost, resets gold and bumps the ascension count.
--- Returns the new ascension count, or nil if the player can't afford it.
+-- Resets gold and bumps the ascension count once the gate is broken.
+-- Returns the new ascension count, or nil if the gate has not fallen.
 function PlayerData.ascend(player)
 	local profile = profiles[player.UserId]
 	if not profile then
 		return nil
 	end
-	if profile.gold < Economy.ascendCost(profile.rebirthCount) then
-		return nil
+	if not profile.gateCleared then
+		return nil -- ascending needs the gate (the last wall of the run) to be broken
 	end
+	profile.gateCleared = false
 	profile.gold = 0
 	profile.rebirthCount += 1
 	PlayerData.changed(player)
 	return profile.rebirthCount
+end
+
+-- Called by Walls when the gate (last wall of a run) breaks.
+function PlayerData.setGateCleared(player, cleared)
+	local profile = profiles[player.UserId]
+	if profile and profile.gateCleared ~= cleared then
+		profile.gateCleared = cleared
+		PlayerData.changed(player)
+	end
 end
 
 return PlayerData

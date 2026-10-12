@@ -48,6 +48,21 @@ local GRAVE_UI = {
 	Celestial = { emoji = "", image = "", color = C(40, 60, 100) },
 }
 
+-- The best (rarest) rarity a grave can give with at least 0.05 % of its rolls, and its chance in percent (for the UI)
+local RARITY_RANK = require(Shared:WaitForChild("Rarities")).Rank
+local function bestOdds(odds)
+	local total, best, bestRank = 0, nil, 0
+	for rarity, w in pairs(odds) do
+		total += w
+	end
+	for rarity, w in pairs(odds) do
+		if RARITY_RANK[rarity] > bestRank and w / total >= 0.0005 then
+			best, bestRank = rarity, RARITY_RANK[rarity]
+		end
+	end
+	return best, best and (odds[best] / total * 100) or 0
+end
+
 -- Ordered grave tier definitions
 local GRAVE_ORDER = { "Mossy", "Stone", "Ancient", "Cursed", "Shadow", "Abyssal", "Eldritch", "Void", "Eternal", "Celestial" }
 local GRAVE_DATA = {}
@@ -59,7 +74,9 @@ for _, key in ipairs(GRAVE_ORDER) do
 		emoji = ui.emoji,
 		image = ui.image,
 		cost = g.cost,
-		luck = g.luck,
+		odds = g.odds,
+		bestRarity = (bestOdds(g.odds)),
+		bestPercent = select(2, bestOdds(g.odds)),
 		unlockAscension = g.unlockAscension,
 		color = ui.color,
 	})

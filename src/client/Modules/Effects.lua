@@ -75,43 +75,11 @@ local function showBigText(line1, line2, color1, color2)
 	end)
 end
 
-local function spawnConfetti()
-	local colors = {
-		Color3.fromRGB(255, 100, 180),
-		Color3.fromRGB(100, 200, 255),
-		Color3.fromRGB(255, 220, 80),
-		Color3.fromRGB(160, 255, 130),
-		Color3.fromRGB(200, 130, 255),
-	}
-	for _ = 1, 35 do
-		local p = Instance.new("Frame")
-		p.Size = UDim2.new(0, math.random(8, 18), 0, math.random(8, 18))
-		p.Position = UDim2.new(math.random(10, 90) / 100, 0, -0.05, 0)
-		p.Rotation = math.random(0, 360)
-		p.BackgroundColor3 = colors[math.random(#colors)]
-		p.BorderSizePixel = 0
-		p.ZIndex = 19
-		p.Parent = screenGui
-		local ft = math.random(12, 22) / 10
-		TweenService:Create(p, TweenInfo.new(ft, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = UDim2.new(p.Position.X.Scale, 0, math.random(80, 110) / 100, 0),
-			Rotation = p.Rotation + math.random(180, 540),
-		}):Play()
-		game:GetService("Debris"):AddItem(p, ft + 0.1)
-	end
-end
-
 local wallBreakEvt = ReplicatedStorage:WaitForChild("WallBreak", 5)
 if wallBreakEvt then
-	wallBreakEvt.OnClientEvent:Connect(function(goldReward, clearedLayer)
-		screenShake(0.35, 0.6)
-		spawnConfetti()
-		showBigText(
-			"WALL CLEARED!",
-			"Layer " .. (clearedLayer or "?") .. " destroyed!   +" .. goldReward .. " Gold",
-			Color3.fromRGB(255, 220, 80),
-			Color3.fromRGB(200, 170, 255)
-		)
+	-- no banner or confetti (it fires every few seconds once the army is strong): just a light shake
+	wallBreakEvt.OnClientEvent:Connect(function()
+		screenShake(0.15, 0.3)
 	end)
 end
 

@@ -81,19 +81,15 @@ ascendCancelBtn.BorderSizePixel = 0
 ascendCancelBtn.ZIndex = 51
 Instance.new("UICorner", ascendCancelBtn).CornerRadius = UDim.new(0, 10)
 
-local ASCEND_UNLOCKS = {
-	[1] = "Unlocks: Stone Coffin grave",
-	[2] = "Unlocks: Ancient Tomb grave",
-}
-
 updateAscendPanel = function()
-	local tier = State.rebirthCount + 1
-	local cost = Economy.ascendCost(State.rebirthCount)
-	local unlockText = ASCEND_UNLOCKS[tier] or "No new unlocks — gold multiplier only"
-	local newMult = 1.0 + (State.rebirthCount + 1)
-	ascendInfoLbl.Text =
-		string.format("Cost: %s Gold\n%s\nNew gold multiplier: %.0fx", fmt(cost), unlockText, newMult)
-	local canAfford = State.gold >= cost
+	local nextGrave = GRAVE_DATA[State.rebirthCount + 2] -- the tier this ascension unlocks (GRAVE_DATA[1] = Mossy)
+	local unlockText = nextGrave and ("Unlocks: " .. nextGrave.name) or "No new grave tier"
+	local newMult = Economy.damageMultiplier(State.rebirthCount + 1)
+	local ready = State.gateCleared
+	local head = ready and "The gate has fallen!" or ("Break wall " .. Economy.WALLS_PER_RUN .. " (the gate) to ascend")
+	ascendInfoLbl.Text = head .. "\n" .. unlockText .. "\nUnit damage after ascending: "
+		.. string.format("%.1fx", newMult) .. "\nThe wall and your gold reset"
+	local canAfford = ready
 	ascendConfirmBtn.BackgroundColor3 = canAfford and Color3.fromRGB(140, 60, 10) or Color3.fromRGB(50, 25, 10)
 	ascendConfirmBtn.TextColor3 = canAfford and Color3.fromRGB(255, 230, 150) or Color3.fromRGB(130, 100, 60)
 end
@@ -103,7 +99,7 @@ ascendCancelBtn.MouseButton1Click:Connect(function()
 end)
 
 ascendConfirmBtn.MouseButton1Click:Connect(function()
-	if State.gold < Economy.ascendCost(State.rebirthCount) then
+	if not State.gateCleared then
 		return
 	end
 	-- The server checks the cost and performs the ascension; Sync reports back
@@ -121,7 +117,7 @@ Sync.onApplied(function(ascended)
 	if ascended then
 		showBigText(
 			"ASCENDED!",
-			"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.0fx", State.goldMultiplier) .. " Gold Multiplier",
+			"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.1fx", Economy.damageMultiplier(State.rebirthCount)) .. " Damage",
 			Color3.fromRGB(255, 190, 80),
 			Color3.fromRGB(255, 220, 150)
 		)

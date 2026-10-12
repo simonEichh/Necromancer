@@ -28,7 +28,9 @@ end
 -- ── fmt helper (local copy for currency display) ─────────────
 local function fmtCurrency(n)
 	if fmtNumber then return fmtNumber(n) end
-	if n >= 1e9 then return string.format("%.1fB", n/1e9)
+	if n >= 1e15 then return string.format("%.1fQa", n/1e15)
+	elseif n >= 1e12 then return string.format("%.1fT", n/1e12)
+	elseif n >= 1e9 then return string.format("%.1fB", n/1e9)
 	elseif n >= 1e6 then return string.format("%.1fM", n/1e6)
 	elseif n >= 1e3 then return string.format("%.1fK", n/1e3)
 	else return tostring(math.floor(n)) end

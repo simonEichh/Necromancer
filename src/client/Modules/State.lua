@@ -6,6 +6,7 @@ local State = {
 	gold = 0,
 	gems = 0,
 	rebirthCount = 0,
+	gateCleared = false, -- the gate fell: ascending is possible
 	goldMultiplier = 1.0,
 
 	-- Inventory: up to INVENTORY_MAX units; first 10 are shown in the toolbar
@@ -37,7 +38,6 @@ local State = {
 
 	-- Constants
 	INVENTORY_MAX = Economy.INVENTORY_MAX,
-	ASCEND_COSTS = Economy.ASCEND_COSTS,
 	UPGRADE_MAX = Economy.UPGRADE_MAX,
 }
 

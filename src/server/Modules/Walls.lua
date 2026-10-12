@@ -14,20 +14,21 @@ local incrementQuest = Quests.increment
 -- Lane layout, in "forward" studs along the lane measured from the plot centre (see PlotFrame):
 --   0 .. 24     the plot's Base (graves, spawn)
 --   24 .. 105   open battlefield: the army marches here and forms up (see Army: formation rows)
---   105         the front wall (WALL_FWD); the queue of walls stands behind it, WALL_SPACING apart
+--   105 .. 302  the walls of a run (Economy.WALLS_PER_RUN, 32 of them), WALL_SPACING apart, ALL standing from the start. The
+--               front wall is the first one; breaking it crumbles it and the army marches on to the next, so it advances
+--               down the lane until it reaches the last wall: THE GATE, in front of the outer ring's gate tower.
 --   308         the lane ends at the gate tower of the outer ring (radius 392 minus the plot centre radius 84,
---               see tools/studio/build_ring.lua). If you move the ring or the walls keep
---               WALL_FWD + NUM_WALLS * WALL_SPACING (the slot a new wall slides in from) below LANE_END_FWD.
-local WALL_FWD = 105         -- distance of the front wall from the plot centre (the old WallOrigin part is no longer used)
+--               see tools/studio/build_ring.lua). If you move the ring, update LANE_END_FWD and GATE_FWD.
+local NUM_WALLS = Economy.WALLS_PER_RUN
+local WALL_FWD = 105         -- distance of the FIRST wall from the plot centre
+local GATE_FWD = 302         -- distance of the last wall (the gate)
 local LANE_START_FWD = 24    -- outer edge of the plot's Base
 local LANE_END_FWD = 308
-local WALL_SPACING = 36      -- distance between queued walls
-local NUM_WALLS = 5          -- walls in the queue (front wall + 4 behind it)
+local WALL_SPACING = (GATE_FWD - WALL_FWD) / (NUM_WALLS - 1) -- about 6.4 studs: a thick corridor of walls
 local WALL_WIDTH = 40        -- across the lane
-local WALL_THICKNESS = 4
-local WALL_HEIGHT = 20       -- front wall height
-local WALL_HEIGHT_STEP = 5   -- each wall further back is this much taller
-local SLIDE_TIME = 1.0       -- seconds for the queue to slide forward after a break
+local WALL_THICKNESS = 3
+local WALL_HEIGHT = 20       -- height of an ordinary wall
+local GATE_HEIGHT = 36       -- the gate is taller
 
 -- lane look (matches the plaza stone)
 local LANE_COLOR = Color3.fromRGB(84, 88, 106)
@@ -46,7 +47,8 @@ local LAYER_COLORS = {
 -- "12.3K" style numbers for the HP text (wall HP gets huge)
 local function compact(n)
 	n = math.floor(n)
-	if n >= 1e12 then return string.format("%.1fT", n / 1e12)
+	if n >= 1e15 then return string.format("%.1fQa", n / 1e15)
+	elseif n >= 1e12 then return string.format("%.1fT", n / 1e12)
 	elseif n >= 1e9 then return string.format("%.1fB", n / 1e9)
 	elseif n >= 1e6 then return string.format("%.1fM", n / 1e6)
 	elseif n >= 1e4 then return string.format("%.1fK", n / 1e3)
@@ -58,13 +60,25 @@ end
 local FILL_LOW = Color3.fromRGB(150, 38, 38)
 local FILL_FULL = Color3.fromRGB(232, 78, 56)
 
+-- "WALL 5 / 32", "THE GATE" for the last wall of a run, "LAYER 40" beyond it (walls past the gate are optional farming)
+local GATE_COLOR = Color3.fromRGB(150, 118, 60)
+local function layerText(layer)
+	if Economy.isGate(layer) then
+		return "THE GATE"
+	elseif layer < Economy.WALLS_PER_RUN then
+		return "WALL " .. layer .. " / " .. Economy.WALLS_PER_RUN
+	end
+	return "LAYER " .. layer
+end
+
 local function updateWallGui(plotState)
+	if not plotState.wall then return end -- the gate has fallen: no wall left
 	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
 	plotState.hpFill.Size = UDim2.new(pct, 0, 1, 0)
 	plotState.hpFill.BackgroundColor3 = FILL_LOW:Lerp(FILL_FULL, pct)
 	plotState.hpText.Text = compact(plotState.wallHP) .. " / " .. compact(plotState.WALL_MAX_HP)
 	if plotState.layerLbl then
-		plotState.layerLbl.Text = "LAYER " .. plotState.wallLayer
+		plotState.layerLbl.Text = layerText(plotState.wallLayer)
 	end
 end
 
@@ -143,66 +157,71 @@ local WALL_MATERIALS = {
 	Enum.Material.Slate,       Enum.Material.Basalt, Enum.Material.Limestone,
 }
 
--- ── Wall queue ────────────────────────────────────────────────
--- The front wall always stays at the same spot (the plot's WallOrigin). Walls further back in the
--- queue stand behind it, getting taller like a skyline. Breaking the front wall crumbles it and
--- slides the whole queue one slot forward, so the fight never moves away from the hub.
-local function wallHeight(slot)
-	return WALL_HEIGHT + (slot - 1) * WALL_HEIGHT_STEP
+-- ── Walls ─────────────────────────────────────────────────────
+-- All walls of a run stand in the lane from the start, WALL_SPACING apart. plotState.wallQueue[layer] is the wall of that
+-- layer. The army fights the wall of plotState.wallLayer; when it breaks the army marches on to the next one
+-- (plotState.wallFwd / wallTargetFwd / wallFaceFwd follow the front wall, Army reads them every frame).
+local function wallFwdOf(layer)
+	return WALL_FWD + (layer - 1) * WALL_SPACING
 end
 
--- World CFrame of a queue slot: centred across the lane, wallFwd + (slot-1)*spacing along it,
--- oriented like the plot (part X = across the lane, Z = along it)
-local function slotCFrame(plotState, slot)
-	local pos = PlotFrame.toWorld(plotState, 0, plotState.wallFwd + (slot - 1) * WALL_SPACING)
-		+ Vector3.new(0, wallHeight(slot) / 2, 0)
-	return CFrame.new(pos) * PlotFrame.rotation(plotState)
+local function wallHeight(layer)
+	return Economy.isGate(layer) and GATE_HEIGHT or WALL_HEIGHT
 end
 
--- Spawns a preview wall at a queue slot (slot may be one past the end: the wall slides in from there)
-local function spawnPreviewWall(slot, layerNum, plotState, invisible)
-	local height = wallHeight(math.min(slot, NUM_WALLS))
+-- Moves the "front" (where the army fights) to the wall of `layer`
+local function setFront(plotState, layer)
+	plotState.wallFwd = wallFwdOf(layer)
+	plotState.wallTargetFwd = plotState.wallFwd - (WALL_THICKNESS / 2 + 3)
+	plotState.wallFaceFwd = plotState.wallFwd - WALL_THICKNESS / 2
+	plotState.wallTarget = PlotFrame.toWorld(plotState, 0, plotState.wallTargetFwd)
+end
+
+local function spawnWall(layer, plotState)
+	local height = wallHeight(layer)
+	local gate = Economy.isGate(layer)
 	local wallPart = Instance.new("Part")
 	wallPart.Name = "PreviewWall_" .. plotState.plotIndex
-	wallPart.Size = Vector3.new(WALL_WIDTH, height, WALL_THICKNESS)
-	wallPart.CFrame = slotCFrame(plotState, slot)
+	wallPart.Size = Vector3.new(WALL_WIDTH, height, gate and WALL_THICKNESS + 2 or WALL_THICKNESS)
+	wallPart.CFrame = CFrame.new(PlotFrame.toWorld(plotState, 0, wallFwdOf(layer)) + Vector3.new(0, height / 2, 0))
+		* PlotFrame.rotation(plotState)
 	wallPart.Anchored = true
-	wallPart.Color = Color3.fromRGB(70, 72, 86)
-	wallPart.Transparency = invisible and 1 or 0
-	wallPart.Material = WALL_MATERIALS[math.random(#WALL_MATERIALS)]
+	wallPart.Color = gate and GATE_COLOR or LAYER_COLORS[((layer - 1) % #LAYER_COLORS) + 1]
+	wallPart.Material = gate and Enum.Material.Brick or WALL_MATERIALS[(layer % #WALL_MATERIALS) + 1]
 	wallPart.Parent = workspace
 
-	-- small "Layer N" tag above the wall (sized in studs, so it shrinks with distance)
+	-- small "Wall N" tag above the wall (sized in studs, so it shrinks with distance); only the gate is visible from afar
 	local gui = Instance.new("BillboardGui", wallPart)
 	gui.Name = "PreviewGui"
 	gui.Size = UDim2.new(12, 0, 3, 0)
 	gui.StudsOffset = Vector3.new(0, height / 2 + 3, 0)
 	gui.AlwaysOnTop = false
-	gui.MaxDistance = 400
+	gui.MaxDistance = gate and 400 or 60
 	local lbl = Instance.new("TextLabel", gui)
 	lbl.Size = UDim2.new(1, 0, 1, 0)
 	lbl.BackgroundTransparency = 1
-	lbl.Text = "Layer " .. layerNum
-	lbl.TextColor3 = Color3.fromRGB(215, 205, 235)
+	lbl.Text = gate and "THE GATE" or ("Wall " .. layer)
+	lbl.TextColor3 = gate and Color3.fromRGB(255, 214, 120) or Color3.fromRGB(215, 205, 235)
 	lbl.TextStrokeTransparency = 0.5
 	lbl.TextScaled = true
 	lbl.Font = Enum.Font.GothamBold
 	return wallPart
 end
 
--- Promotes a wall to the active wall (full color + HP bar)
-local function activateWall(wallPart, plotState)
+-- Makes the wall of `layer` the one being fought (HP bar on it, the army's front moves to it)
+local function activateWall(plotState, layer)
+	local wallPart = plotState.wallQueue[layer]
 	wallPart.Name = "TheWall_" .. plotState.plotIndex
-	wallPart.Color = LAYER_COLORS[((plotState.wallLayer - 1) % #LAYER_COLORS) + 1]
 	local previewGui = wallPart:FindFirstChild("PreviewGui")
 	if previewGui then previewGui:Destroy() end
 	buildWallGui(wallPart, plotState)
+	plotState.wall = wallPart
+	setFront(plotState, layer)
 end
 
--- Spawns the lane ground + the wall queue, activates the first wall
+-- Spawns the lane ground + every wall of the run, activates the first one
 local function initWallQueue(plotState)
-	-- the whole lane from the plot's Base to the gate tower of the outer ring (radius 392): the battlefield in front
-	-- of the front wall plus the room behind it for every queued wall and the slot a new wall slides in from
+	-- the whole lane from the plot's Base to the gate tower of the outer ring (radius 392)
 	local groundLen = LANE_END_FWD - LANE_START_FWD
 	local groundCentreFwd = LANE_START_FWD + groundLen / 2
 	local initGround = Instance.new("Part")
@@ -242,41 +261,11 @@ local function initWallQueue(plotState)
 	end
 
 	plotState.wallQueue = {}
-	plotState.wallTweens = {}
-	for slot = 1, NUM_WALLS do
-		table.insert(plotState.wallQueue, spawnPreviewWall(slot, plotState.wallLayer + slot - 1, plotState))
+	for layer = 1, NUM_WALLS do
+		plotState.wallQueue[layer] = spawnWall(layer, plotState)
 	end
-
-	activateWall(plotState.wallQueue[1], plotState)
-	plotState.wall = plotState.wallQueue[1]
-	-- units walk to just in front of the fixed front slot (distances are "forward" along the lane)
-	plotState.wallTargetFwd = plotState.wallFwd - (WALL_THICKNESS / 2 + 3)
-	plotState.wallFaceFwd = plotState.wallFwd - WALL_THICKNESS / 2
-	plotState.wallTarget = PlotFrame.toWorld(plotState, 0, plotState.wallTargetFwd)
+	activateWall(plotState, 1)
 	updateWallGui(plotState)
-end
-
--- Slides every queued wall to its slot (cancelling any slide still in progress)
-local function slideQueue(plotState)
-	for _, tween in ipairs(plotState.wallTweens) do
-		tween:Cancel()
-	end
-	plotState.wallTweens = {}
-	local info = TweenInfo.new(SLIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-	for slot, wall in ipairs(plotState.wallQueue) do
-		local height = wallHeight(slot)
-		local tween = TweenService:Create(wall, info, {
-			CFrame = slotCFrame(plotState, slot),
-			Size = Vector3.new(WALL_WIDTH, height, WALL_THICKNESS),
-			Transparency = 0,
-		})
-		tween:Play()
-		table.insert(plotState.wallTweens, tween)
-		local previewGui = wall:FindFirstChild("PreviewGui")
-		if previewGui then
-			previewGui.StudsOffset = Vector3.new(0, height / 2 + 3, 0)
-		end
-	end
 end
 
 -- A broken wall flashes, fades out and throws a few chunks of itself away from the units
@@ -304,24 +293,36 @@ local function crumbleWall(wall, plotState)
 	Debris:AddItem(wall, 0.4)
 end
 
+-- Ascensions of the plot's owner (the wall's HP and gold depend on them)
+local function ownerRebirths(plotState)
+	for _, p in ipairs(Players:GetPlayers()) do
+		if tostring(p.UserId) == plotState.ownerId then
+			local profile = PlayerData.get(p)
+			return profile and profile.rebirthCount or 0
+		end
+	end
+	return 0
+end
+
 local function breakWall(plotState)
+	local brokenLayer = plotState.wallLayer
 	plotState.wallLayer += 1
-	plotState.WALL_MAX_HP = math.floor(500 * (2 ^ (plotState.wallLayer - 1)))
-	plotState.wallHP = plotState.WALL_MAX_HP
-	plotState.wallRegen = plotState.wallLayer * 2
+	crumbleWall(plotState.wallQueue[brokenLayer], plotState)
 
-	-- Crumble the front wall, queue a new wall at the far end (it fades in while sliding)
-	crumbleWall(table.remove(plotState.wallQueue, 1), plotState)
-	local newLayer = plotState.wallLayer + NUM_WALLS - 1
-	table.insert(plotState.wallQueue, spawnPreviewWall(NUM_WALLS + 1, newLayer, plotState, true))
+	if plotState.wallLayer <= NUM_WALLS then
+		-- the army marches on to the next wall
+		plotState.WALL_MAX_HP = Economy.wallHp(plotState.wallLayer, ownerRebirths(plotState))
+		plotState.wallHP = plotState.WALL_MAX_HP
+		plotState.wallRegen = plotState.wallLayer * 2
+		activateWall(plotState, plotState.wallLayer)
+		updateWallGui(plotState)
+	else
+		-- that was the gate: nothing left to fight until the player ascends
+		plotState.wall = nil
+		plotState.wallHP = 0
+	end
 
-	-- The next wall slides up to the front; it is the active wall straight away
-	activateWall(plotState.wallQueue[1], plotState)
-	plotState.wall = plotState.wallQueue[1]
-	slideQueue(plotState)
-	updateWallGui(plotState)
-
-	local goldReward = math.floor(1000 * plotState.wallLayer * plotState.goldMultiplier)
+	local goldReward = Economy.wallGold(plotState.wallLayer, ownerRebirths(plotState))
 	for _, p in ipairs(Players:GetPlayers()) do
 		if tostring(p.UserId) == plotState.ownerId then
 			local profile = PlayerData.get(p)
@@ -330,6 +331,10 @@ local function breakWall(plotState)
 				PlayerData.addGold(p, math.floor(goldReward * mult))
 			end
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)
+			if Economy.isGate(brokenLayer) then
+				PlayerData.setGateCleared(p, true)
+				Remotes.Notice:FireClient(p, "The gate has fallen! You can ascend now.")
+			end
 			incrementQuest(p, "breakWalls", 1)
 			incrementQuest(p, "earnGold", goldReward)
 			break
@@ -339,16 +344,17 @@ local function breakWall(plotState)
 end
 
 local function resetWall(plotState)
-	for _, w in ipairs(plotState.wallQueue or {}) do
+	for _, w in pairs(plotState.wallQueue or {}) do
 		if w and w.Parent then w:Destroy() end
 	end
 	plotState.wallQueue = {}
+	plotState.wall = nil
 	for _, ext in ipairs(plotState.groundExtensions) do
 		if ext and ext.Parent then ext:Destroy() end
 	end
 	plotState.groundExtensions = {}
 	plotState.wallLayer = 1
-	plotState.WALL_MAX_HP = 500
+	plotState.WALL_MAX_HP = Economy.wallHp(1, ownerRebirths(plotState))
 	plotState.wallHP = plotState.WALL_MAX_HP
 	plotState.wallRegen = 1
 	initWallQueue(plotState)

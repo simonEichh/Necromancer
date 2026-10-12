@@ -1,7 +1,11 @@
 -- Number formatting helpers.
 
 local function fmtGold(n)
-	if n >= 1e9 then
+	if n >= 1e15 then
+		return string.format("%.1fQa", n / 1e15)
+	elseif n >= 1e12 then
+		return string.format("%.1fT", n / 1e12)
+	elseif n >= 1e9 then
 		return string.format("%.1fB", n / 1e9)
 	elseif n >= 1e6 then
 		return string.format("%.1fM", n / 1e6)
@@ -13,7 +17,11 @@ local function fmtGold(n)
 end
 
 local function fmt(n)
-	if n >= 1e9 then
+	if n >= 1e15 then
+		return string.format("%.1fQa", n / 1e15)
+	elseif n >= 1e12 then
+		return string.format("%.1fT", n / 1e12)
+	elseif n >= 1e9 then
 		return string.format("%.1fB", n / 1e9)
 	elseif n >= 1e6 then
 		return string.format("%.1fM", n / 1e6)
