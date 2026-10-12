@@ -103,7 +103,7 @@ local function makePortrait(parent, unitType, size, startAngleDeg)
 	vp.CurrentCamera = cam
 	cam.Parent = vp
 	local radius = boxSize.Magnitude / 2
-	local dist = radius / math.tan(math.rad(cam.FieldOfView / 2)) * 0.8
+	local dist = radius / math.tan(math.rad(cam.FieldOfView / 2)) * 1.0
 	cam.CFrame = CFrame.lookAt(Vector3.new(0, 0, -dist), Vector3.zero)
 
 	local state = { model = model, angle = math.rad(startAngleDeg or 200) }
@@ -257,7 +257,14 @@ function GachaReveal.play(results, opts)
 	ground.Parent = stage
 
 	-- ── The grave (a picture, or a stone block) ──────────────
-	local graveUi = GameData.GRAVE_DATA and GameData.GRAVE_DATA[opts.graveType or ""]
+	-- (GameData.GRAVE_DATA is an ordered list, so look the grave up by its key)
+	local graveUi
+	for _, g in ipairs(GameData.GRAVE_DATA or {}) do
+		if g.key == opts.graveType then
+			graveUi = g
+			break
+		end
+	end
 	local grave
 	if graveUi and graveUi.image and graveUi.image ~= "" then
 		grave = Instance.new("ImageLabel")
@@ -333,7 +340,7 @@ function GachaReveal.play(results, opts)
 	nameLbl.TextStrokeTransparency = 1
 
 	local infoLbl = Theme.label(stage, { text = "", size = "Body", font = "Body", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 22) })
-	infoLbl.Position = UDim2.new(0, 0, 1, -50)
+	infoLbl.Position = UDim2.new(0, 0, 1, -34)
 	infoLbl.ZIndex = Z + 8
 	infoLbl.TextTransparency = 1
 
@@ -419,11 +426,11 @@ function GachaReveal.play(results, opts)
 		tween(infoLbl, 0.35, { TextTransparency = 0 })
 
 		-- the 3D portrait rises onto the plinth and turns slowly
-		local portraitSize = multi and 210 or 250
+		local portraitSize = multi and 210 or 240
 		portrait, portraitState = makePortrait(stage, best.unitType, UDim2.fromOffset(portraitSize, portraitSize))
 		portrait.AnchorPoint = Vector2.new(0.5, 0.5)
 		portrait.Position = UDim2.new(0.5, 0, 0.85, 30)
-		tween(portrait, 0.55, { Position = UDim2.new(0.5, 0, 0.56, 14) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		tween(portrait, 0.55, { Position = UDim2.new(0.5, 0, 0.5, 8) }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		if portraitState then
 			local start = os.clock()
 			o.conn = RunService.RenderStepped:Connect(function()

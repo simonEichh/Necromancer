@@ -14,6 +14,7 @@ local ALL_UNIT_KEYS = GameData.ALL_UNIT_KEYS
 local Sync = require(script.Parent.Sync)
 
 local GachaReveal = require(script.Parent.GachaReveal)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 local isRolling = false
 local autoRollActive = false
@@ -64,7 +65,7 @@ openGrave = function(graveType, count)
 
 	-- Check for inventory space
 	local hasSpace = false
-	for i = 1, 10 do
+	for i = 1, Economy.INVENTORY_MAX do -- the whole inventory (the server is the real judge)
 		if State.inventory[i] == nil then
 			hasSpace = true
 			break
