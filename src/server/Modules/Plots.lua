@@ -225,10 +225,20 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 		or (plotState.wallFwd - 60)
 	local forward = PlotFrame.forwardFlat(plotState)
 	for _, u in ipairs(plotState.activeUnits) do
-		u.staticFwd = nil -- towers rise again at the new first wall
+		u.staticFwd = nil
 		if u.block and u.block.Parent then
-			local pos = PlotFrame.toWorld(plotState, u.lateral, nearFwd + math.random(-5, 5)) + Vector3.new(0, 7.7, 0)
-			u.block.CFrame = CFrame.lookAt(pos, pos + forward)
+			if u.def.static then
+				-- towers cannot walk: they rise again straight at their slot in front of the new first wall
+				local pos = PlotFrame.toWorld(plotState, u.slotLat or 0, plotState.wallTargetFwd - (u.slotStand or Army.standDistance(u.def)))
+					+ Vector3.new(0, u.def.size.Y / 2 + 1, 0)
+				u.block.CFrame = CFrame.lookAt(pos, pos + forward)
+				if u.model then
+					u.model:SetAttribute("RiseStart", workspace:GetServerTimeNow())
+				end
+			else
+				local pos = PlotFrame.toWorld(plotState, u.lateral, nearFwd + math.random(-5, 5)) + Vector3.new(0, 7.7, 0)
+				u.block.CFrame = CFrame.lookAt(pos, pos + forward)
+			end
 		end
 	end
 	-- the player goes back to the main plaza (the same spot the SHOPS button uses)
