@@ -195,17 +195,50 @@ function StarSummon.play(results, opts)
 	local START_HERO = START_IMPACT + T_SHAKE + 1.2 -- from here the camera only orbits the grave slowly
 	local END_TIME = START_RISE + T_RISE + T_HOLD
 
-	-- ── The place: a spot on the ground in front of the player ──
-	local flatLook = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
-	local dir = flatLook.Magnitude > 0.1 and flatLook.Unit or Vector3.new(0, 0, -1)
-	local right = Vector3.new(-dir.Z, 0, dir.X)
+	-- ── The place: a spot on the ground near the player with a clear view ──
+	-- The grave stands about 30 studs away from the player; the cinematic cameras sit behind it and above it, so the spot
+	-- is only used when nothing (a wall, a stall) is between the grave and those camera positions. The player's own look
+	-- direction is tried first, then the others around them.
 	local up = Vector3.yAxis
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = { char }
-	local probe = hrp.Position + dir * 30 + Vector3.new(0, 30, 0)
-	local hit = Workspace:Raycast(probe, Vector3.new(0, -80, 0), rayParams)
-	local G = hit and hit.Position or (hrp.Position + dir * 30 - Vector3.new(0, 3, 0))
+	local ignore = {}
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other.Character then
+			table.insert(ignore, other.Character)
+		end
+	end
+	rayParams.FilterDescendantsInstances = ignore
+
+	local flatLook = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+	local lookDir = flatLook.Magnitude > 0.1 and flatLook.Unit or Vector3.new(0, 0, -1)
+	local function viewIsClear(from, to)
+		return Workspace:Raycast(from, to - from, rayParams) == nil
+	end
+	local dir, right, G
+	for _, degrees in ipairs({ 0, 45, -45, 90, -90, 135, -135, 180 }) do
+		local a = math.rad(degrees)
+		local d = Vector3.new(lookDir.X * math.cos(a) - lookDir.Z * math.sin(a), 0, lookDir.X * math.sin(a) + lookDir.Z * math.cos(a))
+		local r = Vector3.new(-d.Z, 0, d.X)
+		local hit = Workspace:Raycast(hrp.Position + d * 30 + Vector3.new(0, 30, 0), Vector3.new(0, -80, 0), rayParams)
+		if hit and math.abs(hit.Position.Y - hrp.Position.Y) < 8 then
+			local g = hit.Position
+			local eye = g + up * 3
+			local cameraBehind = g - d * 34 + up * 4.5
+			local cameraHero = g - d * 18 + r * 6 + up * 4
+			if viewIsClear(eye, cameraBehind) and viewIsClear(eye, cameraHero) and viewIsClear(eye, g + d * 10 + up * 3) then
+				dir, right, G = d, r, g
+				break
+			end
+		end
+	end
+	if not G then
+		-- no clear spot found: use the player's look direction anyway
+		dir = lookDir
+		right = Vector3.new(-dir.Z, 0, dir.X)
+		local hit = Workspace:Raycast(hrp.Position + dir * 30 + Vector3.new(0, 30, 0), Vector3.new(0, -80, 0), rayParams)
+		G = hit and hit.Position or (hrp.Position + dir * 30 - Vector3.new(0, 3, 0))
+	end
 
 	local fxFolder = Instance.new("Folder")
 	fxFolder.Name = "StarSummonFX"

@@ -14,7 +14,13 @@ local ALL_UNIT_KEYS = GameData.ALL_UNIT_KEYS
 local Sync = require(script.Parent.Sync)
 
 local GachaReveal = require(script.Parent.GachaReveal)
+local StarSummon = require(script.Parent.StarSummon)
+local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+
+-- Pulls whose best result has at least this rarity rank (5 = Legendary) play the star summon cinematic first; the
+-- overlay then shows the result (Collect, odds, the results grid). Lower pulls keep the short overlay show.
+local STAR_MIN_RANK = 5
 
 local isRolling = false
 local autoRollActive = false
@@ -24,31 +30,52 @@ local openGrave -- forward declared: the reveal's "Open x10" button calls it
 -- Shows the reveal for the server's results (a list: one entry per grave opened)
 local function playRollAnimation(results)
 	local graveType = currentRollGraveType
-	GachaReveal.play(results, {
-		graveType = graveType,
-		autoRoll = function() return autoRollActive end,
-		setAuto = function(on) autoRollActive = on end,
-		ownedLeft = function() return graveType and State.ownedGraves[graveType] or 0 end,
-		openMore = function(count) openGrave(graveType, count) end,
-		onRevealed = function()
-			-- The server already stored the units; show the data it held back until now
-			Sync.release()
-		end,
-		onClose = function()
-			if autoRollActive and graveType and (State.ownedGraves[graveType] or 0) > 0 and #results == 1 then
-				-- auto roll: open the next one right away (the server uses up the grave)
-				Sync.hold()
-				local remote = ReplicatedStorage:FindFirstChild("DigGrave")
-				if remote then
-					remote:FireServer(graveType, 1)
+	local function showOverlay(skipShow)
+		GachaReveal.play(results, {
+			graveType = graveType,
+			skipShow = skipShow,
+			autoRoll = function() return autoRollActive end,
+			setAuto = function(on) autoRollActive = on end,
+			ownedLeft = function() return graveType and State.ownedGraves[graveType] or 0 end,
+			openMore = function(count) openGrave(graveType, count) end,
+			onRevealed = function()
+				-- The server already stored the units; show the data it held back until now
+				Sync.release()
+			end,
+			onClose = function()
+				if autoRollActive and graveType and (State.ownedGraves[graveType] or 0) > 0 and #results == 1 then
+					-- auto roll: open the next one right away (the server uses up the grave)
+					Sync.hold()
+					local remote = ReplicatedStorage:FindFirstChild("DigGrave")
+					if remote then
+						remote:FireServer(graveType, 1)
+					end
+					-- isRolling stays true; the next RollResult plays the next reveal
+				else
+					isRolling = false
+					autoRollActive = false
 				end
-				-- isRolling stays true; the next RollResult plays the next reveal
-			else
-				isRolling = false
-				autoRollActive = false
-			end
-		end,
-	})
+			end,
+		})
+	end
+
+	local bestRank = 0
+	for _, r in ipairs(results) do
+		bestRank = math.max(bestRank, Rarities.Rank[r.rarity] or 0)
+	end
+	if bestRank >= STAR_MIN_RANK then
+		-- a rare pull: the cinematic first (the data update stays held back), then the result in the overlay
+		local ok = pcall(StarSummon.play, results, {
+			onDone = function()
+				showOverlay(true)
+			end,
+		})
+		if not ok then
+			showOverlay(false)
+		end
+	else
+		showOverlay(false)
+	end
 end
 
 openGrave = function(graveType, count)

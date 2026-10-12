@@ -9,6 +9,7 @@
 --              onClose    function(), called when the overlay closes (Collect, or auto roll continuing)
 --              ownedLeft  function() -> number, how many graves of that type the player still has (for "Open x10")
 --              openMore   function(count), asks the caller to open `count` more graves
+--              skipShow   true = no buildup/burst, jump straight to the result (used after the star summon cinematic)
 --
 -- Phases of one reveal: 1. buildup (the grave shakes and cracks, its glow slowly hints at the rarity, a big rarity may
 -- flicker out right before the burst), 2. burst (flash, shockwave rings, sparks, the panel shakes), 3. reveal (a 3D
@@ -214,6 +215,9 @@ function GachaReveal.play(results, opts)
 	local t = tierOf(best.rarity)
 
 	local o = { dead = false, skipped = false, revealed = false }
+	if opts.skipShow then
+		o.skipped = true -- the star summon already played the show: go straight to the result
+	end
 	GachaReveal.active = o
 
 	-- ── Panel (a stone slab, not the whole screen) ───────────
