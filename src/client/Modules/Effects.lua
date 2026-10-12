@@ -1,4 +1,4 @@
--- Screen effects: wall-break rewards, floating damage numbers, big announcement text.
+-- Screen effects: wall-break rewards, big announcement text. (Wall hit flashes: HitEffects.)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -132,43 +132,6 @@ if noticeEvt then
 		banner.BorderSizePixel = 0
 		Instance.new("UICorner", banner).CornerRadius = UDim.new(0, 8)
 		game:GetService("Debris"):AddItem(banner, 2.5)
-	end)
-end
-
-local damageEvt = ReplicatedStorage:WaitForChild("DamageHit", 5)
-if damageEvt then
-	damageEvt.OnClientEvent:Connect(function(amount, worldPos, isGhost)
-		local anchor = Instance.new("Part")
-		anchor.Size = Vector3.new(0.1, 0.1, 0.1)
-		anchor.Position = worldPos + Vector3.new(-4, 0, 0)
-		anchor.Anchored = false
-		anchor.CanCollide = false
-		anchor.Transparency = 1
-		anchor.Parent = workspace
-
-		local bv = Instance.new("BodyVelocity")
-		bv.Velocity = Vector3.new(math.random(-2, 2), 8, math.random(-1, 1))
-		bv.MaxForce = Vector3.new(1e4, 1e4, 1e4)
-		bv.P = 1e4
-		bv.Parent = anchor
-
-		local gui = Instance.new("BillboardGui", anchor)
-		gui.Size = UDim2.new(0, 80, 0, 45)
-		gui.AlwaysOnTop = true
-		gui.LightInfluence = 0
-
-		local lbl = Instance.new("TextLabel", gui)
-		lbl.Size = UDim2.new(1, 0, 1, 0)
-		lbl.BackgroundTransparency = 1
-		lbl.Text = "-" .. amount
-		lbl.TextScaled = true
-		lbl.Font = Enum.Font.GothamBold
-		lbl.TextColor3 = isGhost and Color3.fromRGB(29, 59, 255) or Color3.fromRGB(255, 64, 6)
-
-		TweenService
-			:Create(lbl, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 1 })
-			:Play()
-		game:GetService("Debris"):AddItem(anchor, 1)
 	end)
 end
 

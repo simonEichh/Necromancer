@@ -20,7 +20,7 @@ local EVENTS = {
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync
 	"BuyGraveResult",
-	"DamageHit",
+	"WallHit", -- (position, forward, damage, isGhost): a unit hit the wall; clients draw the hit flash (HitEffects)
 	"DataSync", -- full snapshot of the player's authoritative data
 	"DigRejected",
 	"Notice", -- short message to show the player

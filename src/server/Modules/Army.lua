@@ -341,16 +341,10 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 	print("🏆 " .. player.Name .. " used Place Best — deployed " .. deployed .. " units")
 end)
 
-local function flashAttack(isGhost, position, plotState)
-	local flash = Instance.new("Part")
-	flash.Size = Vector3.new(1.5, 1.5, 0.3)
-	flash.CFrame = CFrame.new(position)
-	flash.Anchored = true
-	flash.CanCollide = false
-	flash.BrickColor = isGhost and BrickColor.new("Pastel blue") or BrickColor.new("Bright yellow")
-	flash.Material = Enum.Material.Neon
-	flash.Parent = workspace
-	game:GetService("Debris"):AddItem(flash, 0.2)
+-- Tells the clients a unit hit the wall at `position` (they draw the hit flash, see client HitEffects). Nothing is
+-- spawned on the server; `forward` is the lane direction, i.e. which way the wall's front face points away from.
+local function sendWallHit(plotState, position, damage, isGhost)
+	Remotes.WallHit:FireAllClients(position, PlotFrame.forwardFlat(plotState), damage, isGhost)
 end
 
 local function shootArrow(fromPos, targetPos, damage, plotState)
@@ -372,10 +366,9 @@ local function shootArrow(fromPos, targetPos, damage, plotState)
 	):Play()
 	task.delay(travelTime, function()
 		if arrow and arrow.Parent then arrow:Destroy() end
-		flashAttack(true, targetPos, plotState)
 		plotState.wallHP = math.max(0, plotState.wallHP - damage)
 		updateWallGui(plotState)
-		Remotes.DamageHit:FireAllClients(damage, targetPos, true)
+		sendWallHit(plotState, targetPos, damage, true)
 		if plotState.wallHP <= 0 then breakWall(plotState) end
 	end)
 end
@@ -464,8 +457,8 @@ end
 -- the same shot schedule from them with the synced server clock (workspace:GetServerTimeNow(), see client SpellEffects):
 -- shot k (k = 0, 1, 2 ...) is fired at BarrageStart + k / BarrageRate and lands ShotTime seconds later.
 -- The server settles the damage on the same schedule: the damage of all shots that landed since the last tick is applied
--- to the wall in batches (BATCH_INTERVAL); the wall's HP bar shows the hits, so barrage shots have no floating damage
--- numbers (DamageHit). The damage per
+-- to the wall in batches (BATCH_INTERVAL); the wall's HP bar shows the hits and the orbs draw their own impacts, so
+-- barrage shots send no WallHit. The damage per
 -- second stays the unit's normal DPS (damage / attackCD), so this changes how it looks and feels, not the balance.
 local DEFAULT_SHOTS_PER_SECOND = 6 -- a unit def can override it with shotsPerSecond
 local SPELL_ORB_SPEED = 30         -- studs per second: sets the flight time of a shot
@@ -617,12 +610,12 @@ local function update(now, dt)
 					if u.block.Name == "Goblin" then
 						shootArrow(fromPos, targetPos, u.def.damage, plotState)
 					else
-						local impactPos = PlotFrame.toWorld(plotState, math.random(-8, 8), plotState.wallFaceFwd)
+						-- somewhere on the wall face in front of this unit
+						local impactPos = PlotFrame.toWorld(plotState, lat + math.random(-3, 3), plotState.wallFaceFwd)
 							+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
-						flashAttack(u.def.transparent, impactPos, plotState)
 						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
 						updateWallGui(plotState)
-						Remotes.DamageHit:FireAllClients(u.def.damage, impactPos, u.def.transparent)
+						sendWallHit(plotState, impactPos, u.def.damage, u.def.transparent)
 						if plotState.wallHP <= 0 then breakWall(plotState) end
 					end
 				end
