@@ -4,6 +4,7 @@
 --   State = "walk" | "idle"  (idle = standing and attacking)
 --   AttackCount             (incremented on every attack; the swing plays on each change)
 --   Speed, AttackCD         (walk speed in studs/s, seconds between attacks)
+-- and optionally, set once on the model: Float (hover bob amplitude in studs, for floating units)
 -- Every client animates the model's Motor6D joints locally each frame, so nothing is sent over the
 -- network per frame and no uploaded Animation assets are needed.
 --
@@ -96,7 +97,9 @@ local function animate(model, rig, dt, now)
 	-- body bob + sway
 	local breathe = math.sin(t * 2) * 0.03
 	local bob = math.abs(s) * 0.12 * w * scale
-	set(rig, "Root", CFrame.new(0, bob, 0))
+	-- floating units (attribute Float = amplitude in studs) hover up and down instead of stepping
+	local float = (model:GetAttribute("Float") or 0) * math.sin(t * 2.2) * scale
+	set(rig, "Root", CFrame.new(0, bob + float, 0))
 
 	-- arms (left arm swings with the right leg; the sword arm swings less)
 	local idleElbow = 0.25 + 0.15 * w
