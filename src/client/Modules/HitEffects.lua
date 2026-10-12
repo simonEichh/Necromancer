@@ -4,10 +4,9 @@
 --
 -- One hit is made of:
 --   1. a bright core flash that swells and fades (neon ball, half in front of the wall face),
---   2. a shockwave ring flat on the wall that expands and fades (a SurfaceGui ring),
---   3. sparks flying out of the wall towards the army and falling in an arc,
---   4. a few puffs of dust,
---   5. a short flicker of light.
+--   2. sparks flying out of the wall towards the army and falling in an arc,
+--   3. a few puffs of dust,
+--   4. a short flicker of light.
 -- Bigger hits are bigger (scaled by the logarithm of the damage). Ghost (transparent) units hit in cold blue-white, the
 -- others in warm yellow-orange. Everything is local: the server sends one small event per hit and nothing else.
 -- (Staff caster barrages do not use this: their orbs draw their own impacts, see SpellEffects.)
@@ -81,41 +80,7 @@ local function flash(position, forward, damage, isGhost)
 	}):Play()
 	Debris:AddItem(core, 0.3)
 
-	-- 2. shockwave ring on the wall face
-	local ring = newPart("HitRing", Vector3.new(1 * scale, 1 * scale, 0.05), facing)
-	ring.Transparency = 1
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-	gui.CanvasSize = Vector2.new(256, 256)
-	gui.LightInfluence = 0
-	gui.Brightness = 2.5
-	gui.Parent = ring
-	local group = Instance.new("CanvasGroup")
-	group.Size = UDim2.fromScale(1, 1)
-	group.BackgroundTransparency = 1
-	group.GroupTransparency = 0.05
-	group.Parent = gui
-	local circle = Instance.new("Frame")
-	circle.AnchorPoint = Vector2.new(0.5, 0.5)
-	circle.Position = UDim2.fromScale(0.5, 0.5)
-	circle.Size = UDim2.fromScale(0.94, 0.94)
-	circle.BackgroundTransparency = 1
-	circle.BorderSizePixel = 0
-	circle.Parent = group
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = circle
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = palette.glow
-	stroke.Thickness = 14
-	stroke.Parent = circle
-	local ringInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(ring, ringInfo, { Size = Vector3.new(7 * scale, 7 * scale, 0.05) }):Play()
-	TweenService:Create(group, ringInfo, { GroupTransparency = 1 }):Play()
-	Debris:AddItem(ring, 0.45)
-
-	-- 3 + 4. sparks and dust, emitted from a tiny invisible part facing away from the wall
+	-- 2 + 3. sparks and dust, emitted from a tiny invisible part facing away from the wall
 	local emitterPart = newPart("HitEmitter", Vector3.one * 0.2, facing)
 	emitterPart.Transparency = 1
 
@@ -152,7 +117,7 @@ local function flash(position, forward, damage, isGhost)
 	sparks:Emit(math.floor(9 + 5 * scale))
 	dust:Emit(math.floor(2 + scale))
 
-	-- 5. light flicker
+	-- 4. light flicker
 	local light = Instance.new("PointLight")
 	light.Color = palette.glow
 	light.Range = 12 * scale

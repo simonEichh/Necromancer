@@ -610,9 +610,11 @@ local function update(now, dt)
 					if u.block.Name == "Goblin" then
 						shootArrow(fromPos, targetPos, u.def.damage, plotState)
 					else
-						-- somewhere on the wall face in front of this unit
-						local impactPos = PlotFrame.toWorld(plotState, lat + math.random(-3, 3), plotState.wallFaceFwd)
-							+ Vector3.new(0, 3.7 + math.random(0, 7), 0)
+						-- on the wall face right in front of this unit, around chest height, with a little jitter
+						local unitHeight = u.model and (u.model:GetAttribute("Height") or 5) * u.model:GetScale()
+							or u.def.size.Y * 1.6
+						local impactPos = PlotFrame.toWorld(plotState, lat + (math.random() - 0.5) * 2.4, plotState.wallFaceFwd)
+							+ Vector3.new(0, unitHeight * (0.5 + math.random() * 0.2), 0)
 						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
 						updateWallGui(plotState)
 						sendWallHit(plotState, impactPos, u.def.damage, u.def.transparent)
