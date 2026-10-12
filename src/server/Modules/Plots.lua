@@ -231,6 +231,12 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 			u.block.CFrame = CFrame.lookAt(pos, pos + forward)
 		end
 	end
+	-- the player goes back to the main plaza (the same spot the SHOPS button uses)
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		local hub = workspace:GetAttribute("HubSpawn") or Vector3.new(0, 3, 24)
+		hrp.CFrame = CFrame.lookAt(hub, hub + Vector3.new(0, 0, -1))
+	end
 	print("⬆️ " .. player.Name .. " ascended — wall reset, graves: " .. #plotState.graveSlots)
 end)
 
