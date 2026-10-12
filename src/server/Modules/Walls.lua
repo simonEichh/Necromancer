@@ -43,36 +43,99 @@ local LAYER_COLORS = {
 	Color3.fromRGB(160, 100, 108),
 }
 
+-- "12.3K" style numbers for the HP text (wall HP gets huge)
+local function compact(n)
+	n = math.floor(n)
+	if n >= 1e12 then return string.format("%.1fT", n / 1e12)
+	elseif n >= 1e9 then return string.format("%.1fB", n / 1e9)
+	elseif n >= 1e6 then return string.format("%.1fM", n / 1e6)
+	elseif n >= 1e4 then return string.format("%.1fK", n / 1e3)
+	end
+	return tostring(n)
+end
+
+-- Fill colour by remaining health: a deep blood red when almost broken, a lively red-orange when full
+local FILL_LOW = Color3.fromRGB(150, 38, 38)
+local FILL_FULL = Color3.fromRGB(232, 78, 56)
+
 local function updateWallGui(plotState)
 	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
 	plotState.hpFill.Size = UDim2.new(pct, 0, 1, 0)
-	plotState.hpFill.BackgroundColor3 = Color3.fromRGB(220, math.floor(60*pct), math.floor(60*pct))
-	plotState.hpText.Text = "Layer " .. plotState.wallLayer .. "  " .. math.floor(plotState.wallHP) .. " / " .. plotState.WALL_MAX_HP
+	plotState.hpFill.BackgroundColor3 = FILL_LOW:Lerp(FILL_FULL, pct)
+	plotState.hpText.Text = compact(plotState.wallHP) .. " / " .. compact(plotState.WALL_MAX_HP)
+	if plotState.layerLbl then
+		plotState.layerLbl.Text = "LAYER " .. plotState.wallLayer
+	end
 end
+
+-- The wall's health bar (a billboard above the front wall): a "LAYER n" title and a stone-framed bar with a worn
+-- bronze rim, a glossy blood-red fill and the HP numbers. Matches the client Theme (dark gothic); built here on the server
+-- because the billboard belongs to the wall part.
+local BAR_STONE = Color3.fromRGB(22, 25, 28)
+local BAR_RIM = Color3.fromRGB(122, 110, 84)
+local BAR_BONE = Color3.fromRGB(222, 214, 190)
 
 local function buildWallGui(wallPart, plotState)
 	local gui = Instance.new("BillboardGui", wallPart)
-	gui.Size = UDim2.new(0, 260, 0, 55)
+	gui.Size = UDim2.new(0, 320, 0, 74)
 	gui.StudsOffset = Vector3.new(0, 14, 0)
 	gui.AlwaysOnTop = true
-	local bg = Instance.new("Frame", gui)
-	bg.Size = UDim2.new(1, 0, 0.5, 0)
-	bg.Position = UDim2.new(0, 0, 0.1, 0)
-	bg.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-	bg.BorderSizePixel = 0
-	Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 6)
-	plotState.hpFill = Instance.new("Frame", bg)
+
+	local layerLbl = Instance.new("TextLabel", gui)
+	layerLbl.Size = UDim2.new(1, 0, 0, 30)
+	layerLbl.BackgroundTransparency = 1
+	layerLbl.Text = "LAYER 1"
+	layerLbl.TextColor3 = BAR_BONE
+	layerLbl.TextSize = 26
+	layerLbl.Font = Enum.Font.FredokaOne
+	layerLbl.TextStrokeColor3 = Color3.fromRGB(8, 10, 12)
+	layerLbl.TextStrokeTransparency = 0
+	plotState.layerLbl = layerLbl
+
+	-- stone frame with a bronze rim
+	local frame = Instance.new("Frame", gui)
+	frame.Size = UDim2.new(1, 0, 0, 34)
+	frame.Position = UDim2.new(0, 0, 0, 36)
+	frame.BackgroundColor3 = BAR_STONE
+	frame.BorderSizePixel = 0
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 5)
+	local rim = Instance.new("UIStroke", frame)
+	rim.Color = BAR_RIM
+	rim.Thickness = 3
+	rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+	-- the track the fill slides in (inset from the rim)
+	local track = Instance.new("Frame", frame)
+	track.Size = UDim2.new(1, -8, 1, -8)
+	track.Position = UDim2.new(0, 4, 0, 4)
+	track.BackgroundColor3 = Color3.fromRGB(8, 10, 12)
+	track.BorderSizePixel = 0
+	track.ClipsDescendants = true
+	Instance.new("UICorner", track).CornerRadius = UDim.new(0, 3)
+
+	plotState.hpFill = Instance.new("Frame", track)
 	plotState.hpFill.Size = UDim2.new(1, 0, 1, 0)
-	plotState.hpFill.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+	plotState.hpFill.BackgroundColor3 = FILL_FULL
 	plotState.hpFill.BorderSizePixel = 0
-	Instance.new("UICorner", plotState.hpFill).CornerRadius = UDim.new(0, 6)
-	plotState.hpText = Instance.new("TextLabel", gui)
-	plotState.hpText.Size = UDim2.new(1, 0, 0.38, 0)
-	plotState.hpText.Position = UDim2.new(0, 0, 0.62, 0)
+	Instance.new("UICorner", plotState.hpFill).CornerRadius = UDim.new(0, 3)
+	local shade = Instance.new("UIGradient", plotState.hpFill) -- lighter on top, darker at the bottom: a rounded, glossy fill
+	shade.Rotation = 90
+	shade.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 150))
+	local gloss = Instance.new("Frame", plotState.hpFill) -- a thin highlight along the top edge
+	gloss.Size = UDim2.new(1, 0, 0.32, 0)
+	gloss.BackgroundColor3 = Color3.new(1, 1, 1)
+	gloss.BackgroundTransparency = 0.82
+	gloss.BorderSizePixel = 0
+
+	plotState.hpText = Instance.new("TextLabel", frame)
+	plotState.hpText.Size = UDim2.new(1, 0, 1, 0)
 	plotState.hpText.BackgroundTransparency = 1
-	plotState.hpText.TextColor3 = Color3.fromRGB(255, 210, 210)
-	plotState.hpText.TextScaled = true
-	plotState.hpText.Font = Enum.Font.GothamBold
+	plotState.hpText.TextColor3 = Color3.fromRGB(255, 244, 232)
+	plotState.hpText.TextSize = 18
+	plotState.hpText.Font = Enum.Font.FredokaOne
+	plotState.hpText.TextStrokeColor3 = Color3.fromRGB(20, 6, 6)
+	plotState.hpText.TextStrokeTransparency = 0
+	plotState.hpText.ZIndex = 3
 end
 
 local WALL_MATERIALS = {

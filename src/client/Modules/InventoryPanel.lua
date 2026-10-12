@@ -1,4 +1,6 @@
 local InventoryPanel = {}
+local Theme = require(script.Parent.Theme)
+local C = Theme.Color
 
 -- ── Private state ────────────────────────────────────────────
 local invSortMode   = "DPS"
@@ -30,15 +32,16 @@ ensureInvSlots = function()
 	for i = 1, INVENTORY_MAX do
 		local slot = Instance.new("Frame", invScroll)
 		slot.Size = UDim2.new(0, INV_SW, 0, INV_SH)
-		slot.BackgroundColor3 = Color3.fromRGB(14, 7, 28)
+		slot.BackgroundColor3 = C.Void
 		slot.BorderSizePixel = 0
 		slot.LayoutOrder = i
 		slot.ZIndex = 37
-		Instance.new("UICorner", slot).CornerRadius = UDim.new(0, 8)
+		Theme.corner(slot, Theme.Radius.Small)
 
 		local stroke = Instance.new("UIStroke", slot)
-		stroke.Thickness = 1.5
-		stroke.Enabled = false
+		stroke.Thickness = 2
+		stroke.Color = C.Border
+		stroke.Transparency = 0.6 -- an empty slot: a faint carved outline
 
 		local eLbl = Instance.new("TextLabel", slot)
 		eLbl.Size = UDim2.new(1, 0, 0.55, 0)
@@ -53,8 +56,8 @@ ensureInvSlots = function()
 		nLbl.Position = UDim2.new(0, 2, 1, -17)
 		nLbl.BackgroundTransparency = 1
 		nLbl.Text = ""
-		nLbl.TextSize = 10
-		nLbl.Font = Enum.Font.Gotham
+		nLbl.TextSize = 11
+		nLbl.Font = Theme.Font.Body
 		nLbl.TextTruncate = Enum.TextTruncate.AtEnd
 		nLbl.ZIndex = 38
 
@@ -64,8 +67,8 @@ ensureInvSlots = function()
 		indLbl.BackgroundTransparency = 1
 		indLbl.Text = ""
 		indLbl.TextSize = 10
-		indLbl.Font = Enum.Font.GothamBold
-		indLbl.TextColor3 = Color3.fromRGB(255, 255, 200)
+		indLbl.Font = Theme.Font.Strong
+		indLbl.TextColor3 = C.BoneDim
 		indLbl.ZIndex = 39
 
 		local btn = Instance.new("TextButton", slot)
@@ -155,21 +158,20 @@ refresh = function()
 			local invIdx = entry.idx
 			local unit   = entry.unit
 			local info   = UNIT_INFO[unit.unitType] or {}
-			local rc     = RARITY_COLORS[info.rarity] or Color3.fromRGB(80, 40, 120)
-			local ri, gi, bi = rc.R * 255, rc.G * 255, rc.B * 255
+			local rc     = RARITY_COLORS[info.rarity] or C.Border
 			sd.currentInvIdx = invIdx
-			sd.frame.BackgroundColor3 =
-				Color3.fromRGB(math.floor(ri*0.16+5), math.floor(gi*0.16+3), math.floor(bi*0.16+10))
+			sd.frame.BackgroundColor3 = C.Stone:Lerp(rc, 0.16) -- dark stone with a tint of the unit's rarity
 			sd.stroke.Color   = rc
-			sd.stroke.Enabled = true
+			sd.stroke.Transparency = 0
 			sd.emoji.Text     = info.emoji or ""
 			sd.name.Text      = unit.unitType
-			sd.name.TextColor3 = Color3.fromRGB(210, 195, 235)
+			sd.name.TextColor3 = C.Bone
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
 		else
 			sd.currentInvIdx  = nil
-			sd.frame.BackgroundColor3 = Color3.fromRGB(14, 7, 28)
-			sd.stroke.Enabled = false
+			sd.frame.BackgroundColor3 = C.Void
+			sd.stroke.Color = C.Border
+			sd.stroke.Transparency = 0.6
 			sd.emoji.Text     = ""
 			sd.name.Text      = ""
 			sd.ind.Text       = ""
@@ -196,112 +198,90 @@ function InventoryPanel.init(sg, deps)
 	updateCarriedUnitFn = deps.updateCarriedUnit
 	swapSlotsFn       = deps.swapSlots
 
-	-- ── Main panel ───────────────────────────────────────────
-	panel = Instance.new("Frame")
+	-- ── Main panel (Theme.panel: stone frame, title bar, body) ──
+	local themed = Theme.panel(screenGui, { title = "Inventory (0 / " .. INVENTORY_MAX .. ")", size = UDim2.fromOffset(900, 580), zIndex = 35 })
+	panel = themed.frame
 	panel.Name = "InventoryPanel"
-	panel.Size = UDim2.new(0, 900, 0, 580)
-	panel.Position = UDim2.new(0.5, -450, 0.5, -290)
-	panel.BackgroundColor3 = Color3.fromRGB(8, 4, 20)
-	panel.BackgroundTransparency = 0.05
-	panel.BorderSizePixel = 0
 	panel.Visible = false
 	panel.ZIndex = 35
-	panel.Parent = screenGui
-	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
+	invTitle = themed.title
+	invTitle.TextSize = 26
+	local body = themed.body
 
 	do
-		local stroke = Instance.new("UIStroke", panel)
-		stroke.Color = Color3.fromRGB(80, 40, 140)
-		stroke.Thickness = 2
-
-		invTitle = Instance.new("TextLabel", panel)
-		invTitle.Size = UDim2.new(1, -60, 0, 44)
-		invTitle.Position = UDim2.new(0, 14, 0, 4)
-		invTitle.BackgroundTransparency = 1
-		invTitle.Text = "Inventory (0 / " .. INVENTORY_MAX .. ")"
-		invTitle.TextColor3 = Color3.fromRGB(220, 195, 255)
-		invTitle.TextScaled = true
-		invTitle.Font = Enum.Font.GothamBold
-		invTitle.TextXAlignment = Enum.TextXAlignment.Left
-		invTitle.ZIndex = 36
-
-		local closeBtn = Instance.new("TextButton", panel)
-		closeBtn.Size = UDim2.new(0, 36, 0, 36)
-		closeBtn.Position = UDim2.new(1, -44, 0, 6)
-		closeBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 80)
-		closeBtn.Text = "X"
-		closeBtn.TextColor3 = Color3.fromRGB(210, 160, 255)
-		closeBtn.TextScaled = true
-		closeBtn.Font = Enum.Font.GothamBold
-		closeBtn.BorderSizePixel = 0
-		closeBtn.ZIndex = 37
-		Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
-		closeBtn.MouseButton1Click:Connect(function()
-			panel.Visible = false
-		end)
+		-- close button in the title bar
+		local closeBtn = Theme.stoneButton(panel, {
+			text = "X", color = "red", size = UDim2.fromOffset(44, 28),
+			position = UDim2.new(1, -62, 0, 6), zIndex = 37,
+			onClick = function() panel.Visible = false end,
+		})
 
 		-- ── Sidebar: sort buttons ────────────────────────────
-		local sidebar = Instance.new("Frame", panel)
-		sidebar.Size = UDim2.new(0, 106, 1, -52)
-		sidebar.Position = UDim2.new(0, 6, 0, 50)
-		sidebar.BackgroundColor3 = Color3.fromRGB(12, 6, 26)
+		local sidebar = Instance.new("Frame", body)
+		sidebar.Size = UDim2.new(0, 112, 1, 0)
+		sidebar.BackgroundColor3 = C.Void
 		sidebar.BorderSizePixel = 0
 		sidebar.ZIndex = 36
-		Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+		Theme.corner(sidebar, Theme.Radius.Small)
+		Theme.stroke(sidebar, C.Border, Theme.Stroke.Thin)
 
-		local sortByLbl = Instance.new("TextLabel", sidebar)
-		sortByLbl.Size = UDim2.new(1, 0, 0, 26)
-		sortByLbl.Position = UDim2.new(0, 0, 0, 4)
-		sortByLbl.BackgroundTransparency = 1
-		sortByLbl.Text = "Sort by:"
-		sortByLbl.TextColor3 = Color3.fromRGB(150, 130, 190)
-		sortByLbl.TextScaled = true
-		sortByLbl.Font = Enum.Font.Gotham
+		local sortByLbl = Theme.label(sidebar, { text = "SORT BY", size = "Small", font = "Strong", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 24) })
+		sortByLbl.Position = UDim2.fromOffset(0, 8)
 		sortByLbl.ZIndex = 37
 
 		local SORT_DEFS = {
-			{ key = "DPS",    label = "DPS",    color = Color3.fromRGB(100, 255, 130) },
-			{ key = "Chance", label = "Chance", color = Color3.fromRGB(255, 220, 80)  },
-			{ key = "Letter", label = "Letter", color = Color3.fromRGB(180, 170, 255) },
+			{ key = "DPS", label = "DPS" },
+			{ key = "Chance", label = "Rarity" },
+			{ key = "Letter", label = "A to Z" },
 		}
 		local sortBtns = {}
+		local function paintSortButtons()
+			for _, sbtn in ipairs(sortBtns) do
+				-- the active choice is green, the others grey
+				sbtn.stone.root:SetAttribute("Active", sbtn.key == invSortMode)
+				sbtn.refresh()
+			end
+		end
 		for idx, sd in ipairs(SORT_DEFS) do
-			local sb = Instance.new("TextButton", sidebar)
-			sb.Size = UDim2.new(1, -10, 0, 68)
-			sb.Position = UDim2.new(0, 5, 0, 32 + (idx-1)*76)
-			sb.BorderSizePixel = 0
-			sb.TextScaled = true
-			sb.Font = Enum.Font.GothamBold
-			sb.ZIndex = 37
-			sb.Text = sd.label
-			Instance.new("UICorner", sb).CornerRadius = UDim.new(0, 10)
-			table.insert(sortBtns, { btn = sb, key = sd.key, color = sd.color })
 			local key = sd.key
-			sb.MouseButton1Click:Connect(function()
-				invSortMode = key
-				for _, s in ipairs(sortBtns) do
-					local act = s.key == invSortMode
-					s.btn.BackgroundColor3 = act and Color3.fromRGB(55, 22, 90) or Color3.fromRGB(22, 10, 44)
-					s.btn.TextColor3 = act and s.color or Color3.fromRGB(120, 100, 155)
+			local entry = { key = key }
+			local function build(color)
+				if entry.stone then entry.stone.root:Destroy() end
+				entry.stone = Theme.stoneButton(sidebar, {
+					text = sd.label, color = color, size = UDim2.fromOffset(90, 40),
+					position = UDim2.fromOffset(11, 40 + (idx - 1) * 56), zIndex = 37,
+					onClick = function()
+						invSortMode = key
+						paintSortButtons()
+						refresh()
+					end,
+				})
+			end
+			entry.refresh = function()
+				local wantGreen = key == invSortMode
+				if entry.isGreen ~= wantGreen then
+					entry.isGreen = wantGreen
+					if wantGreen then
+						build(nil) -- the active choice is the green button
+					else
+						build("stone")
+					end
 				end
-				refresh()
-			end)
+			end
+			table.insert(sortBtns, entry)
+			entry.refresh()
 		end
-		for _, s in ipairs(sortBtns) do
-			local act = s.key == invSortMode
-			s.btn.BackgroundColor3 = act and Color3.fromRGB(55, 22, 90) or Color3.fromRGB(22, 10, 44)
-			s.btn.TextColor3 = act and s.color or Color3.fromRGB(120, 100, 155)
-		end
+		paintSortButtons()
 	end
 
 	-- ── Scroll area ──────────────────────────────────────────
-	invScroll = Instance.new("ScrollingFrame", panel)
-	invScroll.Size = UDim2.new(1, -120, 1, -52)
-	invScroll.Position = UDim2.new(0, 116, 0, 50)
+	invScroll = Instance.new("ScrollingFrame", body)
+	invScroll.Size = UDim2.new(1, -124, 1, 0)
+	invScroll.Position = UDim2.new(0, 124, 0, 0)
 	invScroll.BackgroundTransparency = 1
 	invScroll.BorderSizePixel = 0
 	invScroll.ScrollBarThickness = 6
-	invScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 60, 180)
+	invScroll.ScrollBarImageColor3 = C.Verdigris
 	invScroll.ZIndex = 36
 
 	do

@@ -178,10 +178,13 @@ end
 -- ============================================================
 -- Panel: a framed window with a title bar and a body
 -- ============================================================
--- opts: title, size (UDim2), position (UDim2), anchor (Vector2). Returns { frame, body, title, setTitle }.
+-- opts: title, size (UDim2), position (UDim2), anchor (Vector2), zIndex (number: the UI uses global z-ordering, so the
+-- header and body are put just above the frame). Returns { frame, body, title, setTitle }.
 function Theme.panel(parent, opts)
 	opts = opts or {}
+	local z = opts.zIndex or 1
 	local frame = Instance.new("Frame")
+	frame.ZIndex = z
 	frame.BackgroundColor3 = Theme.Color.Stone
 	frame.BorderSizePixel = 0
 	frame.Size = opts.size or UDim2.fromOffset(420, 360)
@@ -195,6 +198,7 @@ function Theme.panel(parent, opts)
 	header.BackgroundColor3 = Theme.Color.Void
 	header.BorderSizePixel = 0
 	header.Size = UDim2.new(1, 0, 0, 40)
+	header.ZIndex = z + 1
 	Theme.corner(header, Theme.Radius.Medium)
 	header.Parent = frame
 	-- (square off the header's bottom corners)
@@ -203,21 +207,25 @@ function Theme.panel(parent, opts)
 	fill.BorderSizePixel = 0
 	fill.Size = UDim2.new(1, 0, 0, 10)
 	fill.Position = UDim2.new(0, 0, 1, -10)
+	fill.ZIndex = z + 1
 	fill.Parent = header
 	local line = Instance.new("Frame") -- a thin soul-green rule under the title
 	line.BackgroundColor3 = Theme.Color.Verdigris
 	line.BorderSizePixel = 0
 	line.Size = UDim2.new(1, 0, 0, 1)
 	line.Position = UDim2.new(0, 0, 1, 0)
+	line.ZIndex = z + 2
 	line.Parent = header
 
 	local title = Theme.label(header, { text = opts.title or "", size = "Heading", font = "Title", frameSize = UDim2.new(1, -24, 1, 0) })
 	title.Position = UDim2.fromOffset(14, 0)
+	title.ZIndex = z + 2
 
 	local body = Instance.new("Frame")
 	body.BackgroundTransparency = 1
 	body.Size = UDim2.new(1, 0, 1, -42)
 	body.Position = UDim2.fromOffset(0, 42)
+	body.ZIndex = z + 1
 	Theme.padding(body, 12)
 	body.Parent = frame
 
@@ -256,9 +264,10 @@ local STONE_TINTS = {
 	gold = Color3.fromRGB(236, 190, 84),
 	blue = Color3.fromRGB(96, 168, 236),
 	purple = Color3.fromRGB(160, 100, 224),
+	stone = Color3.fromRGB(124, 132, 136), -- neutral grey, for inactive choices (tabs, sort buttons)
 }
 
--- opts: text, color ("green" default | "red" | "gold" | "blue" | "purple"), size (UDim2 of the button SHAPE, offsets only,
+-- opts: text, color ("green" default | "red" | "gold" | "blue" | "purple" | "stone"), size (UDim2 of the button SHAPE, offsets only,
 -- default 150 x 44), position, anchor, zIndex, onClick, disabled. Returns { root, button, label }: place and size `root`;
 -- root:SetAttribute("Disabled", true/false) disables or enables it.
 function Theme.stoneButton(parent, opts)
