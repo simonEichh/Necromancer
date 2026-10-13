@@ -41,7 +41,7 @@ local function apply(snap)
 	end
 	table.clear(State.inventory)
 	for _, entry in ipairs(snap.inventory) do
-		State.inventory[entry.slot] = { unitType = entry.unitType, oneIn = entry.oneIn, level = entry.level or 0, fails = entry.fails or 0 }
+		State.inventory[entry.slot] = { unitType = entry.unitType, oneIn = entry.oneIn, level = entry.level or 0, fails = entry.fails or 0, locked = entry.locked == true }
 	end
 	State.placed = snap.placed or {}
 	State.materials = snap.materials or {}

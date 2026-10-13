@@ -15,6 +15,8 @@ local EVENTS = {
 	"PlayerAscend",
 	"RequestData",
 	"SellUnit",
+	"SellAll", -- (maxRank, keepUpgraded): sell every unlocked inventory unit of that rarity rank or lower
+	"ToggleLock", -- (inventory slot): a locked unit can never be sold or dismantled
 	"SwapInventory",
 	"UpgradeUnit", -- (kind "inv" | "grave", index): the Forge, see UnitUpgrades
 	"DismantleUnit", -- (inventory slot)

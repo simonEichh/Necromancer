@@ -4,11 +4,23 @@ local C = Theme.Color
 local UnitPortrait = require(script.Parent.UnitPortrait)
 local LevelBadge = require(script.Parent.LevelBadge)
 local LevelEconomy = require(game:GetService("ReplicatedStorage").Shared.Economy)
+local Rarities = require(game:GetService("ReplicatedStorage").Shared.Rarities)
+local State = require(script.Parent.State)
+local Format = require(script.Parent.Format)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local sellAllRemote = ReplicatedStorage:WaitForChild("SellAll", 10)
+local toggleLockRemote = ReplicatedStorage:WaitForChild("ToggleLock", 10)
 
 -- ── Private state ────────────────────────────────────────────
 local invSortMode   = "DPS"
 local invSlotsReady = false
 local invSlots      = {}
+-- sell all / lock
+local sellMaxRank   = 1     -- sell units of this rarity rank or lower (1 = Common)
+local keepUpgraded  = true  -- never sell units above level 0
+local lockMode      = false -- clicking a slot locks/unlocks it instead of picking it
+local confirmSell   = false -- the Sell button was pressed once and asks "Sure?"
+local updateSellSummary
 
 -- ── UI refs ──────────────────────────────────────────────────
 local panel, invTitle, invScroll
@@ -80,9 +92,24 @@ ensureInvSlots = function()
 		btn.Text = ""
 		btn.ZIndex = 39
 
+		-- "LOCK" tag on locked units
+		local lockLbl = Instance.new("TextLabel", slot)
+		lockLbl.Size = UDim2.new(0, 34, 0, 13)
+		lockLbl.Position = UDim2.new(0, 2, 0, 16)
+		lockLbl.BackgroundColor3 = C.Void
+		lockLbl.BackgroundTransparency = 0.2
+		lockLbl.BorderSizePixel = 0
+		lockLbl.Text = "LOCK"
+		lockLbl.TextSize = 10
+		lockLbl.Font = Theme.Font.Strong
+		lockLbl.TextColor3 = Color3.fromRGB(236, 190, 84)
+		lockLbl.Visible = false
+		lockLbl.ZIndex = 39
+		Theme.corner(lockLbl, 3)
+
 		local sd = {
 			frame = slot, emoji = eLbl, name = nLbl, portrait = nil, badge = LevelBadge.attach(slot, 40),
-			ind = indLbl, btn = btn, stroke = stroke,
+			ind = indLbl, btn = btn, stroke = stroke, lock = lockLbl,
 			currentInvIdx = nil,
 		}
 		invSlots[i] = sd
@@ -115,6 +142,10 @@ ensureInvSlots = function()
 		btn.MouseButton1Click:Connect(function()
 			local invIdx = sd.currentInvIdx
 			if not invIdx or not inventory[invIdx] then return end
+			if lockMode then
+				if toggleLockRemote then toggleLockRemote:FireServer(invIdx) end -- the new state comes back via Sync
+				return
+			end
 			local sel = getSelectedSlot()
 			if invIdx == sel then return end
 			swapSlotsFn(sel, invIdx) -- the server swaps them and the new order comes back via Sync
@@ -178,6 +209,7 @@ refresh = function()
 			sd.name.Text      = unit.unitType
 			sd.name.TextColor3 = C.Bone
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
+			sd.lock.Visible   = unit.locked == true
 		else
 			sd.currentInvIdx  = nil
 			sd.frame.BackgroundColor3 = C.Void
@@ -189,7 +221,11 @@ refresh = function()
 			sd.badge.set(0)
 			sd.name.Text      = ""
 			sd.ind.Text       = ""
+			sd.lock.Visible   = false
 		end
+	end
+	if updateSellSummary then
+		updateSellSummary()
 	end
 end
 
@@ -213,7 +249,7 @@ function InventoryPanel.init(sg, deps)
 	swapSlotsFn       = deps.swapSlots
 
 	-- ── Main panel (Theme.panel: stone frame, title bar, body) ──
-	local themed = Theme.panel(screenGui, { title = "Inventory (0 / " .. INVENTORY_MAX .. ")", size = UDim2.fromOffset(900, 580), zIndex = 35 })
+	local themed = Theme.panel(screenGui, { title = "Inventory (0 / " .. INVENTORY_MAX .. ")", size = UDim2.fromOffset(960, 580), zIndex = 35 })
 	panel = themed.frame
 	panel.Name = "InventoryPanel"
 	panel.Visible = false
@@ -232,7 +268,7 @@ function InventoryPanel.init(sg, deps)
 
 		-- ── Sidebar: sort buttons ────────────────────────────
 		local sidebar = Instance.new("Frame", body)
-		sidebar.Size = UDim2.new(0, 112, 1, 0)
+		sidebar.Size = UDim2.new(0, 170, 1, 0)
 		sidebar.BackgroundColor3 = C.Void
 		sidebar.BorderSizePixel = 0
 		sidebar.ZIndex = 36
@@ -262,8 +298,8 @@ function InventoryPanel.init(sg, deps)
 			local function build(color)
 				if entry.stone then entry.stone.root:Destroy() end
 				entry.stone = Theme.stoneButton(sidebar, {
-					text = sd.label, color = color, size = UDim2.fromOffset(90, 40),
-					position = UDim2.fromOffset(11, 40 + (idx - 1) * 56), zIndex = 37,
+					text = sd.label, color = color, size = UDim2.fromOffset(150, 38),
+					position = UDim2.fromOffset(10, 36 + (idx - 1) * 46), zIndex = 37,
 					onClick = function()
 						invSortMode = key
 						paintSortButtons()
@@ -286,12 +322,117 @@ function InventoryPanel.init(sg, deps)
 			entry.refresh()
 		end
 		paintSortButtons()
+
+		-- ── Sidebar: sell all (rarity filter, keep upgraded) and lock mode ──
+		local function header(text, y)
+			local l = Theme.label(sidebar, { text = text, size = "Small", font = "Strong", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 20) })
+			l.Position = UDim2.fromOffset(0, y)
+			l.ZIndex = 37
+			return l
+		end
+		-- a stone button that is rebuilt when its colour has to change (green = on, grey = off)
+		local function choiceButton(y, getText, isOn, color, onClick)
+			local entry = {}
+			entry.refresh = function()
+				local want = isOn and (isOn() and "on" or "off") or (color or "stone")
+				if entry.state ~= want then
+					entry.state = want
+					if entry.stone then entry.stone.root:Destroy() end
+					entry.stone = Theme.stoneButton(sidebar, {
+						text = getText(), color = (want == "on") and nil or (want == "off" and "stone" or want),
+						size = UDim2.fromOffset(150, 38), position = UDim2.fromOffset(10, y), zIndex = 37,
+						onClick = onClick,
+					})
+				end
+				entry.stone.label.Text = getText()
+			end
+			entry.refresh()
+			return entry
+		end
+
+		header("SELL ALL", 182)
+		header("up to", 202).TextSize = 12
+		local rarityBtn, keepBtn, sellBtn, lockBtn
+		rarityBtn = choiceButton(220, function()
+			return LevelEconomy.RARITIES_ASC[sellMaxRank]
+		end, nil, "stone", function()
+			sellMaxRank = sellMaxRank % #LevelEconomy.RARITIES_ASC + 1
+			confirmSell = false
+			rarityBtn.refresh()
+			updateSellSummary()
+		end)
+		keepBtn = choiceButton(266, function()
+			return "Keep Lv 1+"
+		end, function() return keepUpgraded end, nil, function()
+			keepUpgraded = not keepUpgraded
+			confirmSell = false
+			keepBtn.refresh()
+			updateSellSummary()
+		end)
+		local summary = Theme.label(sidebar, { text = "", size = "Small", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -8, 0, 34) })
+		summary.Position = UDim2.fromOffset(4, 308)
+		summary.TextWrapped = true
+		summary.ZIndex = 37
+		sellBtn = choiceButton(346, function()
+			return confirmSell and "Sure?" or "Sell"
+		end, nil, "red", function()
+			if not confirmSell then
+				confirmSell = true
+				sellBtn.refresh()
+				task.delay(3, function()
+					if confirmSell then
+						confirmSell = false
+						sellBtn.refresh()
+					end
+				end)
+				return
+			end
+			confirmSell = false
+			sellBtn.refresh()
+			if sellAllRemote then sellAllRemote:FireServer(sellMaxRank, keepUpgraded) end
+		end)
+
+		header("LOCK", 396)
+		local lockHint
+		lockBtn = choiceButton(416, function()
+			return "Lock mode"
+		end, function() return lockMode end, nil, function()
+			lockMode = not lockMode
+			lockBtn.refresh()
+			lockHint.Visible = lockMode
+		end)
+		lockHint = Theme.label(sidebar, { text = "Click units to lock or unlock them. Locked units are never sold.", size = "Small", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -8, 0, 48) })
+		lockHint.Position = UDim2.fromOffset(4, 458)
+		lockHint.TextWrapped = true
+		lockHint.TextSize = 12
+		lockHint.Visible = false
+		lockHint.ZIndex = 37
+
+		-- what "Sell" would do right now
+		updateSellSummary = function()
+			local count, gold = 0, 0
+			local mult = LevelEconomy.sellGoldMultiplier(State.coinBoostLevel or 0)
+			for i = 1, INVENTORY_MAX do
+				local u = inventory[i]
+				if u and not u.locked then
+					local info = UNIT_INFO[u.unitType] or {}
+					local rank = Rarities.Rank[info.rarity] or 1
+					if rank <= sellMaxRank and not (keepUpgraded and (u.level or 0) > 0) then
+						count += 1
+						gold += math.floor(LevelEconomy.sellValue(u.oneIn or UNIT_ONE_IN[u.unitType] or 1) * mult)
+					end
+				end
+			end
+			summary.Text = count .. " units\n" .. Format.fmtGold(gold) .. " Gold"
+			sellBtn.stone.root:SetAttribute("Disabled", count == 0)
+		end
+		updateSellSummary()
 	end
 
 	-- ── Scroll area ──────────────────────────────────────────
 	invScroll = Instance.new("ScrollingFrame", body)
-	invScroll.Size = UDim2.new(1, -124, 1, 0)
-	invScroll.Position = UDim2.new(0, 124, 0, 0)
+	invScroll.Size = UDim2.new(1, -182, 1, 0)
+	invScroll.Position = UDim2.new(0, 182, 0, 0)
 	invScroll.BackgroundTransparency = 1
 	invScroll.BorderSizePixel = 0
 	invScroll.ScrollBarThickness = 6

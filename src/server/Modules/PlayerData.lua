@@ -96,6 +96,7 @@ function PlayerData.create(player, saved)
 						oneIn = clampNumber(entry.oneIn, Units.getBaseOneIn(entry.unitType), 1),
 						level = math.floor(clampNumber(entry.level, 0, 0)) <= Economy.MAX_UNIT_LEVEL and math.floor(clampNumber(entry.level, 0, 0)) or Economy.MAX_UNIT_LEVEL,
 						fails = math.floor(clampNumber(entry.fails, 0, 0)),
+						locked = entry.locked == true or nil,
 					}
 				end
 			end
@@ -123,7 +124,7 @@ function PlayerData.snapshot(profile)
 	for slot = 1, INVENTORY_MAX do
 		local unit = profile.inventory[slot]
 		if unit then
-			table.insert(inventory, { slot = slot, unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0 })
+			table.insert(inventory, { slot = slot, unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0, locked = unit.locked == true })
 		end
 	end
 	local owned = {}
@@ -225,7 +226,7 @@ function PlayerData.hasFreeSlot(player)
 end
 
 -- Adds a unit to the first free slot. Returns the slot, or nil if the inventory is full.
-function PlayerData.addUnit(player, unitType, oneIn, level, fails)
+function PlayerData.addUnit(player, unitType, oneIn, level, fails, locked)
 	local profile = profiles[player.UserId]
 	if not profile or not Units.Stats[unitType] then
 		return nil
@@ -234,7 +235,7 @@ function PlayerData.addUnit(player, unitType, oneIn, level, fails)
 	if not slot then
 		return nil
 	end
-	profile.inventory[slot] = { unitType = unitType, oneIn = oneIn or Units.getBaseOneIn(unitType), level = level or 0, fails = fails or 0 }
+	profile.inventory[slot] = { unitType = unitType, oneIn = oneIn or Units.getBaseOneIn(unitType), level = level or 0, fails = fails or 0, locked = locked == true or nil }
 	PlayerData.changed(player)
 	return slot
 end
@@ -260,6 +261,17 @@ function PlayerData.getUnit(player, slot)
 		return nil
 	end
 	return profile.inventory[slot]
+end
+
+-- Locks or unlocks the unit in a slot (a locked unit can never be sold or dismantled). Returns the new state, or nil.
+function PlayerData.toggleLock(player, slot)
+	local unit = PlayerData.getUnit(player, slot)
+	if not unit then
+		return nil
+	end
+	unit.locked = (not unit.locked) or nil
+	PlayerData.changed(player)
+	return unit.locked == true
 end
 
 function PlayerData.swapSlots(player, a, b)
@@ -288,7 +300,7 @@ function PlayerData.setInventoryList(player, list)
 		if i > INVENTORY_MAX then
 			break
 		end
-		profile.inventory[i] = { unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0 }
+		profile.inventory[i] = { unitType = unit.unitType, oneIn = unit.oneIn, level = unit.level or 0, fails = unit.fails or 0, locked = unit.locked }
 	end
 	PlayerData.changed(player)
 end

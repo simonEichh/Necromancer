@@ -48,7 +48,7 @@ local function collect(player, profile)
 	if plotState then
 		for slotIndex, slot in pairs(plotState.graveSlots) do
 			if slot.occupied and slot.unitType then
-				table.insert(placed, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0 })
+				table.insert(placed, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0, locked = slot.locked == true })
 			end
 		end
 	end
@@ -114,7 +114,7 @@ function Persistence.restorePlaced(player)
 	for _, entry in ipairs(placed) do
 		if type(entry) == "table" and type(entry.slot) == "number" then
 			local level = math.clamp(math.floor(tonumber(entry.level) or 0), 0, Economy.MAX_UNIT_LEVEL)
-			Army.placeInSlot(plotState, entry.slot, entry.unitType, level, math.max(0, math.floor(tonumber(entry.fails) or 0)))
+			Army.placeInSlot(plotState, entry.slot, entry.unitType, level, math.max(0, math.floor(tonumber(entry.fails) or 0)), entry.locked == true)
 		end
 	end
 end

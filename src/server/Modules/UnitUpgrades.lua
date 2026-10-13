@@ -94,6 +94,10 @@ Remotes.DismantleUnit.OnServerEvent:Connect(function(player, slot)
 	end
 	local unit = PlayerData.getUnit(player, slot)
 	if not unit then return end
+	if unit.locked then
+		Remotes.Notice:FireClient(player, unit.unitType .. " is locked. Unlock it in the inventory to dismantle it.")
+		return
+	end
 	local rarity = Units.Rarity[unit.unitType]
 	local amount = Economy.dismantleYield(Rarities.Rank[rarity] or 1)
 	PlayerData.takeUnit(player, slot)
