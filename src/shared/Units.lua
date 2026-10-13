@@ -215,6 +215,22 @@ local UNITS = {
 		transparent = true,
 		regenReduction = 1.0,
 	},
+	-- a floating gas-masked child, "crucified" in the air; points a claw finger out of its sleeve and fires a thin beam
+	-- (model attribute AttackStyle = "FingerBeam"; the damage lands hitDelay seconds after the attack, with the beam)
+	Hush = {
+		color = BrickColor.new("Royal purple"),
+		size = Vector3.new(2.2, 4, 2.2),
+		damage = 76000,
+		speed = 12,
+		attackRange = 20,
+		attackCD = 2.0,
+		hitDelay = 0.5,
+		infiniteRange = true, -- beams the wall from the fixed post like the Sigilwright: no marching, the arm stays raised
+		-- special attack (Army.startSpecial, client SpecialFx): rips a rift into reality, chains swarm out and bite into the
+		-- wall (hit 1), then explode (hit 2). `share` of the unit's damage comes from the special, the rest from basic
+		-- attacks, so its DPS is unchanged. In Studio the cooldown is SPECIAL_TEST_COOLDOWN (Army) for testing.
+		special = { kind = "RiftChains", cooldown = 90, share = 0.35, duration = 8.8, hits = { { at = 6.95, share = 0.4 }, { at = 7.6, share = 0.6 } } },
+	},
 	DeathIncarnate = {
 		color = BrickColor.new("Really black"),
 		size = Vector3.new(5, 5, 5),
@@ -300,6 +316,7 @@ local RARITY_UNITS = {
 	Eternal = {
 		{ unit = "TheUndying", weight = 2 },
 		{ unit = "DeathIncarnate", weight = 1 },
+		{ unit = "Hush", weight = 1 },
 	},
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
@@ -349,6 +366,7 @@ local UNIT_EMOJIS = {
 	-- Eternal
 	TheUndying = "",
 	DeathIncarnate = "",
+	Hush = "",
 	-- Primordial
 	LastLantern = "",
 	Sigilwright = "",

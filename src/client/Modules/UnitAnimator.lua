@@ -40,6 +40,15 @@ local function register(model)
 			end
 		end
 	end
+	-- with StreamingEnabled a model placed in the world can arrive before its parts and joints: pick those up later
+	model.DescendantAdded:Connect(function(d)
+		if d:IsA("Motor6D") then
+			joints[d.Name] = d
+			if d.Name:sub(1, 4) == "Spin" then
+				table.insert(spinners, { joint = d, speed = d:GetAttribute("SpinSpeed") or 1 })
+			end
+		end
+	end)
 	rigs[model] = {
 		joints = joints,
 		spinners = spinners,
@@ -75,7 +84,8 @@ local function attackPose(u)
 end
 
 local function attackDuration(model)
-	return math.min(0.55, (model:GetAttribute("AttackCD") or 1) * 0.85)
+	-- units with a longer, scripted attack (e.g. Hush's finger beam) set AttackAnim on the model
+	return model:GetAttribute("AttackAnim") or math.min(0.55, (model:GetAttribute("AttackCD") or 1) * 0.85)
 end
 
 -- Staff cast stance (AttackStyle = "StaffCast"): while the unit stands at the wall and keeps attacking it holds
@@ -115,6 +125,7 @@ local function animate(model, rig, dt, now)
 	local casterStyle = style == "StaffCast" or style == "SigilCast"
 	if count ~= rig.lastCount then
 		rig.lastCount = count
+		rig.lastShot = now
 		if not casterStyle then
 			rig.attackStart = now -- (casters hold a stance while the server reports a barrage instead of swinging per attack)
 		end
@@ -199,6 +210,173 @@ local function animate(model, rig, dt, now)
 	set(rig, "RStaff", ANGLES(staffRot, 0, 0))
 	set(rig, "Waist", ANGLES(waistPitch, 0, waistRoll))
 	set(rig, "Neck", ANGLES(-0.04 * w, math.sin(t * 0.8) * 0.12 * (1 - w), 0))
+
+	-- "Crucified" pose (model attribute Pose, e.g. Hush): the rig is BUILT in a T pose; it hangs in the air as if nailed
+	-- to an invisible cross: arms sag a little, the empty sleeves hang from the elbows and swing, the head hangs to one
+	-- side and twitches now and then, the legs dangle with the feet crossed, and the whole body sways slowly
+	if model:GetAttribute("Pose") == "Crucified" then
+		local sway = math.sin(t * 0.6)
+		local sag = 0.12 + breathe
+		set(rig, "RShoulder", ANGLES(0, 0, -sag))
+		set(rig, "LShoulder", ANGLES(0, 0, sag))
+		-- the empty sleeves hang from the elbows (undoing the shoulder sag) in three loose segments (Elbow, Sleeve1,
+		-- Sleeve2): each segment is bent a little against the one above (crumpled cloth) and swings with a delay and
+		-- more than the one above, so the sleeve dangles like fabric
+		for i, side in ipairs({ "R", "L" }) do
+			local dir = (side == "R") and 1 or -1
+			local p0 = i * 1.7
+			local function swing(k, amp)
+				local d = k * 0.55 -- each lower segment lags behind
+				return math.sin(t * 1.15 + p0 - d) * amp, math.sin(t * 0.85 + p0 * 0.7 - d) * amp * 0.7
+			end
+			local x1, z1 = swing(0, 0.12)
+			local x2, z2 = swing(1, 0.16)
+			local x3, z3 = swing(2, 0.2)
+			set(rig, side .. "Elbow", ANGLES(x1 + 0.05, 0, dir * sag + z1 + dir * 0.06))
+			set(rig, side .. "Sleeve1", ANGLES(x2 - 0.18, 0, z2 - dir * 0.22))
+			set(rig, side .. "Sleeve2", ANGLES(x3 + 0.16, 0, z3 + dir * 0.14))
+		end
+		-- a short twitch of the head every few seconds
+		local cycle = (t * 0.17) % 1
+		local twitch = (cycle < 0.04) and math.sin(cycle / 0.04 * math.pi) * 0.3 or 0
+		set(rig, "Neck", ANGLES(-0.35 - twitch * 0.5, math.sin(t * 0.4) * 0.1, 0.32 + twitch))
+		set(rig, "Waist", ANGLES(-0.06 + breathe, 0, sway * 0.03))
+		-- legs hang slack, crossed at the ankles, swinging a little
+		local swing = math.sin(t * 0.9) * 0.06
+		set(rig, "RHip", ANGLES(0.05 + swing, 0, -0.1))
+		set(rig, "LHip", ANGLES(-0.03 + swing, 0, 0.1))
+		set(rig, "RKnee", ANGLES(-0.15, 0, 0))
+		set(rig, "LKnee", ANGLES(-0.2, 0, 0))
+		set(rig, "Root", CFrame.new(0, float + rise, 0) * ANGLES(0, math.sin(t * 0.3) * 0.08, sway * 0.05))
+
+		-- the finger-beam attack (AttackStyle "FingerBeam"): while the unit is fighting (it shot within the last
+		-- AttackCD + 0.8 s and is not walking) the right sleeve stays raised, pointing straight at the wall, and the claw
+		-- finger stays out of the sleeve opening; every shot (FingerBeam.lua draws circle + beam) only adds a small recoil.
+		-- The sleeve drops again when the unit walks or has nothing left to shoot.
+		if style == "FingerBeam" then
+			local cd = model:GetAttribute("AttackCD") or 2
+			local spAt = model:GetAttribute("SpecialAt")
+			local inSpecial = spAt ~= nil and (workspace:GetServerTimeNow() - spAt) < 9.6 -- (no basic shots during a special)
+			local fighting = state ~= "walk" and ((rig.lastShot ~= nil and (now - rig.lastShot) < cd + 0.8) or inSpecial)
+			rig.hold = (rig.hold or 0) + ((fighting and 1 or 0) - (rig.hold or 0)) * clamp01(dt * 5)
+			local k = rig.hold * rig.hold * (3 - 2 * rig.hold) -- smoothstep
+			local ext = math.clamp((rig.hold - 0.45) / 0.45, 0, 1)
+			local recoil = 0
+			if rig.lastShot then
+				local since = now - rig.lastShot - 0.5 -- the beam fires 0.5 s after the attack starts
+				if since > 0 and since < 0.3 then
+					recoil = math.sin(since / 0.3 * math.pi) * 0.12
+				end
+			end
+			local rest = Vector3.new(math.cos(math.rad(32)), -math.sin(math.rad(32)), 0) -- the upper arm at rest (build_hush.lua)
+			local function fromTo(a, b)
+				local axis = a:Cross(b)
+				if axis.Magnitude < 1e-4 then return CFrame.new() end
+				return CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(a:Dot(b), -1, 1)))
+			end
+			local aim = Vector3.new(-0.08, 0.06 + recoil, -1).Unit -- straight ahead at the wall, a touch inward and up
+			local shoulder = fromTo(rest, aim)
+			local elbow = fromTo(Vector3.new(0, -1, 0), rest) -- the hanging sleeve lines up with the arm
+			local function blend(name, target)
+				local joint = rig.joints[name]
+				if joint then
+					joint.Transform = joint.Transform:Lerp(target, k)
+				end
+			end
+			if k > 0.001 then
+				blend("RShoulder", shoulder)
+				blend("RElbow", elbow)
+				blend("RSleeve1", CFrame.new())
+				blend("RSleeve2", CFrame.new())
+				blend("Neck", ANGLES(0.05, 0, 0.12)) -- the head lifts toward the wall
+			end
+			set(rig, "RFinger", CFrame.new(0, -1.6 * ext + recoil * 0.6, 0))
+		end
+
+		-- the Rift Chains special (SpecialFx.lua draws the rip and the chains from the same server clock). The finger stays
+		-- in the sleeve; the whole body acts it out: wind-up (sleeve out to the side, leaning back and twisting), a quick
+		-- slash, hunched over the rip with both sleeves raised, slowly pulling the chains out, a short gathering pull, both
+		-- arms flung up as the chains scatter (arching back, rising), thrown down at the wall (leaning in), shudders at the
+		-- impacts, a jolt back from the explosions, and back into the aiming stance. Keyframes are blended over the pose
+		-- set above (fading in and out), so it starts and ends smoothly.
+		local specialAt = model:GetAttribute("SpecialAt")
+		if specialAt and model:GetAttribute("SpecialKind") == "RiftChains" then
+			local st = workspace:GetServerTimeNow() - specialAt
+			if st >= 0 and st < 8.8 then
+				local function v(x, y, z) return Vector3.new(x, y, z).Unit end
+				local restR = v(math.cos(math.rad(32)), -math.sin(math.rad(32)), 0) -- the upper arms at rest (build_hush.lua)
+				local restL = v(-restR.X, restR.Y, 0)
+				local fwdR = v(-0.08, 0.06, -1)
+				-- t, right arm, left arm, sleeves along the arm (1) or hanging (0), waist pitch / yaw, neck pitch / roll, rise
+				local F = {
+					{ 0, fwdR, restL, 1, -0.06, 0, -0.1, 0.15, 0 },
+					{ 0.7, v(1, 0.25, 0.2), restL, 1, 0.18, 0.25, 0.2, 0, 0.3 },
+					{ 0.9, v(1, 0.28, 0.25), restL, 1, 0.22, 0.3, 0.22, 0, 0.35 },
+					{ 1.05, v(-0.55, -0.5, -0.7), v(-0.5, -0.3, 0.2), 1, -0.25, -0.35, -0.15, 0, 0 },
+					{ 1.7, v(0.35, -0.1, -1), v(-0.35, -0.1, -1), 0, -0.2, 0, -0.3, 0.1, -0.2 },
+					{ 5.0, v(0.25, 0.05, -1), v(-0.25, 0.05, -1), 0, -0.3, 0, -0.38, -0.1, -0.35 },
+					{ 5.3, v(0.6, -0.2, -0.5), v(-0.6, -0.2, -0.5), 0.5, -0.1, 0, -0.1, 0, -0.1 },
+					{ 5.55, v(0.45, 1, -0.15), v(-0.45, 1, -0.15), 1, 0.35, 0, 0.5, 0, 1.1 },
+					{ 6.0, v(0.4, 1, -0.2), v(-0.4, 1, -0.2), 1, 0.3, 0, 0.42, 0, 1.2 },
+					{ 6.6, v(0.15, -0.25, -1), v(-0.15, -0.25, -1), 1, -0.32, 0, -0.25, 0, 0.4 },
+					{ 7.55, v(0.15, -0.2, -1), v(-0.15, -0.2, -1), 0.6, -0.25, 0, -0.2, 0, 0.25 },
+					{ 7.75, v(0.25, 0.1, -1), v(-0.25, 0.1, -1), 0.6, 0.18, 0, 0.28, 0, 0.55 },
+					{ 8.4, fwdR, restL, 1, -0.06, 0, -0.1, 0.15, 0 },
+					{ 8.8, fwdR, restL, 1, -0.06, 0, -0.1, 0.15, 0 },
+				}
+				local k0, k1, f = F[1], F[2], 0
+				for i = 1, #F - 1 do
+					if st >= F[i][1] and st < F[i + 1][1] then
+						k0, k1 = F[i], F[i + 1]
+						f = (st - k0[1]) / (k1[1] - k0[1])
+						f = f * f * (3 - 2 * f)
+						break
+					end
+				end
+				local function num(i) return k0[i] + (k1[i] - k0[i]) * f end
+				local function dir(i) return k0[i]:Lerp(k1[i], f).Unit end
+				local aimR, aimL, along = dir(2), dir(3), num(4)
+				local wp, wy, np, nr, rise2 = num(5), num(6), num(7), num(8), num(9)
+				-- slow pulling motion while the chains creep out, shudders at the impacts
+				if st > 1.7 and st < 5.3 then
+					local pull = math.sin(st * 2.6) * 0.12
+					aimR = (aimR + Vector3.new(0, pull, pull * 0.5)).Unit
+					aimL = (aimL + Vector3.new(0, pull, pull * 0.5)).Unit
+				end
+				if st > 6.6 and st < 7.3 then
+					wp += math.sin(now * 38) * 0.05
+					np += math.sin(now * 33 + 1) * 0.06
+				end
+				local function fromTo(a, b)
+					local axis = a:Cross(b)
+					if axis.Magnitude < 1e-4 then return CFrame.new() end
+					return CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(a:Dot(b), -1, 1)))
+				end
+				-- fade in over 0.15 s and out over the last 0.4 s
+				local w = math.clamp(st / 0.15, 0, 1) * math.clamp((8.8 - st) / 0.4, 0, 1)
+				local function blend(name, target)
+					local joint = rig.joints[name]
+					if joint then
+						joint.Transform = joint.Transform:Lerp(target, w)
+					end
+				end
+				local down = Vector3.new(0, -1, 0)
+				for _, arm in ipairs({ { "R", restR, aimR }, { "L", restL, aimL } }) do
+					local side, rest, aimDir = arm[1], arm[2], arm[3]
+					local shoulder = fromTo(rest, aimDir)
+					blend(side .. "Shoulder", shoulder)
+					-- the sleeve either streams along the arm or hangs straight down (undoing the arm's rotation)
+					blend(side .. "Elbow", shoulder:Inverse():Lerp(fromTo(down, rest), along))
+					blend(side .. "Sleeve1", ANGLES(math.sin(t * 1.3) * 0.12 * (1 - along), 0, 0))
+					blend(side .. "Sleeve2", ANGLES(math.sin(t * 1.3 - 0.6) * 0.16 * (1 - along), 0, 0))
+				end
+				set(rig, "RFinger", CFrame.new()) -- the finger stays in the sleeve during the special
+				blend("Waist", ANGLES(wp, wy, 0))
+				blend("Neck", ANGLES(np, 0, nr))
+				blend("Root", CFrame.new(0, float + rise + rise2 * scale, 0) * ANGLES(0, wy * 0.4, 0))
+			end
+		end
+	end
 
 	-- wings (bats and other fliers): LWing/RWing flap up and down around Z; they flap faster while moving
 	if rig.joints.LWing or rig.joints.RWing then

@@ -685,6 +685,68 @@ local function stopBeam(u)
 end
 
 -- Applies the damage of every shot that has landed (called once per plot per frame).
+-- ── Special attacks (unit def `special`, e.g. Hush's Rift Chains) ─────────
+-- A unit with a special charges it for `cooldown` seconds (shown on the client as a meter from the model attributes
+-- SpecialStart = server time the charge began and SpecialCD), then, while it has a wall to fight, fires it: the model
+-- gets SpecialAt (server time it starts), SpecialKind, SpecialAim (the spot on the wall) and SpecialSeed (so every client
+-- draws the same chains); basic attacks pause for `duration`, and the damage lands at the `hits` moments. The special
+-- deals `share` of the unit's damage per cycle and basic attacks the rest, so the unit's DPS stays damage / attackCD.
+local SPECIAL_TEST_COOLDOWN = 10 -- in Studio specials charge this fast, to test them
+local function specialCooldown(def)
+	return game:GetService("RunService"):IsStudio() and SPECIAL_TEST_COOLDOWN or def.special.cooldown
+end
+
+local function chargeSpecial(u, now, cooldown)
+	u.specialReady = now + cooldown
+	if u.model then
+		u.model:SetAttribute("SpecialStart", workspace:GetServerTimeNow())
+		u.model:SetAttribute("SpecialCD", cooldown)
+	end
+end
+
+local function initSpecial(u, now)
+	-- each unit starts somewhere in its charge, so several specials do not fire at the same moment
+	local cd = specialCooldown(u.def)
+	local head = cd * math.random() * 0.4
+	u.specialReady = now + cd - head
+	if u.model then
+		u.model:SetAttribute("SpecialStart", workspace:GetServerTimeNow() - head)
+		u.model:SetAttribute("SpecialCD", cd)
+	end
+end
+
+local function startSpecial(u, plotState, lat, now)
+	local sp = u.def.special
+	local cd = specialCooldown(u.def)
+	local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
+	if u.model then
+		u.model:SetAttribute("SpecialKind", sp.kind)
+		u.model:SetAttribute("SpecialAim", aim)
+		u.model:SetAttribute("SpecialSeed", math.random(1, 1e6))
+		u.model:SetAttribute("SpecialAt", workspace:GetServerTimeNow())
+	end
+	-- basic attacks resume when the special is over
+	u.lastAttack = now + sp.duration - u.def.attackCD
+	-- the damage of one cycle: the special's share of (DPS x cooldown)
+	local total = (u.def.damage / u.def.attackCD) * sp.share * cd
+	for _, h in ipairs(sp.hits) do
+		task.delay(h.at, function()
+			if not plotState.wall or not u.block or not u.block.Parent then return end
+			local dmg = total * h.share
+			plotState.wallHP = math.max(0, plotState.wallHP - dmg)
+			updateWallGui(plotState)
+			if plotState.wallHP <= 0 then breakWall(plotState) end
+		end)
+	end
+	-- the next charge starts when this special is over
+	task.delay(sp.duration, function()
+		if u.block and u.block.Parent then
+			chargeSpecial(u, now + sp.duration, cd) -- (`now` is the loop clock at the start)
+		end
+	end)
+	u.specialReady = math.huge -- until the charge restarts
+end
+
 local function settleBarrages(plotState, now)
 	local t = workspace:GetServerTimeNow()
 	local damage = 0
@@ -801,6 +863,9 @@ local function update(now, dt)
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				setState(u, "idle")
 				local attackStyle = u.model and u.model:GetAttribute("AttackStyle")
+				if u.def.special and not u.specialReady then
+					initSpecial(u, now)
+				end
 				if attackStyle == "StaffCast" or attackStyle == "SigilCast" then
 					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage)
 					if not u.barrage or u.barrage.endTime then
@@ -818,6 +883,8 @@ local function update(now, dt)
 						u.model:SetAttribute("AimPos", PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
 							+ Vector3.new(0, BEAM_AIM_HEIGHT, 0))
 					end
+				elseif u.def.special and plotState.wall and now >= u.specialReady then
+					startSpecial(u, plotState, lat, now)
 				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
 					if u.model then
@@ -835,10 +902,23 @@ local function update(now, dt)
 							or u.def.size.Y * 1.6
 						local impactPos = PlotFrame.toWorld(plotState, lat + (math.random() - 0.5) * 2.4, plotState.wallFaceFwd)
 							+ Vector3.new(0, unitHeight * (0.5 + math.random() * 0.2), 0)
-						plotState.wallHP = math.max(0, plotState.wallHP - u.def.damage)
-						updateWallGui(plotState)
-						sendWallHit(plotState, impactPos, u.def.damage, u.def.transparent)
-						if plotState.wallHP <= 0 then breakWall(plotState) end
+						-- (a unit with a special deals only the rest of its damage with basic attacks)
+						local damage = u.def.damage * (u.def.special and (1 - u.def.special.share) or 1)
+						local function hit()
+							if not plotState.wall then return end -- the gate already fell
+							plotState.wallHP = math.max(0, plotState.wallHP - damage)
+							updateWallGui(plotState)
+							sendWallHit(plotState, impactPos, damage, u.def.transparent)
+							if plotState.wallHP <= 0 then breakWall(plotState) end
+						end
+						if u.def.hitDelay then
+							-- the attack animation shoots something first (e.g. Hush's finger beam): the client aims it at AimPos
+							-- and the damage lands when it arrives
+							if u.model then u.model:SetAttribute("AimPos", impactPos) end
+							task.delay(u.def.hitDelay, hit)
+						else
+							hit()
+						end
 					end
 				end
 			else
