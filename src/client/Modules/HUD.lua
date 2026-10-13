@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 
 -- ── Private UI refs ──────────────────────────────────────────
 local goldLbl, gemsLbl, luckLbl, spinCountLbl, spinBadge
+local dustFrame, dustChips = nil, {}
 
 -- ── Injected deps ────────────────────────────────────────────
 local getGold, getGems, getSpins, getLuckBuffEnd, getCountdown, fmtNumber
@@ -128,6 +129,59 @@ function HUD.init(screenGui, deps)
 	currencyFrame.ZIndex = 5
 	Instance.new("UICorner", currencyFrame).CornerRadius = UDim.new(0, 12)
 
+	-- dust row above it: a chip per dust the player has (hidden while they have none)
+	do
+		local Theme = require(script.Parent.Theme)
+		local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
+		dustFrame = Instance.new("Frame", screenGui)
+		dustFrame.Name = "DustBar"
+		dustFrame.AutomaticSize = Enum.AutomaticSize.X
+		dustFrame.Size = UDim2.new(0, 0, 0, 30)
+		dustFrame.Position = UDim2.new(0, 10, 1, -116)
+		dustFrame.BackgroundColor3 = Color3.fromRGB(8, 4, 20)
+		dustFrame.BackgroundTransparency = 0.3
+		dustFrame.BorderSizePixel = 0
+		dustFrame.ZIndex = 5
+		dustFrame.Visible = false
+		Instance.new("UICorner", dustFrame).CornerRadius = UDim.new(0, 8)
+		local pad = Instance.new("UIPadding", dustFrame)
+		pad.PaddingLeft = UDim.new(0, 8)
+		pad.PaddingRight = UDim.new(0, 8)
+		local list = Instance.new("UIListLayout", dustFrame)
+		list.FillDirection = Enum.FillDirection.Horizontal
+		list.VerticalAlignment = Enum.VerticalAlignment.Center
+		list.Padding = UDim.new(0, 10)
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		for i, dust in ipairs(Economy.DUSTS) do
+			local chip = Instance.new("Frame", dustFrame)
+			chip.BackgroundTransparency = 1
+			chip.AutomaticSize = Enum.AutomaticSize.X
+			chip.Size = UDim2.new(0, 0, 1, 0)
+			chip.LayoutOrder = i
+			chip.Visible = false
+			local row = Instance.new("UIListLayout", chip)
+			row.FillDirection = Enum.FillDirection.Horizontal
+			row.VerticalAlignment = Enum.VerticalAlignment.Center
+			row.Padding = UDim.new(0, 5)
+			local dot = Instance.new("Frame", chip)
+			dot.Size = UDim2.fromOffset(12, 12)
+			dot.BackgroundColor3 = Theme.DustColor[dust]
+			dot.BorderSizePixel = 0
+			dot.ZIndex = 6
+			dot.Rotation = 45 -- a small diamond
+			local count = Instance.new("TextLabel", chip)
+			count.AutomaticSize = Enum.AutomaticSize.X
+			count.Size = UDim2.new(0, 0, 1, 0)
+			count.BackgroundTransparency = 1
+			count.Font = Enum.Font.GothamBold
+			count.TextSize = 18
+			count.TextColor3 = Theme.DustColor[dust]
+			count.Text = "0"
+			count.ZIndex = 6
+			dustChips[dust] = { frame = chip, count = count, name = Economy.DUST_NAMES[dust] }
+		end
+	end
+
 	goldLbl = Instance.new("TextLabel", currencyFrame)
 	goldLbl.Size = UDim2.new(1, -10, 0.5, 0)
 	goldLbl.Position = UDim2.new(0, 8, 0, 0)
@@ -189,6 +243,17 @@ function HUD.init(screenGui, deps)
 end
 
 function HUD.update()
+	if dustFrame then
+		local State = require(script.Parent.State)
+		local any = false
+		for dust, chip in pairs(dustChips) do
+			local n = (State.materials and State.materials[dust]) or 0
+			chip.frame.Visible = n > 0
+			chip.count.Text = chip.name .. " " .. require(script.Parent.Format).fmtGold(n)
+			any = any or n > 0
+		end
+		dustFrame.Visible = any
+	end
 	if goldLbl then
 		goldLbl.Text = "Gold " .. fmtCurrency(getGold())
 	end

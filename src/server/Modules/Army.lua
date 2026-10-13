@@ -291,6 +291,14 @@ local function spawnUnit(unitType, customPos, plotState, level)
 	})
 end
 
+-- The name line on a grave: the unit and, once upgraded, its level
+local function graveTitle(unitType, level)
+	if (level or 0) > 0 then
+		return unitType .. "  Lv " .. level
+	end
+	return unitType
+end
+
 -- Spawns a unit on a grave slot and updates the slot's labels/prompt.
 -- Returns false if the slot is missing or already occupied. `locked` travels with the unit (see Inventory: ToggleLock).
 local function placeInSlot(plotState, slotIndex, unitType, level, fails, locked)
@@ -308,7 +316,7 @@ local function placeInSlot(plotState, slotIndex, unitType, level, fails, locked)
 	slot.unitEntry = plotState.activeUnits[#plotState.activeUnits]
 	local dps = math.floor(UNITS[unitType].damage * ownerDamageMultiplier(plotState) * Economy.levelMultiplier(level) / UNITS[unitType].attackCD)
 	local rarity = UNIT_RARITY[unitType] or "Common"
-	slot.label.Text = unitType
+	slot.label.Text = graveTitle(unitType, level)
 	slot.rarityLabel.Text = rarity
 	slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
 	slot.dpsLabel.Text = dps .. " DPS"
@@ -330,6 +338,9 @@ local function setUnitLevel(plotState, slotIndex, level, fails)
 		if u.dpsLbl then u.dpsLbl.Text = dps .. " DPS" end
 		slot.dpsLabel.Text = dps .. " DPS"
 		if u.model then u.model:SetAttribute("Level", level) end
+	end
+	if slot.unitType then
+		slot.label.Text = graveTitle(slot.unitType, level)
 	end
 	return true
 end

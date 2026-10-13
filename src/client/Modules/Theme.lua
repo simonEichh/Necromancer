@@ -246,6 +246,15 @@ end
 -- tools/design/make_button_images.py (PNGs in design/buttons/) and uploaded. Each image is 512 x 160 with a 16 px margin
 -- round the 480 x 128 button shape (room for the hover glow) and is sliced 9-patch style: the corner pieces (cut corner,
 -- bevel, diamonds) stay fixed, the middle stretches. Keep SLICE in sync with the script.
+-- Colours of the five upgrade dusts (keys from Economy.DUSTS)
+Theme.DustColor = {
+	Stone = Color3.fromRGB(150, 146, 140),
+	Silver = Color3.fromRGB(196, 204, 216),
+	Gold = Color3.fromRGB(232, 190, 90),
+	Diamond = Color3.fromRGB(130, 220, 240),
+	Star = Color3.fromRGB(226, 150, 255),
+}
+
 Theme.Image = {
 	StoneButton = {
 		Default = "rbxassetid://88492918328761",

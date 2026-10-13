@@ -129,13 +129,7 @@ hintLbl.TextWrapped = true
 hintLbl.ZIndex = Z + 3
 
 -- the materials row (bottom): one chip per dust
-local DUST_COLORS = {
-	Stone = Color3.fromRGB(150, 146, 140),
-	Silver = Color3.fromRGB(196, 204, 216),
-	Gold = Color3.fromRGB(232, 190, 90),
-	Diamond = Color3.fromRGB(130, 220, 240),
-	Star = Color3.fromRGB(226, 150, 255),
-}
+local DUST_COLORS = Theme.DustColor
 local matBar = Instance.new("Frame")
 matBar.BackgroundColor3 = C.Void
 matBar.BorderSizePixel = 0
