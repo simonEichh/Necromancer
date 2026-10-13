@@ -18,10 +18,10 @@ local function makePillBtn(parent, text, color, x, callback)
 	}).root
 end
 
--- ── Helper: make a side button (stone button; the icon spot is gone until real icons exist) ──
+-- ── Helper: make a side button (stone button with its painted icon, see Theme.Image.Icon) ──
 local function makeIconBtn(parent, icon, label, yPos, color, callback)
 	return Theme.stoneButton(parent, {
-		text = label, color = color, size = UDim2.fromOffset(112, 44),
+		text = label, color = color, size = UDim2.fromOffset(166, 44), icon = icon,
 		position = UDim2.fromOffset(0, yPos), zIndex = 5, onClick = callback,
 	}).root
 end
@@ -101,23 +101,23 @@ function HUD.init(screenGui, deps)
 
 	-- ── Left side: icon buttons ──────────────────────────────
 	local leftPanel = Instance.new("Frame", screenGui)
-	leftPanel.Size = UDim2.new(0, 112, 0, 400)
-	leftPanel.Position = UDim2.new(0, 10, 0.5, -150)
+	leftPanel.Size = UDim2.new(0, 166, 0, 400)
+	leftPanel.Position = UDim2.new(0, 16, 0.5, -150)
 	leftPanel.BackgroundTransparency = 1
 	leftPanel.ZIndex = 5
 
-	makeIconBtn(leftPanel, "", "Ascend", 0, "purple", deps.onAscend)
-	makeIconBtn(leftPanel, "", "Inventory", 62, "blue", deps.onInventory)
+	makeIconBtn(leftPanel, Theme.Image.Icon.Ascend, "Ascend", 0, "purple", deps.onAscend)
+	makeIconBtn(leftPanel, Theme.Image.Icon.Inventory, "Inventory", 62, "blue", deps.onInventory)
 
 	-- ── Right side: icon buttons ─────────────────────────────
 	local rightPanel = Instance.new("Frame", screenGui)
-	rightPanel.Size = UDim2.new(0, 112, 0, 400)
-	rightPanel.Position = UDim2.new(1, -122, 0.5, -50)
+	rightPanel.Size = UDim2.new(0, 166, 0, 400)
+	rightPanel.Position = UDim2.new(1, -176, 0.5, -50)
 	rightPanel.BackgroundTransparency = 1
 	rightPanel.ZIndex = 5
 
-	makeIconBtn(rightPanel, "", "Quests", 0, "blue", deps.onQuests)
-	makeIconBtn(rightPanel, "", "Friends", 62, nil, deps.onFriends or function() end)
+	makeIconBtn(rightPanel, Theme.Image.Icon.Quests, "Quests", 0, "blue", deps.onQuests)
+	makeIconBtn(rightPanel, Theme.Image.Icon.Friends, "Friends", 62, nil, deps.onFriends or function() end)
 
 	-- ── Bottom left: currency display ────────────────────────
 	local currencyFrame = Instance.new("Frame", screenGui)
@@ -182,11 +182,21 @@ function HUD.init(screenGui, deps)
 		end
 	end
 
+	for i, img in ipairs({ Theme.Image.Icon.Gold, Theme.Image.Icon.Gems }) do
+		local icon = Instance.new("ImageLabel", currencyFrame)
+		icon.BackgroundTransparency = 1
+		icon.Image = img
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Size = UDim2.fromOffset(36, 36)
+		icon.Position = UDim2.new(0, 22, (i - 0.5) / 2, 0)
+		icon.ZIndex = 6
+	end
+
 	goldLbl = Instance.new("TextLabel", currencyFrame)
-	goldLbl.Size = UDim2.new(1, -10, 0.5, 0)
-	goldLbl.Position = UDim2.new(0, 8, 0, 0)
+	goldLbl.Size = UDim2.new(1, -50, 0.5, -4)
+	goldLbl.Position = UDim2.new(0, 44, 0, 2)
 	goldLbl.BackgroundTransparency = 1
-	goldLbl.Text = "Gold 0"
+	goldLbl.Text = "0"
 	goldLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
 	goldLbl.TextXAlignment = Enum.TextXAlignment.Left
 	goldLbl.TextScaled = true
@@ -194,10 +204,10 @@ function HUD.init(screenGui, deps)
 	goldLbl.ZIndex = 6
 
 	gemsLbl = Instance.new("TextLabel", currencyFrame)
-	gemsLbl.Size = UDim2.new(1, -10, 0.5, 0)
-	gemsLbl.Position = UDim2.new(0, 8, 0.5, 0)
+	gemsLbl.Size = UDim2.new(1, -50, 0.5, -4)
+	gemsLbl.Position = UDim2.new(0, 44, 0.5, 2)
 	gemsLbl.BackgroundTransparency = 1
-	gemsLbl.Text = "Gems 0"
+	gemsLbl.Text = "0"
 	gemsLbl.TextColor3 = Color3.fromRGB(100, 200, 255)
 	gemsLbl.TextXAlignment = Enum.TextXAlignment.Left
 	gemsLbl.TextScaled = true
@@ -255,10 +265,10 @@ function HUD.update()
 		dustFrame.Visible = any
 	end
 	if goldLbl then
-		goldLbl.Text = "Gold " .. fmtCurrency(getGold())
+		goldLbl.Text = fmtCurrency(getGold())
 	end
 	if gemsLbl then
-		gemsLbl.Text = "Gems " .. tostring(getGems())
+		gemsLbl.Text = tostring(getGems())
 	end
 	if spinCountLbl then
 		local n = getSpins()

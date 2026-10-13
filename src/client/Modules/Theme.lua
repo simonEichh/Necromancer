@@ -263,6 +263,16 @@ Theme.Image = {
 		Disabled = "rbxassetid://84718582421395",
 		Neutral = "rbxassetid://127236828836350", -- grey master, tinted with ImageColor3
 	},
+	-- painted icons (sources in Images/UI, cropped to 512 px in design/icons, uploaded through the Studio MCP)
+	Icon = {
+		Ascend = "rbxassetid://76467986926265",
+		Friends = "rbxassetid://122891510658917",
+		Gems = "rbxassetid://94154571559100",
+		Gold = "rbxassetid://103334898656401",
+		Graves = "rbxassetid://132018737296754",
+		Inventory = "rbxassetid://132970482585009",
+		Quests = "rbxassetid://84837079908309",
+	},
 }
 local STONE_SLICE = Rect.new(80, 56, 432, 104)
 local STONE_MARGIN, STONE_SHAPE_H = 16, 128
@@ -277,7 +287,8 @@ local STONE_TINTS = {
 }
 
 -- opts: text, color ("green" default | "red" | "gold" | "blue" | "purple" | "stone"), size (UDim2 of the button SHAPE, offsets only,
--- default 150 x 44), position, anchor, zIndex, onClick, disabled. Returns { root, button, label }: place and size `root`;
+-- default 150 x 44), position, anchor, zIndex, onClick, disabled, icon (image id: a big icon overlapping the left end, the
+-- text moves right of it). Returns { root, button, label, icon }: place and size `root`;
 -- root:SetAttribute("Disabled", true/false) disables or enables it.
 function Theme.stoneButton(parent, opts)
 	opts = opts or {}
@@ -306,10 +317,24 @@ function Theme.stoneButton(parent, opts)
 	button.ZIndex = opts.zIndex or 1
 	button.Parent = root
 
+	local textLeft = opts.icon and h * 1.05 or h * 0.55
+	local icon
+	if opts.icon then
+		icon = Instance.new("ImageLabel")
+		icon.Name = "Icon"
+		icon.BackgroundTransparency = 1
+		icon.Image = opts.icon
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Size = UDim2.fromOffset(h * 1.3, h * 1.3)
+		icon.Position = UDim2.new(0, h * 0.5, 0.5, -2)
+		icon.ZIndex = (opts.zIndex or 1) + 2
+		icon.Parent = root
+	end
+
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.new(1, -h * 1.1, 1, 0) -- keeps the text between the two diamonds
-	label.Position = UDim2.new(0, h * 0.55, 0, 0)
+	label.Size = UDim2.new(1, -(textLeft + h * 0.55), 1, 0) -- keeps the text between the icon/left diamond and the right diamond
+	label.Position = UDim2.new(0, textLeft, 0, 0)
 	label.Font = Theme.Font.Strong
 	label.Text = opts.text or ""
 	label.TextScaled = false
@@ -344,7 +369,12 @@ function Theme.stoneButton(parent, opts)
 		label.TextColor3 = (state == "Disabled") and Color3.fromRGB(140, 156, 148) or textColor
 		label.TextStrokeColor3 = textStroke
 		label.TextStrokeTransparency = (state == "Disabled") and 0.35 or 0
-		label.Position = UDim2.new(0, h * 0.55, 0, (state == "Pressed") and math.max(1, h * 0.03) or 0)
+		local sink = (state == "Pressed") and math.max(1, h * 0.03) or 0
+		label.Position = UDim2.new(0, textLeft, 0, sink)
+		if icon then
+			icon.Position = UDim2.new(0, h * 0.5, 0.5, sink - 2)
+			icon.Size = UDim2.fromOffset(h * (state == "Hover" and 1.4 or 1.3), h * (state == "Hover" and 1.4 or 1.3))
+		end
 	end
 
 	root:SetAttribute("Disabled", opts.disabled == true)
@@ -361,7 +391,7 @@ function Theme.stoneButton(parent, opts)
 		end
 	end)
 	show("Default")
-	return { root = root, button = button, label = label }
+	return { root = root, button = button, label = label, icon = icon }
 end
 
 return Theme
