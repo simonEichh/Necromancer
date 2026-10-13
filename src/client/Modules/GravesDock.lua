@@ -1,7 +1,8 @@
 -- The Graves panel (the module keeps its old name "GravesDock" so Sync, ShopPanel and WheelPanel keep calling refresh()).
 --
 -- A small "Graves" stone button on the left side (under Inventory) shows how many graves you own in total, as a badge.
--- Clicking it (or pressing G) opens a stone panel with a card for EVERY grave type: picture, name, how many you own, its luck
+-- Clicking it (or pressing G) opens a stone panel with a card for EVERY grave type: the grave's 3D model turning slowly
+-- (Modules/GraveOpening.template; its picture while it has no model), name, how many you own, its luck
 -- and, for graves you cannot use yet, the ascension that unlocks them. Select a card, then "Open x1" or "Open xN"
 -- (N = min(10, owned)). The panel closes when an opening starts so the reveal has the stage. Nothing sits in the middle of
 -- the screen while you are not opening graves.
@@ -11,9 +12,11 @@
 --   GravesDock.toggle() / GravesDock.isVisible()
 -- "Open all" is planned as a paid feature: it would be a third button next to Open xN.
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local Theme = require(script.Parent.Theme)
 local State = require(script.Parent.State)
+local GraveOpening = require(script.Parent.GraveOpening)
 
 local C = Theme.Color
 local Z = 35 -- base ZIndex of the panel (the UI uses global z-ordering)
@@ -104,6 +107,39 @@ local function openSelected(count)
 	openGraveFn(selected, count)
 end
 
+-- ── 3D grave on a card (graves with a model in ReplicatedStorage.GraveModels) ──
+local turning = {} -- { model, offset } of every card's 3D grave, turned while the panel is open
+local TURN_SPEED = 0.6 -- rad/s
+
+local function makeGraveView(parent, key)
+	local template = GraveOpening.template(key)
+	if not template then
+		return nil
+	end
+	local vp = Instance.new("ViewportFrame")
+	vp.BackgroundTransparency = 1
+	vp.Ambient = Color3.fromRGB(185, 185, 200)
+	vp.LightColor = Color3.fromRGB(255, 244, 230)
+	vp.LightDirection = Vector3.new(0.5, -0.8, 0.4)
+	vp.Parent = parent
+	local model = template:Clone()
+	model:PivotTo(CFrame.new())
+	model.Parent = vp
+	-- turn round the middle of the bounding box; the camera looks at it from the front, a little from above
+	local boxCf, boxSize = model:GetBoundingBox()
+	local offset = boxCf.Position
+	local cam = Instance.new("Camera")
+	cam.FieldOfView = 30
+	local dist = (boxSize.Magnitude / 2) / math.tan(math.rad(cam.FieldOfView / 2)) * 0.62
+	cam.CFrame = CFrame.lookAt(Vector3.new(0, 0.45, -1).Unit * dist, Vector3.zero)
+	cam.Parent = vp
+	vp.CurrentCamera = cam
+	local entry = { model = model, offset = offset, angle = #turning * 0.7 }
+	model:PivotTo(CFrame.Angles(0, entry.angle, 0) * CFrame.new(-offset))
+	table.insert(turning, entry)
+	return vp
+end
+
 -- ── Build ────────────────────────────────────────────────────
 local function build(screenGui)
 	themed = Theme.panel(screenGui, { title = "Graves", size = UDim2.fromOffset(700, 470), zIndex = Z })
@@ -148,14 +184,18 @@ local function build(screenGui)
 		local stroke = Theme.stroke(frame, C.Border, 1)
 		frame.Parent = grid
 
-		local image = Instance.new("ImageLabel")
-		image.BackgroundTransparency = 1
-		image.Image = gd.image or ""
-		image.ScaleType = Enum.ScaleType.Fit
-		image.Size = UDim2.new(1, -16, 0, 72)
-		image.Position = UDim2.fromOffset(8, 8)
+		-- the grave's real 3D model, slowly turning (its picture when it has no model yet)
+		local image = makeGraveView(frame, gd.key)
+		if not image then
+			image = Instance.new("ImageLabel")
+			image.BackgroundTransparency = 1
+			image.Image = gd.image or ""
+			image.ScaleType = Enum.ScaleType.Fit
+			image.Parent = frame
+		end
+		image.Size = UDim2.new(1, -8, 0, 78)
+		image.Position = UDim2.fromOffset(4, 4)
 		image.ZIndex = Z + 4
-		image.Parent = frame
 
 		local nameLbl = Theme.label(frame, { text = gd.name, size = "Small", font = "Strong", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -8, 0, 32) })
 		nameLbl.Position = UDim2.fromOffset(4, 84)
@@ -187,6 +227,17 @@ local function build(screenGui)
 
 		cards[gd.key] = { frame = frame, stroke = stroke, image = image, name = nameLbl, count = countLbl, lock = lockLbl }
 	end
+
+	-- the 3D graves turn only while the panel is open
+	RunService.RenderStepped:Connect(function(dt)
+		if not panel.Visible then
+			return
+		end
+		for _, e in ipairs(turning) do
+			e.angle += TURN_SPEED * dt
+			e.model:PivotTo(CFrame.Angles(0, e.angle, 0) * CFrame.new(-e.offset))
+		end
+	end)
 
 	-- the bar under the grid: what is selected, and the open buttons
 	local bar = Instance.new("Frame")

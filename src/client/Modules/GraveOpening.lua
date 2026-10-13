@@ -80,6 +80,7 @@ function GraveOpening.attach(model, opts)
 
 	-- one flying piece: velocity, spin, fade
 	local flying = {}
+	local rigid = {} -- whole lids flying as one piece
 	local LIFE = opts.world and 1.5 or 1
 	local function launch(p, vel, spin, fadeTime)
 		p.Anchored = true
@@ -111,8 +112,23 @@ function GraveOpening.attach(model, opts)
 		t = t or 0
 		local style = model:GetAttribute("OpenStyle") or "Mound"
 		local origin = corePos()
+		-- OpenStyle "Lid": the whole lid is blasted off in one piece, tumbling up and away (a rigid group)
+		if lid and style == "Lid" then
+			local lidCf = lid:GetBoundingBox()
+			local side = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5)
+			side = side.Magnitude > 0.01 and side.Unit or Vector3.xAxis
+			local axis = Vector3.yAxis:Cross(side).Unit
+			local group = { center = lidCf, parts = {}, t0 = os.clock(),
+				vel = (side * (5 + 3 * t) + Vector3.new(0, 20 + 8 * t, 0)) * math.sqrt(S), axis = axis, spinRate = 4 + 3 * t }
+			for _, p in ipairs(lid:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.Anchored = true
+					table.insert(group.parts, { part = p, offset = lidCf:ToObjectSpace(p.CFrame), trans = p.Transparency })
+				end
+			end
+			table.insert(rigid, group)
+		elseif lid then
 		-- the lid flies apart: small pieces are thrown out of the middle, the big earth mass vanishes in the flash
-		if lid then
 			for _, p in ipairs(lid:GetDescendants()) do
 				if p:IsA("BasePart") then
 					local big = math.max(p.Size.X, p.Size.Y, p.Size.Z) > 2.5 * S
@@ -130,7 +146,7 @@ function GraveOpening.attach(model, opts)
 			end
 		end
 		-- clods of earth thrown up out of the hole (more for rarer pulls)
-		debris(origin, Color3.fromRGB(96, 66, 46), math.floor(10 + 14 * t), (10 + 6 * t) * math.sqrt(S), 0.25, 0.6)
+		debris(origin, (style == "Mound") and Color3.fromRGB(96, 66, 46) or Color3.fromRGB(110, 112, 124), math.floor(10 + 14 * t), (10 + 6 * t) * math.sqrt(S), 0.25, 0.6)
 		-- the pit and the cracks light up in the pull's colour
 		if pit then
 			for _, p in ipairs(pit:GetDescendants()) do
@@ -247,6 +263,25 @@ function GraveOpening.attach(model, opts)
 				if age > LIFE then
 					f.part:Destroy()
 					table.remove(flying, i)
+				end
+			end
+			for i = #rigid, 1, -1 do
+				local r = rigid[i]
+				local age = now - r.t0
+				local pos = r.center.Position + r.vel * age + GRAVITY * (0.5 * age * age)
+				local cf = CFrame.new(pos) * CFrame.fromAxisAngle(r.axis, r.spinRate * age) * (r.center - r.center.Position)
+				local fade = math.clamp((age - (LIFE - 0.5)) / 0.5, 0, 1)
+				for _, e in ipairs(r.parts) do
+					if e.part.Parent then
+						e.part.CFrame = cf * e.offset
+						e.part.Transparency = e.trans + (1 - e.trans) * fade
+					end
+				end
+				if age > LIFE then
+					for _, e in ipairs(r.parts) do
+						e.part:Destroy()
+					end
+					table.remove(rigid, i)
 				end
 			end
 			-- the column shoots up, widens, then thins out
