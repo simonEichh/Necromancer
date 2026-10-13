@@ -140,14 +140,28 @@ local previewRarity = nil -- nil = any
 local previewBtn = makeButton(panel, "Reveal x1", Color3.fromRGB(200, 255, 210))
 previewBtn.Size = UDim2.new(0.3, -8, 0, 28)
 previewBtn.Position = UDim2.fromOffset(8, 66)
+-- like a pull opened by hand: the grave cinematic in the world, then the overlay at the result
+local GraveCinematic = require(script.Parent.GraveCinematic)
+local function previewOpening(count)
+	local results = randomResults(count, previewRarity)
+	panel.Visible = false
+	local started = GraveCinematic.play(results, { graveType = "Mossy", onDone = function()
+		panel.Visible = true
+		GachaReveal.play(results, { graveType = "Mossy", skipShow = true })
+	end })
+	if not started then
+		panel.Visible = true
+		GachaReveal.play(results, { graveType = "Mossy" })
+	end
+end
 previewBtn.MouseButton1Click:Connect(function()
-	GachaReveal.play(randomResults(1, previewRarity), { graveType = "Mossy" })
+	previewOpening(1)
 end)
 local previewBtn10 = makeButton(panel, "Reveal x10", Color3.fromRGB(200, 255, 210))
 previewBtn10.Size = UDim2.new(0.3, -8, 0, 28)
 previewBtn10.Position = UDim2.new(0.3, 4, 0, 66)
 previewBtn10.MouseButton1Click:Connect(function()
-	GachaReveal.play(randomResults(10, previewRarity), { graveType = "Mossy" })
+	previewOpening(10)
 end)
 local rarityBtn = makeButton(panel, "Rarity: any", Color3.fromRGB(255, 230, 160))
 rarityBtn.Size = UDim2.new(0.4, -8, 0, 28)
@@ -176,14 +190,14 @@ starBtn.Size = UDim2.new(0.3, -8, 0, 28)
 starBtn.Position = UDim2.fromOffset(8, 100)
 starBtn.MouseButton1Click:Connect(function()
 	panel.Visible = false
-	StarSummon.play(randomResults(1, previewRarity), { onDone = function() panel.Visible = true end })
+	StarSummon.play(randomResults(1, previewRarity), { graveType = "Mossy", onDone = function() panel.Visible = true end })
 end)
 local starBtn10 = makeButton(panel, "Star x10", Color3.fromRGB(255, 240, 170))
 starBtn10.Size = UDim2.new(0.3, -8, 0, 28)
 starBtn10.Position = UDim2.new(0.3, 4, 0, 100)
 starBtn10.MouseButton1Click:Connect(function()
 	panel.Visible = false
-	StarSummon.play(randomResults(10, previewRarity), { onDone = function() panel.Visible = true end })
+	StarSummon.play(randomResults(10, previewRarity), { graveType = "Mossy", onDone = function() panel.Visible = true end })
 end)
 
 local list = Instance.new("ScrollingFrame")

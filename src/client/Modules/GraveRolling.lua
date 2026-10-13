@@ -15,6 +15,7 @@ local Sync = require(script.Parent.Sync)
 
 local GachaReveal = require(script.Parent.GachaReveal)
 local StarSummon = require(script.Parent.StarSummon)
+local GraveCinematic = require(script.Parent.GraveCinematic)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
@@ -74,11 +75,24 @@ local function playRollAnimation(results)
 	if bestRank >= STAR_MIN_RANK or signatureBest then
 		-- a rare pull: the cinematic first (the data update stays held back), then the result in the overlay
 		local ok = pcall(StarSummon.play, results, {
+			graveType = graveType, -- the star crashes into this grave's real model (when it has one), which then bursts
 			onDone = function()
 				showOverlay(true)
 			end,
 		})
 		if not ok then
+			showOverlay(false)
+		end
+	elseif not autoRollActive then
+		-- opened by hand: the grave cinematic in the world (the best unit rises out of the real grave), then the result;
+		-- graves without a 3D model, or when it cannot play, keep the overlay's short show. Auto Roll always uses the overlay.
+		local okCall, started = pcall(GraveCinematic.play, results, {
+			graveType = graveType,
+			onDone = function()
+				showOverlay(true)
+			end,
+		})
+		if not (okCall and started) then
 			showOverlay(false)
 		end
 	else

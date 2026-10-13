@@ -3,6 +3,8 @@
 --   StarSummon.play(results, opts)
 --     results: list of { unitType, rarity, pity, oneIn } from the server's RollResult (one entry per grave opened)
 --     opts:    onDone  function(), called when the cinematic ends (also when it is skipped)
+--              graveType  the grave that was opened: the star crashes into its real 3D model (GraveModels), which bursts
+--                         open (GraveOpening); graves without a model get a simple tombstone that is blown apart
 --              speed   playback speed (default 1; 0.25 = slow motion, for testing)
 --
 -- What you see: the camera looks up into the sky above a grave in front of you, one star per result lights up (tinted by
@@ -29,6 +31,7 @@ local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Theme = require(script.Parent.Theme)
 local SignatureName = require(script.Parent.SignatureName)
+local GraveOpening = require(script.Parent.GraveOpening)
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
@@ -262,6 +265,14 @@ function StarSummon.play(results, opts)
 		controls:Disable()
 	end)
 	mainGui.Enabled = false
+	-- every other ScreenGui of the game is switched off (there is more than one), restored at the end
+	local hiddenGuis = {}
+	for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+		if g:IsA("ScreenGui") and g.Enabled and g.Name ~= "Freecam" then
+			g.Enabled = false
+			table.insert(hiddenGuis, g)
+		end
+	end
 	camera.CameraType = Enum.CameraType.Scriptable
 
 	-- the player's own character is hidden (only on this screen) so it never blocks the camera; shown again at the end
@@ -358,6 +369,27 @@ function StarSummon.play(results, opts)
 	local graveGlow = newPart(grave, Vector3.new(0.12, 0.12, 0.12), CFrame.new(G + Vector3.new(0, 1.5, 0)), bestColor, Enum.Material.Neon)
 	graveGlow.Transparency = 1
 	local graveParts = { stoneBase, slab, top, crossV, crossH }
+	-- the opened grave's real model replaces the simple tombstone when it has one
+	local worldGrave
+	local graveTemplate = GraveOpening.template(opts.graveType)
+	if graveTemplate then
+		for _, p in ipairs(graveParts) do
+			p:Destroy()
+		end
+		graveParts = {}
+		local GRAVE_SCALE = 1.5
+		local gm = graveTemplate:Clone()
+		gm:ScaleTo(GRAVE_SCALE)
+		local facing = CFrame.lookAt(G, G - dir) -- its front looks back towards the cameras
+		gm:PivotTo(facing)
+		local core = gm:FindFirstChild("Core")
+		if core then
+			local off = G - core.Position
+			gm:PivotTo(facing + Vector3.new(off.X, 0, off.Z))
+		end
+		gm.Parent = grave
+		worldGrave = GraveOpening.attach(gm, { scale = GRAVE_SCALE, world = true })
+	end
 	local graveRest = {}
 	for _, p in ipairs(graveParts) do
 		graveRest[p] = p.CFrame
@@ -448,11 +480,19 @@ function StarSummon.play(results, opts)
 		if unit then
 			CollectionService:RemoveTag(unit, PROP_TAG)
 		end
+		if worldGrave then
+			worldGrave.stop()
+		end
 		fxFolder:Destroy()
 		ui:Destroy()
 		camera.CameraType = saved.cameraType == Enum.CameraType.Scriptable and Enum.CameraType.Custom or saved.cameraType
 		camera.FieldOfView = saved.fov
 		mainGui.Enabled = saved.guiEnabled
+		for _, g in ipairs(hiddenGuis) do
+			if g.Parent then
+				g.Enabled = true
+			end
+		end
 		hideCharacter(false)
 		if controls then
 			pcall(function()
@@ -554,6 +594,9 @@ function StarSummon.play(results, opts)
 		fallLight.Enabled = false
 		fire.Enabled, smoke.Enabled, sparks.Enabled = false, false, false
 		-- the grave is blown apart: its stones jump and vanish, the unit climbs out of the crater
+		if worldGrave then
+			worldGrave.burst(bestColor, t)
+		end
 		for _, p in ipairs(graveParts) do
 			TweenService:Create(p, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 				Transparency = 1,

@@ -108,10 +108,37 @@ end
 local base = disc(body, "Base", 3.6, 0.2, at(0, 0.1, 0), MUD_DARK, Enum.Material.Ground)
 model.PrimaryPart = base
 local MZ = -0.4 -- centre of the mound (the headstone stands at its +Z end)
-part(pit, "PitHole", Vector3.new(2.6, 0.04, 4.6), at(0, 0.22, MZ), Color3.fromRGB(6, 8, 8), Enum.Material.SmoothPlastic)
-for _, s in ipairs({ -1, 1 }) do
-	part(pit, "Glow", Vector3.new(0.12, 0.05, 4.8), at(s * 1.35, 0.23, MZ), GLOW, Enum.Material.Neon)
-	part(pit, "Glow", Vector3.new(2.8, 0.05, 0.12), at(0, 0.23, MZ + s * 2.35), GLOW, Enum.Material.Neon)
+-- the torn-open pit (hidden under the mound until the burst): a ragged black hole made of overlapping discs, broken
+-- earth chunks round its rim and jagged soul-light cracks running out into the ground
+local VOID = Color3.fromRGB(6, 6, 8)
+for _, h in ipairs({ { 0, 0, 1.25 }, { 0.25, -1.1, 1.05 }, { -0.2, 1.0, 1.1 }, { 0.1, -1.9, 0.7 }, { -0.15, 1.8, 0.75 }, { 0.6, 0.3, 0.7 }, { -0.6, -0.5, 0.75 } }) do
+	disc(pit, "PitHole", h[3], 0.04, at(h[1], 0.22, MZ + h[2]), VOID, Enum.Material.SmoothPlastic)
+end
+-- broken earth round the rim, tilted outwards as if torn up from below
+for k = 0, 15 do
+	local a = k / 16 * math.pi * 2 + rng:NextNumber(-0.12, 0.12)
+	local rx, rz = 1.45 + rng:NextNumber(-0.1, 0.25), 2.45 + rng:NextNumber(-0.15, 0.3)
+	local x, z = math.cos(a) * rx, MZ + math.sin(a) * rz
+	local s = rng:NextNumber(0.35, 0.7)
+	local outward = CFrame.lookAt(Vector3.new(x, 0, z), Vector3.new(x * 2, 0, MZ + (z - MZ) * 2))
+	part(pit, "RimChunk", Vector3.new(s * 1.3, s * 0.6, s),
+		CFrame.new(x, 0.2 + s * 0.2, z) * outward.Rotation * CFrame.Angles(math.rad(rng:NextNumber(15, 40)), rng:NextNumber(-0.4, 0.4), 0),
+		(k % 3 == 0) and MUD_LIGHT or MUD, Enum.Material.Ground)
+end
+-- jagged cracks: zigzags leaving the rim at random angles, thinner towards their ends
+for k = 0, 6 do
+	local a = k / 7 * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
+	local px, pz = math.cos(a) * 1.4, MZ + math.sin(a) * 2.3
+	local w = 0.11
+	for _ = 1, 3 do
+		local turn = a + rng:NextNumber(-0.7, 0.7)
+		local len = rng:NextNumber(0.35, 0.7)
+		local nx, nz = px + math.cos(turn) * len, pz + math.sin(turn) * len
+		local mid = Vector3.new((px + nx) / 2, 0.215, (pz + nz) / 2)
+		part(pit, "Glow", Vector3.new(w, 0.03, len + 0.05), CFrame.lookAt(mid, Vector3.new(nx, 0.215, nz)), GLOW, Enum.Material.Neon)
+		px, pz = nx, nz
+		w *= 0.7
+	end
 end
 local core = part(model, "Core", Vector3.new(0.4, 0.4, 0.4), at(0, 0.6, MZ), GLOW, Enum.Material.Neon)
 core.Transparency = 1
