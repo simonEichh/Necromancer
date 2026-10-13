@@ -27,6 +27,8 @@ local GameData = require(script.Parent.GameData)
 local mainGui = require(script.Parent.Gui)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
+local Theme = require(script.Parent.Theme)
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
@@ -186,14 +188,16 @@ function StarSummon.play(results, opts)
 	local T_FALL = 1.5 + 0.9 * t -- the crash down
 	local T_SHAKE = 1.1 -- the impact rocks the camera
 	local T_RISE = 2.4 + 1.0 * t -- the unit climbs out
-	local T_HOLD = 2.4
 	local START_BUILD = T_INTRO
 	local START_FLARE = START_BUILD + T_BUILD
 	local START_FALL = START_FLARE + T_FLARE
 	local START_IMPACT = START_FALL + T_FALL
 	local START_RISE = START_IMPACT + 0.7
 	local START_HERO = START_IMPACT + T_SHAKE + 1.2 -- from here the camera only orbits the grave slowly
-	local END_TIME = START_RISE + T_RISE + T_HOLD
+	-- once the unit is up the cinematic waits for the player (Continue button, or Space / Enter / E) so they can admire it;
+	-- the camera keeps orbiting slowly meanwhile. endTime is set when they continue (the black bars slide out).
+	local HOLD_AT = START_RISE + T_RISE
+	local endTime = math.huge
 
 	-- ── The place: a spot on the ground near the player with a clear view ──
 	-- The grave stands about 30 studs away from the player; the cinematic cameras sit behind it and above it, so the spot
@@ -258,6 +262,18 @@ function StarSummon.play(results, opts)
 	end)
 	mainGui.Enabled = false
 	camera.CameraType = Enum.CameraType.Scriptable
+
+	-- the player's own character is hidden (only on this screen) so it never blocks the camera; shown again at the end
+	local function hideCharacter(hidden)
+		local char = player.Character
+		if not char then return end
+		for _, d in ipairs(char:GetDescendants()) do
+			if d:IsA("BasePart") or d:IsA("Decal") then
+				d.LocalTransparencyModifier = hidden and 1 or 0
+			end
+		end
+	end
+	hideCharacter(true)
 
 	-- its own little UI: black bars, the white flash, the unit's name and the skip button
 	local ui = Instance.new("ScreenGui")
@@ -430,6 +446,7 @@ function StarSummon.play(results, opts)
 		camera.CameraType = saved.cameraType == Enum.CameraType.Scriptable and Enum.CameraType.Custom or saved.cameraType
 		camera.FieldOfView = saved.fov
 		mainGui.Enabled = saved.guiEnabled
+		hideCharacter(false)
 		if controls then
 			pcall(function()
 				controls:Enable()
@@ -442,10 +459,47 @@ function StarSummon.play(results, opts)
 	end
 	skipBtn.Activated:Connect(finish)
 
+	-- the Continue button, shown once the unit is up
+	local continueBtn = Theme.stoneButton(ui, {
+		text = "Continue", size = UDim2.fromOffset(180, 48),
+		position = UDim2.new(0.5, 0, 1, -8), anchor = Vector2.new(0.5, 1), zIndex = 8,
+	})
+	continueBtn.root.Visible = false
+	local function continue()
+		if endTime == math.huge and continueBtn.root.Visible then
+			endTime = T + 0.6
+			continueBtn.root.Visible = false
+		end
+	end
+	continueBtn.button.Activated:Connect(continue)
+	local keyConn = UserInputService.InputBegan:Connect(function(input)
+		local key = input.KeyCode
+		if key == Enum.KeyCode.Space or key == Enum.KeyCode.Return or key == Enum.KeyCode.E or key == Enum.KeyCode.ButtonA then
+			continue()
+		end
+	end)
+	ui.Destroying:Connect(function() keyConn:Disconnect() end)
+
 	local function startFlash(seconds)
 		flashStart = { at = os.clock(), length = seconds }
 		flash.BackgroundTransparency = 0
 	end
+
+	-- how tall the pulled unit stands (floating units like Hush included), so the hero shot can frame all of it:
+	-- the camera looks at the middle of the body and backs off until the whole height fits the field of view
+	local unitTall = 5
+	do
+		local folder = ReplicatedStorage:FindFirstChild("UnitModels")
+		local template = folder and folder:FindFirstChild(best.unitType)
+		local def = Units.Stats[best.unitType]
+		if template and template:GetAttribute("Height") then
+			unitTall = template:GetAttribute("Height") * (def and (def.size.X / 2 * 0.9) or 1)
+		end
+	end
+	local HERO_FOV = 50
+	local heroLookY = math.max(3.5, unitTall * 0.55)
+	local heroDist = math.max(15 + 3 * t, (unitTall * 0.5 + 2) / math.tan(math.rad(HERO_FOV / 2)) * 1.15)
+	local heroCamY = math.max(4, unitTall * 0.4)
 
 	-- the unit rises out of the grave (its own rise animation: UnitAnimator turns RiseStart/RiseTime into a sinking offset
 	-- and SpellEffects kicks up dust)
@@ -584,13 +638,18 @@ function StarSummon.play(results, opts)
 		end
 		local dt = realDt * speed
 		T += dt
-		if T >= END_TIME then
+		hideCharacter(true) -- (the default camera scripts may reset it)
+		if T >= endTime then
 			finish()
 			return
 		end
+		if T >= HOLD_AT and endTime == math.huge and not continueBtn.root.Visible then
+			continueBtn.root.Visible = true
+			skipBtn.Visible = false
+		end
 
 		-- black bars slide in at the start and out at the end
-		local barSize = 0.11 * smooth(T / 0.6) * smooth((END_TIME - T) / 0.6)
+		local barSize = 0.11 * smooth(T / 0.6) * smooth((endTime - T) / 0.6)
 		barTop.Size = UDim2.fromScale(1, barSize)
 		barBottom.Size = UDim2.fromScale(1, barSize)
 
@@ -677,17 +736,19 @@ function StarSummon.play(results, opts)
 			else
 				-- after the crash: the camera sweeps from the chase position to a low hero shot of the grave
 				local k = smooth((T - START_IMPACT) / 1.9)
-				local hero = G - dir * (15 + 3 * t) + right * 6 + up * 4
+				local hero = G - dir * heroDist + right * 6 + up * heroCamY
 				camPos = lastChasePos:Lerp(hero, k)
-				camLook = lastChaseLook:Lerp(G + up * 3.5, k)
+				camLook = lastChaseLook:Lerp(G + up * math.min(heroLookY, 3.5), k)
 				fov = (92 - 38 * k)
 			end
 		else
 			-- the hero shot: slowly orbiting a little while the unit climbs out
 			local orbit = (T - START_HERO) * 0.12
-			camPos = G + (dir * -(15 + 3 * t)) * math.cos(orbit) + right * (6 * math.cos(orbit) + 14 * math.sin(orbit)) + up * 4
-			camLook = G + up * (3.4 + 0.6 * smooth((T - START_RISE) / T_RISE))
-			fov = 54 - 6 * smooth((T - START_RISE) / T_RISE)
+			local riseK = smooth((T - START_RISE) / T_RISE)
+			camPos = G + (dir * -heroDist) * math.cos(orbit) + right * (6 * math.cos(orbit) + 14 * math.sin(orbit)) + up * heroCamY
+			-- the look point climbs with the unit, from the crater up to the middle of its body
+			camLook = G + up * (3.4 + (heroLookY - 3.4) * riseK)
+			fov = HERO_FOV + 4 - 4 * riseK
 		end
 
 		-- camera shake
