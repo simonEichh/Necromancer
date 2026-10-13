@@ -22,10 +22,11 @@ local spawned = {} -- [UserId] = how many dev units this player spawned (to spre
 -- ============================================================
 -- atGraves = true: the unit starts behind the lane like a real one and marches to its formation slot;
 -- otherwise it starts right next to its row in front of the wall, so it is attacking within a second or two.
-Remotes.DevSpawnUnit.OnServerEvent:Connect(function(player, unitType, atGraves)
+Remotes.DevSpawnUnit.OnServerEvent:Connect(function(player, unitType, atGraves, level)
 	if type(unitType) ~= "string" or not UNITS[unitType] then
 		return
 	end
+	level = (type(level) == "number" and level == level) and math.clamp(math.floor(level), 0, 10) or 0
 	local plotState = PlotRegistry.getPlot(player)
 	if not plotState then
 		return
@@ -35,11 +36,11 @@ Remotes.DevSpawnUnit.OnServerEvent:Connect(function(player, unitType, atGraves)
 	spawned[player.UserId] = n
 
 	if atGraves == true then
-		Army.spawnUnit(unitType, nil, plotState)
+		Army.spawnUnit(unitType, nil, plotState, level)
 	else
 		local lateral = ((n - 1) % 7 - 3) * 4.5
 		local forward = Army.standForward(plotState, def)
-		Army.spawnUnit(unitType, PlotFrame.toWorld(plotState, lateral, forward), plotState)
+		Army.spawnUnit(unitType, PlotFrame.toWorld(plotState, lateral, forward), plotState, level)
 	end
 
 	local entry = plotState.activeUnits[#plotState.activeUnits]

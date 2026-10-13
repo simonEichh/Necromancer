@@ -87,16 +87,27 @@ title.Parent = panel
 -- formation slot, so you can watch the army form up)
 local atGraves = false
 local mode = makeButton(panel, "Spawn at: WALL (click to switch)", Color3.fromRGB(160, 220, 255))
-mode.Size = UDim2.new(0.62, -10, 0, 30)
+mode.Size = UDim2.new(0.46, -10, 0, 30)
 mode.Position = UDim2.fromOffset(8, 32)
 mode.MouseButton1Click:Connect(function()
 	atGraves = not atGraves
 	mode.Text = atGraves and "Spawn at: GRAVES (march in)" or "Spawn at: WALL (click to switch)"
 end)
 
+-- the level spawned units get (to preview the level auras: 3, 6, 9, 10)
+local DEV_LEVELS = { 0, 3, 6, 9, 10 }
+local devLevelIndex = 1
+local levelBtn = makeButton(panel, "Lv 0", Color3.fromRGB(150, 255, 190))
+levelBtn.Size = UDim2.new(0.18, -6, 0, 30)
+levelBtn.Position = UDim2.new(0.46, 2, 0, 32)
+levelBtn.MouseButton1Click:Connect(function()
+	devLevelIndex = devLevelIndex % #DEV_LEVELS + 1
+	levelBtn.Text = "Lv " .. DEV_LEVELS[devLevelIndex]
+end)
+
 local clear = makeButton(panel, "Clear", Color3.fromRGB(255, 130, 130))
-clear.Size = UDim2.new(0.38, -10, 0, 30)
-clear.Position = UDim2.new(0.62, 4, 0, 32)
+clear.Size = UDim2.new(0.36, -10, 0, 30)
+clear.Position = UDim2.new(0.64, 4, 0, 32)
 clear.MouseButton1Click:Connect(function()
 	clearEvent:FireServer()
 end)
@@ -205,7 +216,7 @@ for i, name in ipairs(names) do
 	local button = makeButton(list, name, Rarities.Color[rarity])
 	button.LayoutOrder = i
 	button.MouseButton1Click:Connect(function()
-		spawnEvent:FireServer(name, atGraves)
+		spawnEvent:FireServer(name, atGraves, DEV_LEVELS[devLevelIndex])
 	end)
 end
 
