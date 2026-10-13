@@ -5,7 +5,7 @@
 --   DismantleUnit(slot)        inventory units only
 --
 -- Rules (numbers in Economy, tuned with tools/sim/economy_sim.py): a unit is upgraded with the material of ITS rarity; going
--- from level L to L + 1 costs Economy.upgradeCost(L) materials and works with Economy.upgradeChance(L, fails). A failure
+-- from level L to L + 1 costs Economy.unitUpgradeCost(L) materials and works with Economy.upgradeChance(L, fails). A failure
 -- never lowers the level: it costs part of the materials and raises the chance of the next try (pity, saved with the unit).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
@@ -59,7 +59,7 @@ Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
 		return
 	end
 	local rarity = Units.Rarity[unitType]
-	local cost = Economy.upgradeCost(level)
+	local cost = Economy.unitUpgradeCost(level)
 	if (profile.materials[rarity] or 0) < cost then
 		Remotes.Notice:FireClient(player, "Not enough " .. Economy.MATERIAL_NAMES[rarity] .. " (" .. cost .. " needed).")
 		return

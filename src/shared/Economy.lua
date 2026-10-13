@@ -118,7 +118,7 @@ function Economy.levelMultiplier(level)
 end
 
 -- Materials needed to take a unit from `level` to `level + 1`
-function Economy.upgradeCost(level)
+function Economy.unitUpgradeCost(level)
 	return math.ceil(UPGRADE_BASE_COST * UPGRADE_COST_GROWTH ^ level)
 end
 

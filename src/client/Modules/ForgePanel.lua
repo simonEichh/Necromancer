@@ -237,7 +237,7 @@ local function showDetails(entry)
 		nextLbl.Text, costLbl.Text, chanceLbl.Text = "", "", ""
 		upgradeBtn.root:SetAttribute("Disabled", true)
 	else
-		local cost = Economy.upgradeCost(entry.level)
+		local cost = Economy.unitUpgradeCost(entry.level)
 		local have = (State.materials and State.materials[rarity]) or 0
 		local chance = Economy.upgradeChance(entry.level, entry.fails)
 		levelLbl.Text = "Level " .. entry.level .. " / " .. Economy.MAX_UNIT_LEVEL .. "   Damage x" .. string.format("%.1f", Economy.levelMultiplier(entry.level))
