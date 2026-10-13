@@ -262,7 +262,8 @@ local function buildStall(shopName, label, accent, deg)
 	anchor.CFrame = cf * CFrame.new(-2.2, 3.0, 0)
 end
 
-buildStall("GraveShopkeeper", "BUY", Color3.fromRGB(90, 220, 140), 22.5)
+-- the grave shop (plaza angle 22.5) and the Forge (202.5) have their own detailed stalls: after re-running this script,
+-- run build_grave_stall.lua and build_forge_stall.lua again
 buildStall("SellShopkeeper", "SELL", Color3.fromRGB(255, 205, 80), 142.5)
 buildStall("UpgradeShopkeeper", "UPGRADE", Color3.fromRGB(170, 120, 255), 262.5)
 
