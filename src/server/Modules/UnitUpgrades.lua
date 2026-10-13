@@ -15,6 +15,7 @@ local Army = require(script.Parent.Army)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local ShopNpcs = require(script.Parent.ShopNpcs)
 
 local lastRequest = {} -- [UserId] = os.clock() of the last upgrade/dismantle request (a little rate limit)
 local MIN_INTERVAL = 0.12
@@ -35,6 +36,10 @@ end)
 Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
 	local profile = PlayerData.get(player)
 	if not profile or throttled(player) or type(index) ~= "number" or index % 1 ~= 0 then
+		return
+	end
+	if not ShopNpcs.nearForge(player) then
+		Remotes.Notice:FireClient(player, "Visit the Forge to upgrade units.")
 		return
 	end
 
@@ -90,6 +95,10 @@ end)
 Remotes.DismantleUnit.OnServerEvent:Connect(function(player, slot)
 	local profile = PlayerData.get(player)
 	if not profile or throttled(player) then
+		return
+	end
+	if not ShopNpcs.nearForge(player) then
+		Remotes.Notice:FireClient(player, "Visit the Forge to dismantle units.")
 		return
 	end
 	local unit = PlayerData.getUnit(player, slot)

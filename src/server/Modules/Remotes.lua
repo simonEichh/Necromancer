@@ -23,6 +23,7 @@ local EVENTS = {
 	"WheelSpin",
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync
+	"OpenForge", -- the Forge stall's prompt was used: open the Forge panel
 	"BuyGraveResult",
 	"WallHit", -- (position, forward, damage, isGhost): a unit hit the wall; clients draw the hit flash (HitEffects)
 	"DataSync", -- full snapshot of the player's authoritative data

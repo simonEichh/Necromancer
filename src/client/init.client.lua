@@ -178,6 +178,7 @@ require(Modules.HitEffects)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)
+require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
 require(Modules.UpgradePanel)
 WheelPanel = require(Modules.WheelPanel)
 require(Modules.DevPanel) -- Studio only, drawn on top

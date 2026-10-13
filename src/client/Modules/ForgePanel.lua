@@ -7,7 +7,7 @@
 -- server UnitUpgrades): this panel only sends UpgradeUnit(kind, index) / DismantleUnit(slot) and shows what comes back.
 -- Builds its UI when required (no init call).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local Theme = require(script.Parent.Theme)
@@ -353,15 +353,29 @@ end
 -- ============================================================
 -- Wiring
 -- ============================================================
--- the side button (under Graves) and the F key
-Theme.stoneButton(screenGui, {
-	text = "Forge", color = "blue", size = UDim2.fromOffset(112, 44),
-	position = UDim2.new(0, 10, 0.5, 26), zIndex = 5,
-	onClick = function() ForgePanel.toggle() end,
-})
-UserInputService.InputBegan:Connect(function(input, processed)
-	if not processed and input.KeyCode == Enum.KeyCode.F then
-		ForgePanel.toggle()
+-- The Forge only opens at the Forge stall (its prompt fires OpenForge) and closes when the player walks away.
+-- (A "Remote Forge" premium purchase could later open it from anywhere.)
+local FORGE_RANGE = 22 -- a bit less than the server's range, so the panel closes before requests would be refused
+local openForgeRemote = ReplicatedStorage:WaitForChild("OpenForge", 10)
+if openForgeRemote then
+	openForgeRemote.OnClientEvent:Connect(function()
+		if not panel.Visible then
+			ForgePanel.toggle()
+		end
+	end)
+end
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		if panel.Visible then
+			local shops = workspace:FindFirstChild("Shops")
+			local anchor = shops and shops:FindFirstChild("ForgeKeeper")
+			local character = Players.LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if anchor and root and (root.Position - anchor.Position).Magnitude > FORGE_RANGE then
+				panel.Visible = false
+			end
+		end
 	end
 end)
 
