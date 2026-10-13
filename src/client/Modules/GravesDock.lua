@@ -110,6 +110,7 @@ local function build(screenGui)
 	panel = themed.frame
 	panel.Name = "GravesPanel"
 	panel.Visible = false
+	require(script.Parent.Windows).register(panel) -- only one window open at a time
 	local body = themed.body
 
 	Theme.stoneButton(panel, {

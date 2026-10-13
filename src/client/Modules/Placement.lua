@@ -4,11 +4,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
 
--- ── Place Best button (top-center, just below HUD) ────────────
+-- ── Place Best button (bottom, right of the hotbar: it acts on your units) ────────────
+-- the hotbar is 628 px wide, centred, its top 80 px above the bottom edge (Toolbar.lua)
 local Theme = require(script.Parent.Theme)
 local placeBest = Theme.stoneButton(screenGui, {
-	text = "Place Best", color = "gold", size = UDim2.fromOffset(180, 40),
-	position = UDim2.new(0.5, -90, 0, 78), zIndex = 10,
+	text = "Place Best", color = "gold", size = UDim2.fromOffset(170, 44),
+	position = UDim2.new(0.5, 314 + 12, 1, -68), zIndex = 10,
 })
 placeBest.root.Name = "PlaceBestBtn"
 local placeBestBtn = placeBest.button

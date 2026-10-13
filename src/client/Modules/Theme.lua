@@ -59,6 +59,15 @@ Theme.TextSize = { Small = 13, Body = 16, Heading = 22, Title = 30 }
 Theme.Radius = { Small = 4, Medium = 8, Large = 12 } -- squarer than a soft app look: carved stone, not bubbles
 Theme.Stroke = { Thin = 1, Frame = 2 }
 Theme.Tween = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+-- the painted panel frame (Theme.Image.PanelFrame, defined further down) is 9-sliced with these
+local PANEL_SLICE = Rect.new(130, 130, 894, 877)
+local PANEL_SLICE_SCALE = 0.34 -- the border is about 28 px on screen
+local PANEL_FRAME_MARGIN = 28 -- the border hangs outside the panel by this much, so the content area stays the same
+-- Panels without an explicit position are centred in the free space between the top travel tile
+-- and the hotbar, and shrink (UIScale) when they and their frame do not fit there, so they never cover those.
+local PANEL_TOP_RESERVE = 100 -- screen pixels kept free at the top (the travel tile)
+local PANEL_BOTTOM_RESERVE = 146 -- and at the bottom (hotbar)
+local PANEL_SIDE_RESERVE = 100 -- and at each side (menu tiles)
 
 -- ============================================================
 -- Small building blocks
@@ -190,25 +199,26 @@ function Theme.panel(parent, opts)
 	frame.Size = opts.size or UDim2.fromOffset(420, 360)
 	frame.AnchorPoint = opts.anchor or Vector2.new(0.5, 0.5)
 	frame.Position = opts.position or UDim2.fromScale(0.5, 0.5)
-	Theme.corner(frame, Theme.Radius.Medium)
-	Theme.stroke(frame, Theme.Color.Border, Theme.Stroke.Frame)
 	frame.Parent = parent
+	local border = Instance.new("ImageLabel") -- the painted stone frame round the panel
+	border.Name = "Border"
+	border.BackgroundTransparency = 1
+	border.Image = Theme.Image.PanelFrame
+	border.ScaleType = Enum.ScaleType.Slice
+	border.SliceCenter = PANEL_SLICE
+	border.SliceScale = PANEL_SLICE_SCALE
+	border.ImageTransparency = 0
+	border.Size = UDim2.new(1, PANEL_FRAME_MARGIN * 2, 1, PANEL_FRAME_MARGIN * 2)
+	border.Position = UDim2.fromOffset(-PANEL_FRAME_MARGIN, -PANEL_FRAME_MARGIN)
+	border.ZIndex = z - 1 -- behind the panel: the skull corners and the inner bevel must never cover content near the edge
+	border.Parent = frame
 
 	local header = Instance.new("Frame")
 	header.BackgroundColor3 = Theme.Color.Void
 	header.BorderSizePixel = 0
 	header.Size = UDim2.new(1, 0, 0, 40)
 	header.ZIndex = z + 1
-	Theme.corner(header, Theme.Radius.Medium)
 	header.Parent = frame
-	-- (square off the header's bottom corners)
-	local fill = Instance.new("Frame")
-	fill.BackgroundColor3 = Theme.Color.Void
-	fill.BorderSizePixel = 0
-	fill.Size = UDim2.new(1, 0, 0, 10)
-	fill.Position = UDim2.new(0, 0, 1, -10)
-	fill.ZIndex = z + 1
-	fill.Parent = header
 	local line = Instance.new("Frame") -- a thin soul-green rule under the title
 	line.BackgroundColor3 = Theme.Color.Verdigris
 	line.BorderSizePixel = 0
@@ -216,6 +226,26 @@ function Theme.panel(parent, opts)
 	line.Position = UDim2.new(0, 0, 1, 0)
 	line.ZIndex = z + 2
 	line.Parent = header
+
+	if not opts.position then
+		local uiScale = Instance.new("UIScale")
+		uiScale.Parent = frame
+		local function fit()
+			local screen = parent.AbsoluteSize
+			if screen.Y <= 0 then
+				return
+			end
+			local availH = screen.Y - PANEL_TOP_RESERVE - PANEL_BOTTOM_RESERVE
+			local availW = screen.X - PANEL_SIDE_RESERVE * 2
+			local needH = frame.Size.Y.Offset + PANEL_FRAME_MARGIN * 2
+			local needW = frame.Size.X.Offset + PANEL_FRAME_MARGIN * 2
+			uiScale.Scale = math.clamp(math.min(availH / needH, availW / needW), 0.4, 1)
+			frame.Position = UDim2.new(0.5, 0, 0, PANEL_TOP_RESERVE + math.max(availH, 0) / 2)
+		end
+		parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+		frame:GetPropertyChangedSignal("Size"):Connect(fit)
+		fit()
+	end
 
 	local title = Theme.label(header, { text = opts.title or "", size = "Heading", font = "Title", frameSize = UDim2.new(1, -24, 1, 0) })
 	title.Position = UDim2.fromOffset(14, 0)
@@ -272,7 +302,22 @@ Theme.Image = {
 		Graves = "rbxassetid://132018737296754",
 		Inventory = "rbxassetid://132970482585009",
 		Quests = "rbxassetid://84837079908309",
+		Wheel = "rbxassetid://89538272532162",
+		Luck = "rbxassetid://138014044391245",
+		GoldBoost = "rbxassetid://93908510121447",
+		Shops = "rbxassetid://80608883367865",
+		Wall = "rbxassetid://93200728049860",
 	},
+	-- one icon per upgrade dust (keys from Economy.DUSTS)
+	Dust = {
+		Stone = "rbxassetid://86679516329293",
+		Silver = "rbxassetid://106328732077100",
+		Gold = "rbxassetid://107926808773315",
+		Diamond = "rbxassetid://115639264229256",
+		Star = "rbxassetid://81552659651190",
+	},
+	-- the painted window frame (1024 x 1007: stone border about 84 px wide, bronze skull corners, transparent middle), 9-sliced
+	PanelFrame = "rbxassetid://97150066839506",
 }
 local STONE_SLICE = Rect.new(80, 56, 432, 104)
 local STONE_MARGIN, STONE_SHAPE_H = 16, 128

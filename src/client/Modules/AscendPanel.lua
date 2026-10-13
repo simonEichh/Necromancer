@@ -23,6 +23,7 @@ ascendPanel.Position = UDim2.new(0.5, -210, 0.5, -140)
 ascendPanel.BackgroundColor3 = Color3.fromRGB(20, 8, 5)
 ascendPanel.BorderSizePixel = 0
 ascendPanel.Visible = false
+require(script.Parent.Windows).register(ascendPanel) -- only one window open at a time
 ascendPanel.ZIndex = 50
 ascendPanel.Parent = screenGui
 Instance.new("UICorner", ascendPanel).CornerRadius = UDim.new(0, 16)

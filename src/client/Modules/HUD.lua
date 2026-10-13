@@ -10,13 +10,8 @@ local dustFrame, dustChips = nil, {}
 -- ── Injected deps ────────────────────────────────────────────
 local getGold, getGems, getSpins, getLuckBuffEnd, getCountdown, fmtNumber
 
--- ── Helper: make a top teleport button (stone button, see Theme) ──
-local function makePillBtn(parent, text, color, x, callback)
-	return Theme.stoneButton(parent, {
-		text = text, color = color, size = UDim2.fromOffset(150, 44),
-		position = UDim2.new(0.5, x, 0, 14), zIndex = 5, onClick = callback,
-	}).root
-end
+-- the plaza (shops) is the circle round the origin; anywhere else counts as being at your plot / wall
+local PLAZA_RADIUS = 60
 
 -- ── Helper: make a side menu tile (square icon tile, see Theme.iconTile / Theme.Image.Icon) ──
 -- tiles are 68 px, one every TILE_STEP px down a column (the label hangs over the bottom edge)
@@ -46,37 +41,52 @@ function HUD.init(screenGui, deps)
 	getLuckBuffEnd = deps.getLuckBuffEnd
 	fmtNumber      = deps.fmtNumber
 
-	-- ── Top center teleport buttons ──────────────────────────
-	makePillBtn(screenGui, "SHOPS", nil, -160, deps.onShops)
-	makePillBtn(screenGui, "WALL", "red", 10, deps.onWall)
+	-- ── Top center: one travel tile that always offers the other place (Shops at your plot, Wall in the plaza) ──
+	do
+		local inPlaza = nil
+		local travel
+		travel = Theme.iconTile(screenGui, {
+			text = "Shops", anchor = Vector2.new(0.5, 0), position = UDim2.new(0.5, 0, 0, 14), zIndex = 5,
+			onClick = function()
+				if inPlaza then
+					deps.onWall()
+				else
+					deps.onShops()
+				end
+			end,
+		})
+		travel.root.Name = "TravelTile"
+		local player = game:GetService("Players").LocalPlayer
+		local lastCheck = 0
+		RunService.Heartbeat:Connect(function()
+			local now = os.clock()
+			if now - lastCheck < 0.25 then
+				return
+			end
+			lastCheck = now
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if not hrp then
+				return
+			end
+			local p = hrp.Position
+			local nowInPlaza = Vector2.new(p.X, p.Z).Magnitude < PLAZA_RADIUS
+			if nowInPlaza ~= inPlaza then
+				inPlaza = nowInPlaza
+				travel.label.Text = inPlaza and "Wall" or "Shops"
+				travel.icon.Image = (inPlaza and Theme.Image.Icon.Wall or Theme.Image.Icon.Shops) or ""
+			end
+		end)
+	end
 
 	-- ── Top right: spin wheel button ─────────────────────────
-	local spinFrame = Instance.new("Frame", screenGui)
-	spinFrame.Size = UDim2.new(0, 80, 0, 80)
-	spinFrame.Position = UDim2.new(1, -90, 0, 10)
-	spinFrame.BackgroundColor3 = Color3.fromRGB(180, 80, 10)
-	spinFrame.BackgroundTransparency = 0.1
-	spinFrame.BorderSizePixel = 0
-	spinFrame.ZIndex = 5
-	Instance.new("UICorner", spinFrame).CornerRadius = UDim.new(0, 16)
-
-	local spinIcon = Instance.new("TextLabel", spinFrame)
-	spinIcon.Size = UDim2.new(1, 0, 0, 50)
-	spinIcon.Position = UDim2.new(0, 0, 0, 4)
-	spinIcon.BackgroundTransparency = 1
-	spinIcon.Text = ""
-	spinIcon.TextScaled = true
-	spinIcon.ZIndex = 6
-
-	spinCountLbl = Instance.new("TextLabel", spinFrame)
-	spinCountLbl.Size = UDim2.new(1, 0, 0, 22)
-	spinCountLbl.Position = UDim2.new(0, 0, 0, 54)
-	spinCountLbl.BackgroundTransparency = 1
-	spinCountLbl.Text = "0 spins"
-	spinCountLbl.TextColor3 = Color3.fromRGB(255, 220, 150)
-	spinCountLbl.TextScaled = true
-	spinCountLbl.Font = Enum.Font.GothamBold
-	spinCountLbl.ZIndex = 6
+	-- an icon tile like the side menus; its label shows the spins or the countdown to the next free spin
+	local spinTile = Theme.iconTile(screenGui, {
+		icon = Theme.Image.Icon.Wheel, text = "0 spins", size = 76,
+		position = UDim2.new(1, -92, 0, 14), zIndex = 5, onClick = deps.onSpin,
+	})
+	local spinFrame = spinTile.root
+	spinCountLbl = spinTile.label
 
 	spinBadge = Instance.new("TextLabel", spinFrame)
 	spinBadge.Size = UDim2.new(0, 24, 0, 24)
@@ -87,18 +97,9 @@ function HUD.init(screenGui, deps)
 	spinBadge.TextScaled = true
 	spinBadge.Font = Enum.Font.GothamBold
 	spinBadge.BorderSizePixel = 0
-	spinBadge.ZIndex = 7
+	spinBadge.ZIndex = 9
 	spinBadge.Visible = false
 	Instance.new("UICorner", spinBadge).CornerRadius = UDim.new(0.5, 0)
-
-	do
-		local spinBtn = Instance.new("TextButton", spinFrame)
-		spinBtn.Size = UDim2.new(1, 0, 1, 0)
-		spinBtn.BackgroundTransparency = 1
-		spinBtn.Text = ""
-		spinBtn.ZIndex = 8
-		spinBtn.MouseButton1Click:Connect(deps.onSpin)
-	end
 
 	-- ── Left side: icon buttons ──────────────────────────────
 	local leftPanel = Instance.new("Frame", screenGui)
@@ -137,8 +138,8 @@ function HUD.init(screenGui, deps)
 		dustFrame = Instance.new("Frame", screenGui)
 		dustFrame.Name = "DustBar"
 		dustFrame.AutomaticSize = Enum.AutomaticSize.X
-		dustFrame.Size = UDim2.new(0, 0, 0, 30)
-		dustFrame.Position = UDim2.new(0, 10, 1, -116)
+		dustFrame.Size = UDim2.new(0, 0, 0, 34)
+		dustFrame.Position = UDim2.new(0, 10, 1, -120)
 		dustFrame.BackgroundColor3 = Color3.fromRGB(8, 4, 20)
 		dustFrame.BackgroundTransparency = 0.3
 		dustFrame.BorderSizePixel = 0
@@ -164,12 +165,11 @@ function HUD.init(screenGui, deps)
 			row.FillDirection = Enum.FillDirection.Horizontal
 			row.VerticalAlignment = Enum.VerticalAlignment.Center
 			row.Padding = UDim.new(0, 5)
-			local dot = Instance.new("Frame", chip)
-			dot.Size = UDim2.fromOffset(12, 12)
-			dot.BackgroundColor3 = Theme.DustColor[dust]
-			dot.BorderSizePixel = 0
-			dot.ZIndex = 6
-			dot.Rotation = 45 -- a small diamond
+			local icon = Instance.new("ImageLabel", chip)
+			icon.Size = UDim2.fromOffset(28, 28)
+			icon.BackgroundTransparency = 1
+			icon.Image = Theme.Image.Dust[dust] or ""
+			icon.ZIndex = 6
 			local count = Instance.new("TextLabel", chip)
 			count.AutomaticSize = Enum.AutomaticSize.X
 			count.Size = UDim2.new(0, 0, 1, 0)

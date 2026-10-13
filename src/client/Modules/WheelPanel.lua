@@ -82,6 +82,7 @@ do
 	wheelPanel.BorderSizePixel = 0
 	wheelPanel.ZIndex = 60
 	wheelPanel.Visible = false
+	require(script.Parent.Windows).register(wheelPanel) -- only one window open at a time
 	wheelPanel.Parent = screenGui
 	Instance.new("UICorner", wheelPanel).CornerRadius = UDim.new(0, 18)
 

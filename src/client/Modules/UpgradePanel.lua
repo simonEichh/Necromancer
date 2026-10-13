@@ -4,6 +4,7 @@ local screenGui = require(script.Parent.Gui)
 local State = require(script.Parent.State)
 local HUD = require(script.Parent.HUD)
 local Format = require(script.Parent.Format)
+local Theme = require(script.Parent.Theme)
 local fmtGold = Format.fmtGold
 
 local Sync = require(script.Parent.Sync)
@@ -21,6 +22,7 @@ upgradePanel.Position = UDim2.new(0.5, -210, 0.5, -160)
 upgradePanel.BackgroundColor3 = Color3.fromRGB(6, 18, 20)
 upgradePanel.BorderSizePixel = 0
 upgradePanel.Visible = false
+require(script.Parent.Windows).register(upgradePanel) -- only one window open at a time
 upgradePanel.ZIndex = 50
 upgradePanel.Parent = screenGui
 Instance.new("UICorner", upgradePanel).CornerRadius = UDim.new(0, 16)
@@ -63,14 +65,12 @@ local function makeUpgradeRow(parent, yPos, icon, title, getLevel, getMax, getCo
 	row.ZIndex = 51
 	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 12)
 
-	local iconLbl = Instance.new("TextLabel", row)
-	iconLbl.Size = UDim2.new(0, 48, 0, 48)
-	iconLbl.Position = UDim2.new(0, 8, 0.5, -24)
-	iconLbl.BackgroundColor3 = Color3.fromRGB(15, 50, 52)
-	iconLbl.Text = icon
-	iconLbl.TextScaled = true
+	local iconLbl = Instance.new("ImageLabel", row)
+	iconLbl.Size = UDim2.new(0, 56, 0, 56)
+	iconLbl.Position = UDim2.new(0, 4, 0.5, -28)
+	iconLbl.BackgroundTransparency = 1
+	iconLbl.Image = icon
 	iconLbl.ZIndex = 52
-	Instance.new("UICorner", iconLbl).CornerRadius = UDim.new(0, 10)
 
 	local titleLbl = Instance.new("TextLabel", row)
 	titleLbl.Size = UDim2.new(0.55, 0, 0, 26)
@@ -145,7 +145,7 @@ end
 local luckBuyBtn, refreshLuckRow = makeUpgradeRow(
 	upgradePanel,
 	62,
-	"",
+	Theme.Image.Icon.Luck,
 	"Luck Boost",
 	function()
 		return State.luckBoostLevel
@@ -163,7 +163,7 @@ local luckBuyBtn, refreshLuckRow = makeUpgradeRow(
 local coinBuyBtn, refreshCoinRow = makeUpgradeRow(
 	upgradePanel,
 	172,
-	"",
+	Theme.Image.Icon.GoldBoost,
 	"Coin Boost",
 	function()
 		return State.coinBoostLevel

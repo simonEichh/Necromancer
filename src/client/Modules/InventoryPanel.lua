@@ -258,6 +258,7 @@ function InventoryPanel.init(sg, deps)
 	panel = themed.frame
 	panel.Name = "InventoryPanel"
 	panel.Visible = false
+	require(script.Parent.Windows).register(panel) -- only one window open at a time
 	panel.ZIndex = 35
 	invTitle = themed.title
 	invTitle.TextSize = 26
@@ -451,9 +452,12 @@ function InventoryPanel.init(sg, deps)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.FillDirection = Enum.FillDirection.Horizontal
 		grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
-		Instance.new("UIPadding", invScroll).PaddingLeft = UDim.new(0, 4)
+		-- room round the grid so the slots' outer outlines are not clipped by the scrolling frame
+		local pad = Instance.new("UIPadding", invScroll)
+		pad.PaddingLeft = UDim.new(0, 4)
+		pad.PaddingTop = UDim.new(0, 4)
 		local rows = math.ceil(INVENTORY_MAX / INV_COLS)
-		invScroll.CanvasSize = UDim2.new(0, 0, 0, rows * (INV_SH + INV_GAP) + INV_GAP)
+		invScroll.CanvasSize = UDim2.new(0, 0, 0, rows * (INV_SH + INV_GAP) + INV_GAP + 8)
 	end
 end
 

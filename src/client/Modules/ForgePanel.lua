@@ -40,6 +40,7 @@ local themed = Theme.panel(screenGui, { title = "Forge", size = UDim2.fromOffset
 local panel = themed.frame
 panel.Name = "ForgePanel"
 panel.Visible = false
+require(script.Parent.Windows).register(panel) -- only one window open at a time
 local body = themed.body
 
 Theme.stoneButton(panel, {
@@ -63,6 +64,13 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 4)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = list
+-- room round the rows so the selected row's outline is not clipped by the scrolling frame
+local listPad = Instance.new("UIPadding")
+listPad.PaddingTop = UDim.new(0, 3)
+listPad.PaddingBottom = UDim.new(0, 3)
+listPad.PaddingLeft = UDim.new(0, 3)
+listPad.PaddingRight = UDim.new(0, 3)
+listPad.Parent = list
 
 -- the details of the selected unit (right)
 local detail = Instance.new("Frame")
@@ -161,13 +169,21 @@ for i, dust in ipairs(Economy.DUSTS) do
 	local stroke = Theme.stroke(chip, C.Border, 1)
 	chip.Parent = matBar
 	local color = DUST_COLORS[dust] or C.Bone
-	local nameText = Theme.label(chip, { text = Economy.DUST_NAMES[dust], size = "Small", font = "Strong", color = color, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -4, 0, 28) })
-	nameText.Position = UDim2.fromOffset(2, 3)
+	local icon = Instance.new("ImageLabel")
+	icon.BackgroundTransparency = 1
+	icon.Image = Theme.Image.Dust[dust] or ""
+	icon.Size = UDim2.fromOffset(40, 40)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 2, 0.5, 0)
+	icon.ZIndex = Z + 4
+	icon.Parent = chip
+	local nameText = Theme.label(chip, { text = Economy.DUST_NAMES[dust], size = "Small", font = "Strong", color = color, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -44, 0, 28) })
+	nameText.Position = UDim2.fromOffset(42, 3)
 	nameText.TextWrapped = true
 	nameText.TextSize = 11
 	nameText.ZIndex = Z + 4
-	local countText = Theme.label(chip, { text = "0", size = "Heading", font = "Strong", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 24) })
-	countText.Position = UDim2.fromOffset(0, 31)
+	local countText = Theme.label(chip, { text = "0", size = "Heading", font = "Strong", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -42, 0, 24) })
+	countText.Position = UDim2.fromOffset(42, 31)
 	countText.ZIndex = Z + 4
 	chips[dust] = { frame = chip, stroke = stroke, count = countText }
 end

@@ -147,7 +147,7 @@ end)
 local banner = Instance.new("Frame")
 banner.Name = "ObjectiveBanner"
 banner.AnchorPoint = Vector2.new(0.5, 0)
-banner.Position = UDim2.new(0.5, 0, 0, 112)
+banner.Position = UDim2.new(0.5, 0, 0, 104) -- under the travel tile
 banner.Size = UDim2.fromOffset(420, 34)
 banner.BackgroundColor3 = C.Void
 banner.BackgroundTransparency = 0.25

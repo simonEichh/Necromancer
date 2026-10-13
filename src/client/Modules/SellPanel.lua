@@ -28,6 +28,7 @@ sellPanel.Position = UDim2.new(0.5, -210, 0.5, -240)
 sellPanel.BackgroundColor3 = Color3.fromRGB(18, 10, 4)
 sellPanel.BorderSizePixel = 0
 sellPanel.Visible = false
+require(script.Parent.Windows).register(sellPanel) -- only one window open at a time
 sellPanel.ZIndex = 50
 sellPanel.Parent = screenGui
 Instance.new("UICorner", sellPanel).CornerRadius = UDim.new(0, 16)

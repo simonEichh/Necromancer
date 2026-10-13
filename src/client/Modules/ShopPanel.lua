@@ -278,6 +278,7 @@ function ShopPanel.init(screenGui, deps)
 	panel.BackgroundColor3 = Color3.fromRGB(18, 8, 38)
 	panel.BorderSizePixel = 0
 	panel.Visible = false
+	require(script.Parent.Windows).register(panel) -- only one window open at a time
 	panel.ZIndex = 30
 	panel.Parent = screenGui
 	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
