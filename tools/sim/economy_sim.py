@@ -148,6 +148,16 @@ PRESETS["gate"] = dict(
     wall_hp=lambda L, r: 300 * 1.22 ** (L - 1) * prod(GATE_HP_STEP[:r]),
 )
 
+# "dust" preset: like "gate", but the rarities share materials in pairs (Stone, Silver, Gold, Diamond, Star Dust).
+# The higher rarity of a pair pays pair_cost times the materials per level.
+PRESETS["dust"] = dict(
+    PRESETS["gate"],
+    mat_group=2,
+    pair_cost=1.5,
+    mat_stock=10,  # dust of each kind on sale per 5-minute restock
+    mat_price=lambda d: 20 * 50 ** d,  # gold per dust of kind d (0 = Stone)
+)
+
 # Pace targets in ACTIVE minutes per stage (my proposal; the user agreed): ascension k takes this long after the previous one.
 TARGETS = {1: (10, 15), 2: (20, 40), 3: (20, 40), 4: (20, 40), 5: (60, 180), 6: (60, 180), 7: (60, 180), 8: (180, 1440), 9: (180, 1440)}
 
@@ -176,7 +186,7 @@ class Player:
         self.luck_lv = 0
         self.coin_lv = 0
         self.units = []  # {"type", "level"}
-        self.mats = {m: 0 for m in MATERIALS}
+        self.mats = {i: 0 for i in range(len(MATERIALS))}
         self.fail_streak = {}  # per unit id
         self.events = []  # (time, kind, text): the "meaningful progress" moments
         self.best_rank = -1
@@ -217,7 +227,7 @@ class Player:
         self.shop = {k: (SHOP_STOCK[k] if self.rng.random() <= SHOP_CHANCE[k] else 0) for k in SHOP_STOCK}
         self.next_restock = now + RESTOCK_SECONDS
         # the material shop restocks with the grave shop: a few of every tier
-        self.mat_shop = {i: self.R.get("mat_stock", 0) for i in range(len(MATERIALS))}
+        self.mat_shop = {i: self.R.get("mat_stock", 0) for i in range(self.mat_index(len(MATERIALS)) + 1)}
 
     def unit_dps(self, u):
         s = GAME["stats"][u["type"]]
@@ -338,6 +348,17 @@ class Player:
         if stalled and can_ascend and self.gold >= self.ascend_cost():
             self.do_ascend()
 
+    def mat_index(self, rank):
+        """Material of a rarity rank (1 = Common): one per rarity, or one per mat_group rarities."""
+        return (rank - 1) // self.R.get("mat_group", 1)
+
+    def level_cost(self, rank, level):
+        R = self.R
+        cost = R["upgrade_base_cost"] * R["upgrade_cost_growth"] ** level
+        if (rank - 1) % R.get("mat_group", 1) == 1:
+            cost *= R.get("pair_cost", 1)
+        return math.ceil(cost)
+
     def manage_units(self):
         R = self.R
         placed = self.placed()
@@ -351,7 +372,7 @@ class Player:
             rar = GAME["unit_rarity"][u["type"]]
             if R["upgrades"] and rar in placed_rarities and placed_rarities[rar]["level"] < R["max_level"]:
                 # a spare unit of a rarity we are upgrading: dismantle it for materials
-                self.mats[MATERIALS[RANK[rar] - 1]] += round(R["dismantle_base"] * R["dismantle_growth"] ** (RANK[rar] - 1))
+                self.mats[self.mat_index(RANK[rar])] += round(R["dismantle_base"] * R["dismantle_growth"] ** (RANK[rar] - 1))
             else:
                 one_in = GAME["one_in"][u["type"]]
                 self.gold += math.floor(one_in ** 1.2 * 5) * (1 + 0.5 * self.coin_lv)
@@ -369,9 +390,9 @@ class Player:
             if u["level"] >= R["max_level"]:
                 continue
             rar = GAME["unit_rarity"][u["type"]]
-            tier = RANK[rar] - 1
-            cost = math.ceil(R["upgrade_base_cost"] * R["upgrade_cost_growth"] ** u["level"])
-            need = cost - self.mats[MATERIALS[tier]]
+            tier = self.mat_index(RANK[rar])
+            cost = self.level_cost(RANK[rar], u["level"])
+            need = cost - self.mats[tier]
             if need <= 0:
                 continue
             price = R["mat_price"](tier)
@@ -379,15 +400,15 @@ class Player:
             if n > 0:
                 self.gold -= n * price
                 self.mat_shop[tier] -= n
-                self.mats[MATERIALS[tier]] += n
+                self.mats[tier] += n
 
     def try_upgrades(self):
         R = self.R
         for u in self.placed():
             while u["level"] < R["max_level"]:
                 rar = GAME["unit_rarity"][u["type"]]
-                mat = MATERIALS[RANK[rar] - 1]
-                cost = math.ceil(R["upgrade_base_cost"] * R["upgrade_cost_growth"] ** u["level"])
+                mat = self.mat_index(RANK[rar])
+                cost = self.level_cost(RANK[rar], u["level"])
                 if self.mats[mat] < cost:
                     break
                 chance = min(1.0, max(0.2, 1 - 0.08 * u["level"]) + R["upgrade_pity"] * self.fail_streak.get(u["id"], 0))
@@ -427,9 +448,9 @@ class Player:
         amount = R["wall_mats"](self.layer, self.r)
         # mostly the top unlocked tier, sometimes one below
         tier = top if self.rng.random() < 0.7 else max(0, top - 1)
-        self.mats[MATERIALS[tier]] += amount
+        self.mats[self.mat_index(tier + 1)] += amount
         if R["boss_every"] and self.layer % R["boss_every"] == 0:
-            self.mats[MATERIALS[min(len(MATERIALS) - 1, top + 1)]] += amount * 3
+            self.mats[self.mat_index(min(len(MATERIALS) - 1, top + 1) + 1)] += amount * 3
             self.log("boss", f"layer {self.layer}")
 
 

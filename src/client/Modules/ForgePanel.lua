@@ -2,8 +2,8 @@
 --
 -- A "Forge" button on the left (under Graves) or the F key opens it. The list on the left shows the units standing on your
 -- graves and the units in your inventory; click one to see its next level, what it costs, the chance of success and press
--- Upgrade. The row at the bottom shows your materials (one per rarity: a unit is upgraded with the material of its own
--- rarity). Dismantle turns a spare inventory unit into materials of its rarity. The server does everything (see
+-- Upgrade. The row at the bottom shows your dusts (one per pair of rarities: a unit is upgraded with the dust of its own
+-- rarity, Economy.dustOf). Dismantle turns a spare inventory unit into materials of its rarity. The server does everything (see
 -- server UnitUpgrades): this panel only sends UpgradeUnit(kind, index) / DismantleUnit(slot) and shows what comes back.
 -- Builds its UI when required (no init call).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -128,7 +128,14 @@ hintLbl.Position = UDim2.fromOffset(10, 352)
 hintLbl.TextWrapped = true
 hintLbl.ZIndex = Z + 3
 
--- the materials row (bottom): one chip per rarity
+-- the materials row (bottom): one chip per dust
+local DUST_COLORS = {
+	Stone = Color3.fromRGB(150, 146, 140),
+	Silver = Color3.fromRGB(196, 204, 216),
+	Gold = Color3.fromRGB(232, 190, 90),
+	Diamond = Color3.fromRGB(130, 220, 240),
+	Star = Color3.fromRGB(226, 150, 255),
+}
 local matBar = Instance.new("Frame")
 matBar.BackgroundColor3 = C.Void
 matBar.BorderSizePixel = 0
@@ -146,18 +153,18 @@ matLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 matLayout.Padding = UDim.new(0, 4)
 matLayout.Parent = matBar
 local chips = {}
-for i, rarity in ipairs(Economy.RARITIES_ASC) do
+for i, dust in ipairs(Economy.DUSTS) do
 	local chip = Instance.new("Frame")
 	chip.BackgroundColor3 = C.StoneRaised
 	chip.BorderSizePixel = 0
-	chip.Size = UDim2.fromOffset(80, 58)
+	chip.Size = UDim2.fromOffset(120, 58)
 	chip.LayoutOrder = i
 	chip.ZIndex = Z + 3
 	Theme.corner(chip, Theme.Radius.Small)
 	local stroke = Theme.stroke(chip, C.Border, 1)
 	chip.Parent = matBar
-	local color = Theme.rarityColor(rarity)
-	local nameText = Theme.label(chip, { text = Economy.MATERIAL_NAMES[rarity], size = "Small", font = "Strong", color = color, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -4, 0, 28) })
+	local color = DUST_COLORS[dust] or C.Bone
+	local nameText = Theme.label(chip, { text = Economy.DUST_NAMES[dust], size = "Small", font = "Strong", color = color, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -4, 0, 28) })
 	nameText.Position = UDim2.fromOffset(2, 3)
 	nameText.TextWrapped = true
 	nameText.TextSize = 11
@@ -165,7 +172,7 @@ for i, rarity in ipairs(Economy.RARITIES_ASC) do
 	local countText = Theme.label(chip, { text = "0", size = "Heading", font = "Strong", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 24) })
 	countText.Position = UDim2.fromOffset(0, 31)
 	countText.ZIndex = Z + 4
-	chips[rarity] = { frame = chip, stroke = stroke, count = countText }
+	chips[dust] = { frame = chip, stroke = stroke, count = countText }
 end
 
 -- ============================================================
@@ -225,7 +232,8 @@ local function showDetails(entry)
 		return
 	end
 	local rarity = rarityOf(entry.unitType)
-	local material = Economy.MATERIAL_NAMES[rarity]
+	local dust = Economy.dustOf(rarity)
+	local material = Economy.DUST_NAMES[dust]
 	portrait.set(entry.unitType)
 	nameLbl.Text = entry.unitType
 	nameLbl.TextColor3 = Theme.rarityColor(rarity)
@@ -237,8 +245,8 @@ local function showDetails(entry)
 		nextLbl.Text, costLbl.Text, chanceLbl.Text = "", "", ""
 		upgradeBtn.root:SetAttribute("Disabled", true)
 	else
-		local cost = Economy.unitUpgradeCost(entry.level)
-		local have = (State.materials and State.materials[rarity]) or 0
+		local cost = Economy.unitUpgradeCost(entry.level, rarity)
+		local have = (State.materials and State.materials[dust]) or 0
 		local chance = Economy.upgradeChance(entry.level, entry.fails)
 		levelLbl.Text = "Level " .. entry.level .. " / " .. Economy.MAX_UNIT_LEVEL .. "   Damage x" .. string.format("%.1f", Economy.levelMultiplier(entry.level))
 		nextLbl.Text = "Next level: damage x" .. string.format("%.1f", Economy.levelMultiplier(entry.level + 1))
@@ -258,13 +266,13 @@ local function showDetails(entry)
 end
 
 local function paintMaterials(entry)
-	local selectedRarity = entry and rarityOf(entry.unitType)
-	for rarity, chip in pairs(chips) do
-		local count = (State.materials and State.materials[rarity]) or 0
+	local selectedDust = entry and Economy.dustOf(rarityOf(entry.unitType))
+	for dust, chip in pairs(chips) do
+		local count = (State.materials and State.materials[dust]) or 0
 		chip.count.Text = tostring(count)
 		chip.count.TextColor3 = count > 0 and C.Bone or C.BoneDim
-		chip.stroke.Color = (rarity == selectedRarity) and C.Soul or C.Border
-		chip.stroke.Thickness = (rarity == selectedRarity) and 2 or 1
+		chip.stroke.Color = (dust == selectedDust) and C.Soul or C.Border
+		chip.stroke.Thickness = (dust == selectedDust) and 2 or 1
 	end
 end
 

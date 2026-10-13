@@ -87,23 +87,35 @@ function Economy.sellGoldMultiplier(coinBoostLevel)
 end
 
 -- ============================================================
--- Unit upgrades (the Forge). Tuned with tools/sim/economy_sim.py (the "gate" preset models these rules).
+-- Unit upgrades (the Forge). Tuned with tools/sim/economy_sim.py (the "dust" preset models these rules).
 -- ============================================================
--- Every rarity has its own material. A unit is upgraded with the material of ITS rarity; walls drop materials, spare units
--- can be dismantled into them. A failed upgrade never lowers the level: it only costs materials, and every failure makes the
--- next try more likely to succeed (pity).
+-- Materials are DUSTS, one per pair of rarities (Common + Uncommon use Stone Dust, ...). A unit is upgraded with the dust of
+-- ITS rarity; the higher rarity of a pair pays PAIR_COST times as much. Walls drop dust, spare units can be dismantled into it.
+-- A failed upgrade never lowers the level: it only costs dust, and every failure makes the next try more likely (pity).
 Economy.RARITIES_ASC = { "Common", "Uncommon", "Rare", "Cursed", "Legendary", "Abyssal", "Eldritch", "Eternal", "Primordial" }
-Economy.MATERIAL_NAMES = {
-	Common = "Stone Dust",
-	Uncommon = "Bone Shards",
-	Rare = "Grave Iron",
-	Cursed = "Hex Ash",
-	Legendary = "Gilded Relic",
-	Abyssal = "Abyssal Pearl",
-	Eldritch = "Eldritch Ichor",
-	Eternal = "Eternal Ember",
-	Primordial = "Primordial Core",
+Economy.DUSTS = { "Stone", "Silver", "Gold", "Diamond", "Star" } -- lowest first; saved under these keys
+Economy.DUST_NAMES = {
+	Stone = "Stone Dust",
+	Silver = "Silver Dust",
+	Gold = "Gold Dust",
+	Diamond = "Diamond Dust",
+	Star = "Star Dust",
 }
+local RARITIES_PER_DUST = 2
+local PAIR_COST = 1.5
+
+-- index into RARITIES_ASC (1 = Common) of every rarity
+local RARITY_INDEX = {}
+for i, rarity in ipairs(Economy.RARITIES_ASC) do
+	RARITY_INDEX[rarity] = i
+end
+
+-- The dust (key from Economy.DUSTS) that upgrades units of `rarity`
+function Economy.dustOf(rarity)
+	local i = RARITY_INDEX[rarity] or 1
+	return Economy.DUSTS[math.min(#Economy.DUSTS, (i - 1) // RARITIES_PER_DUST + 1)]
+end
+
 Economy.MAX_UNIT_LEVEL = 10
 local LEVEL_DAMAGE = 0.30 -- +30% damage per level
 local UPGRADE_BASE_COST, UPGRADE_COST_GROWTH = 4, 1.55
@@ -117,9 +129,13 @@ function Economy.levelMultiplier(level)
 	return 1 + LEVEL_DAMAGE * (level or 0)
 end
 
--- Materials needed to take a unit from `level` to `level + 1`
-function Economy.unitUpgradeCost(level)
-	return math.ceil(UPGRADE_BASE_COST * UPGRADE_COST_GROWTH ^ level)
+-- Dust needed to take a unit of `rarity` from `level` to `level + 1`
+function Economy.unitUpgradeCost(level, rarity)
+	local cost = UPGRADE_BASE_COST * UPGRADE_COST_GROWTH ^ level
+	if ((RARITY_INDEX[rarity] or 1) - 1) % RARITIES_PER_DUST == 1 then
+		cost *= PAIR_COST -- the higher rarity of the pair
+	end
+	return math.ceil(cost)
 end
 
 -- Chance (0..1) that the next upgrade works, given the level and the failed attempts in a row
@@ -132,21 +148,22 @@ function Economy.upgradeFailLoss(cost)
 	return math.ceil(cost * UPGRADE_FAIL_LOSS)
 end
 
--- Materials (of the unit's own rarity) a spare unit gives when dismantled; `rank` = 1 for Common ... 9 for Primordial
+-- Dust (of the unit's own rarity) a spare unit gives when dismantled; `rank` = 1 for Common ... 9 for Primordial
 function Economy.dismantleYield(rank)
 	return math.floor(DISMANTLE_BASE * DISMANTLE_GROWTH ^ (rank - 1) + 0.5)
 end
 
--- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { rarity, amount }.
--- Mostly the best tier the player has reached (one higher than their ascensions), sometimes the tier below; boss walls
--- and the gate add three times as much of the tier above.
+-- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { dust, amount }.
+-- Mostly the dust of the best rarity the player has reached (one higher than their ascensions), sometimes of the rarity
+-- below; boss walls and the gate add three times as much of the dust of the rarity above.
 function Economy.wallMaterials(layer, rebirthCount, roll)
 	local top = math.min(#Economy.RARITIES_ASC, rebirthCount + 2) -- index into RARITIES_ASC (1 = Common)
 	local amount = 1 + layer // 3
 	local tier = ((roll or math.random()) < 0.7) and top or math.max(1, top - 1)
-	local drops = { { rarity = Economy.RARITIES_ASC[tier], amount = amount } }
+	local drops = { { dust = Economy.dustOf(Economy.RARITIES_ASC[tier]), amount = amount } }
 	if layer % BOSS_EVERY == 0 or layer == Economy.WALLS_PER_RUN then
-		table.insert(drops, { rarity = Economy.RARITIES_ASC[math.min(#Economy.RARITIES_ASC, top + 1)], amount = amount * 3 })
+		local above = Economy.RARITIES_ASC[math.min(#Economy.RARITIES_ASC, top + 1)]
+		table.insert(drops, { dust = Economy.dustOf(above), amount = amount * 3 })
 	end
 	return drops
 end

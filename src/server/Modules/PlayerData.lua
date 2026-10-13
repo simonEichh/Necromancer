@@ -38,7 +38,7 @@ function PlayerData.create(player, saved)
 		gems = 0,
 		rebirthCount = 0,
 		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
-		materials = {}, -- [rarity] = amount of that rarity's upgrade material
+		materials = {}, -- [dust key from Economy.DUSTS] = amount of that upgrade dust
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
@@ -67,8 +67,16 @@ function PlayerData.create(player, saved)
 		end
 
 		if type(saved.materials) == "table" then
+			for _, dust in ipairs(Economy.DUSTS) do
+				profile.materials[dust] = math.floor(clampNumber(saved.materials[dust], 0, 0))
+			end
+			-- old saves kept one material per rarity: pour them into that rarity's dust
 			for _, rarity in ipairs(Economy.RARITIES_ASC) do
-				profile.materials[rarity] = math.floor(clampNumber(saved.materials[rarity], 0, 0))
+				local old = math.floor(clampNumber(saved.materials[rarity], 0, 0))
+				if old > 0 then
+					local dust = Economy.dustOf(rarity)
+					profile.materials[dust] = math.min(profile.materials[dust] + old, MAX_CURRENCY)
+				end
 			end
 		end
 
@@ -123,8 +131,8 @@ function PlayerData.snapshot(profile)
 		owned[key] = count
 	end
 	local materials = {}
-	for _, rarity in ipairs(Economy.RARITIES_ASC) do
-		materials[rarity] = profile.materials[rarity] or 0
+	for _, dust in ipairs(Economy.DUSTS) do
+		materials[dust] = profile.materials[dust] or 0
 	end
 	return {
 		gold = profile.gold,
@@ -299,26 +307,26 @@ function PlayerData.inventoryList(player)
 end
 
 -- ── Materials (unit upgrades) ────────────────────────────────
-function PlayerData.addMaterial(player, rarity, amount)
+function PlayerData.addMaterial(player, dust, amount)
 	local profile = profiles[player.UserId]
-	if not profile or Economy.MATERIAL_NAMES[rarity] == nil or type(amount) ~= "number" or amount ~= amount or amount <= 0 then
+	if not profile or Economy.DUST_NAMES[dust] == nil or type(amount) ~= "number" or amount ~= amount or amount <= 0 then
 		return false
 	end
-	profile.materials[rarity] = math.min((profile.materials[rarity] or 0) + math.floor(amount), MAX_CURRENCY)
+	profile.materials[dust] = math.min((profile.materials[dust] or 0) + math.floor(amount), MAX_CURRENCY)
 	PlayerData.changed(player)
 	return true
 end
 
 -- Takes materials; returns false (and takes nothing) when the player does not have that many.
-function PlayerData.spendMaterial(player, rarity, amount)
+function PlayerData.spendMaterial(player, dust, amount)
 	local profile = profiles[player.UserId]
-	if not profile or Economy.MATERIAL_NAMES[rarity] == nil or type(amount) ~= "number" or amount < 0 then
+	if not profile or Economy.DUST_NAMES[dust] == nil or type(amount) ~= "number" or amount < 0 then
 		return false
 	end
-	if (profile.materials[rarity] or 0) < amount then
+	if (profile.materials[dust] or 0) < amount then
 		return false
 	end
-	profile.materials[rarity] -= amount
+	profile.materials[dust] -= amount
 	PlayerData.changed(player)
 	return true
 end

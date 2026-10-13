@@ -332,7 +332,7 @@ local function breakWall(plotState)
 				PlayerData.addGold(p, math.floor(goldReward * mult))
 				-- the wall drops upgrade materials (boss walls and the gate drop better ones)
 				for _, drop in ipairs(Economy.wallMaterials(brokenLayer, profile.rebirthCount)) do
-					PlayerData.addMaterial(p, drop.rarity, drop.amount)
+					PlayerData.addMaterial(p, drop.dust, drop.amount)
 				end
 			end
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)

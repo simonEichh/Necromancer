@@ -13,7 +13,7 @@ local State = {
 	inventory = {},
 	-- Units standing on the graves: a list of { slot, unitType, level, fails }
 	placed = {},
-	-- Upgrade materials by rarity: { Common = 12, ... } (Economy.MATERIAL_NAMES has their names)
+	-- Upgrade dusts: { Stone = 12, ... } (Economy.DUSTS lists them, Economy.DUST_NAMES has their names)
 	materials = {},
 	selectedSlot = 1,
 

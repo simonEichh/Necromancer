@@ -4,8 +4,8 @@
 --   UpgradeUnit(kind, index)   kind "inv" (inventory slot) or "grave" (grave slot with a unit standing on it)
 --   DismantleUnit(slot)        inventory units only
 --
--- Rules (numbers in Economy, tuned with tools/sim/economy_sim.py): a unit is upgraded with the material of ITS rarity; going
--- from level L to L + 1 costs Economy.unitUpgradeCost(L) materials and works with Economy.upgradeChance(L, fails). A failure
+-- Rules (numbers in Economy, tuned with tools/sim/economy_sim.py): a unit is upgraded with the dust of ITS rarity
+-- (Economy.dustOf); going from level L to L + 1 costs Economy.unitUpgradeCost(L, rarity) dust and works with Economy.upgradeChance(L, fails). A failure
 -- never lowers the level: it costs part of the materials and raises the chance of the next try (pity, saved with the unit).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
@@ -59,9 +59,10 @@ Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
 		return
 	end
 	local rarity = Units.Rarity[unitType]
-	local cost = Economy.unitUpgradeCost(level)
-	if (profile.materials[rarity] or 0) < cost then
-		Remotes.Notice:FireClient(player, "Not enough " .. Economy.MATERIAL_NAMES[rarity] .. " (" .. cost .. " needed).")
+	local dust = Economy.dustOf(rarity)
+	local cost = Economy.unitUpgradeCost(level, rarity)
+	if (profile.materials[dust] or 0) < cost then
+		Remotes.Notice:FireClient(player, "Not enough " .. Economy.DUST_NAMES[dust] .. " (" .. cost .. " needed).")
 		return
 	end
 
@@ -69,11 +70,11 @@ Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
 	local chance = Economy.upgradeChance(level, fails)
 	local success = math.random() < chance
 	if success then
-		PlayerData.spendMaterial(player, rarity, cost)
+		PlayerData.spendMaterial(player, dust, cost)
 		level += 1
 		fails = 0
 	else
-		PlayerData.spendMaterial(player, rarity, Economy.upgradeFailLoss(cost))
+		PlayerData.spendMaterial(player, dust, Economy.upgradeFailLoss(cost))
 		fails += 1
 	end
 
@@ -96,8 +97,9 @@ Remotes.DismantleUnit.OnServerEvent:Connect(function(player, slot)
 	local rarity = Units.Rarity[unit.unitType]
 	local amount = Economy.dismantleYield(Rarities.Rank[rarity] or 1)
 	PlayerData.takeUnit(player, slot)
-	PlayerData.addMaterial(player, rarity, amount)
-	Remotes.Notice:FireClient(player, "Dismantled " .. unit.unitType .. ": +" .. amount .. " " .. Economy.MATERIAL_NAMES[rarity])
+	local dust = Economy.dustOf(rarity)
+	PlayerData.addMaterial(player, dust, amount)
+	Remotes.Notice:FireClient(player, "Dismantled " .. unit.unitType .. ": +" .. amount .. " " .. Economy.DUST_NAMES[dust])
 end)
 
 return {}
