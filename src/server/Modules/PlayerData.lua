@@ -39,6 +39,7 @@ function PlayerData.create(player, saved)
 		rebirthCount = 0,
 		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
 		materials = {}, -- [dust key from Economy.DUSTS] = amount of that upgrade dust
+		catalysts = {}, -- [key from Economy.CATALYSTS] = how many the player owns (bought with gems)
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
@@ -81,6 +82,12 @@ function PlayerData.create(player, saved)
 					local dust = Economy.dustOf(rarity)
 					profile.materials[dust] = math.min(profile.materials[dust] + old, MAX_CURRENCY)
 				end
+			end
+		end
+
+		if type(saved.catalysts) == "table" then
+			for _, key in ipairs(Economy.CATALYSTS) do
+				profile.catalysts[key] = math.floor(clampNumber(saved.catalysts[key], 0, 0))
 			end
 		end
 
@@ -139,11 +146,16 @@ function PlayerData.snapshot(profile)
 	for _, dust in ipairs(Economy.DUSTS) do
 		materials[dust] = profile.materials[dust] or 0
 	end
+	local catalysts = {}
+	for _, key in ipairs(Economy.CATALYSTS) do
+		catalysts[key] = profile.catalysts[key] or 0
+	end
 	return {
 		gold = profile.gold,
 		gems = profile.gems,
 		rebirthCount = profile.rebirthCount,
 		gateCleared = profile.gateCleared,
+		catalysts = catalysts,
 		goldMultiplier = Economy.goldMultiplier(profile.rebirthCount),
 		ownedGraves = owned,
 		luckBoostLevel = profile.upgrades.luckBoost,
@@ -212,6 +224,39 @@ function PlayerData.addGems(player, amount)
 		return false
 	end
 	profile.gems = math.min(profile.gems + amount, MAX_CURRENCY)
+	PlayerData.changed(player)
+	return true
+end
+
+-- Takes gems; returns false (and takes nothing) when the player does not have that many.
+function PlayerData.spendGems(player, amount)
+	local profile = profiles[player.UserId]
+	if not profile or type(amount) ~= "number" or amount ~= amount or amount <= 0 or profile.gems < amount then
+		return false
+	end
+	profile.gems -= amount
+	PlayerData.changed(player)
+	return true
+end
+
+-- ── Catalysts (Forge) ────────────────────────────────────────
+function PlayerData.addCatalyst(player, key, amount)
+	local profile = profiles[player.UserId]
+	if not profile or not Economy.CATALYST_INFO[key] or type(amount) ~= "number" or amount ~= amount or amount <= 0 then
+		return false
+	end
+	profile.catalysts[key] = math.min((profile.catalysts[key] or 0) + math.floor(amount), MAX_CURRENCY)
+	PlayerData.changed(player)
+	return true
+end
+
+-- Uses up one catalyst; returns false when the player has none.
+function PlayerData.useCatalyst(player, key)
+	local profile = profiles[player.UserId]
+	if not profile or (profile.catalysts[key] or 0) < 1 then
+		return false
+	end
+	profile.catalysts[key] -= 1
 	PlayerData.changed(player)
 	return true
 end

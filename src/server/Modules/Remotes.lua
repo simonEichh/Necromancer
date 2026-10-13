@@ -18,9 +18,10 @@ local EVENTS = {
 	"SellAll", -- (maxRank, keepUpgraded): sell every unlocked inventory unit of that rarity rank or lower
 	"ToggleLock", -- (inventory slot): a locked unit can never be sold or dismantled
 	"SwapInventory",
-	"UpgradeUnit", -- (kind "inv" | "grave", index): the Forge, see UnitUpgrades
+	"UpgradeUnit", -- (kind "inv" | "grave", index, useFortune, useWarding): the Forge, see UnitUpgrades
 	"DismantleUnit", -- (inventory slot)
 	"BuyDust", -- (dust key, quantity): the Forge's Buy Dust tab, see UnitUpgrades
+	"BuyCatalyst", -- (catalyst key, quantity): gems for Forge catalysts, see UnitUpgrades
 	"WheelSpin",
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync

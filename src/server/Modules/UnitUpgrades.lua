@@ -3,6 +3,7 @@
 --
 --   UpgradeUnit(kind, index)   kind "inv" (inventory slot) or "grave" (grave slot with a unit standing on it)
 --   DismantleUnit(slot)        inventory units only
+--   BuyCatalyst(key, qty)      gems for catalysts (Economy.CATALYST_INFO); UpgradeUnit's useFortune / useWarding use them
 --   BuyDust(dust, qty)         the Buy Dust tab: gold for dust, limited stock per restock (GraveShop), unlocked by ascension
 --
 -- Rules (numbers in Economy, tuned with tools/sim/economy_sim.py): a unit is upgraded with the dust of ITS rarity
@@ -62,7 +63,30 @@ Remotes.BuyDust.OnServerEvent:Connect(function(player, dust, qty)
 	GraveShop.sendDustStock(player)
 end)
 
-Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
+Remotes.BuyCatalyst.OnServerEvent:Connect(function(player, key, qty)
+	local profile = PlayerData.get(player)
+	if not profile or throttled(player) or type(key) ~= "string" or type(qty) ~= "number" or qty ~= qty then
+		return
+	end
+	local info = Economy.CATALYST_INFO[key]
+	if not info then
+		return
+	end
+	if not ShopNpcs.nearForge(player) then
+		Remotes.Notice:FireClient(player, "Visit the Forge to buy catalysts.")
+		return
+	end
+	local amount = math.min(math.floor(qty), 10, math.floor(profile.gems / info.price))
+	if amount <= 0 then
+		Remotes.Notice:FireClient(player, "Not enough Gems (" .. info.price .. " needed).")
+		return
+	end
+	if PlayerData.spendGems(player, info.price * amount) then
+		PlayerData.addCatalyst(player, key, amount)
+	end
+end)
+
+Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index, useFortune, useWarding)
 	local profile = PlayerData.get(player)
 	if not profile or throttled(player) or type(index) ~= "number" or index % 1 ~= 0 then
 		return
@@ -100,15 +124,21 @@ Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)
 		return
 	end
 
-	-- the roll
+	-- the roll (a Fortune Catalyst raises the chance and is used up; a Warding Catalyst is only used up when it saves the
+	-- dust of a failed attempt)
 	local chance = Economy.upgradeChance(level, fails)
+	if useFortune == true and chance < 1 and PlayerData.useCatalyst(player, "Fortune") then
+		chance = math.min(1, chance + Economy.FORTUNE_BONUS)
+	end
 	local success = math.random() < chance
 	if success then
 		PlayerData.spendMaterial(player, dust, cost)
 		level += 1
 		fails = 0
 	else
-		PlayerData.spendMaterial(player, dust, Economy.upgradeFailLoss(cost))
+		if not (useWarding == true and PlayerData.useCatalyst(player, "Warding")) then
+			PlayerData.spendMaterial(player, dust, Economy.upgradeFailLoss(cost))
+		end
 		fails += 1
 	end
 

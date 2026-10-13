@@ -47,6 +47,7 @@ local function apply(snap)
 	end
 	State.placed = snap.placed or {}
 	State.materials = snap.materials or {}
+	State.catalysts = snap.catalysts or {}
 
 	local ascended = lastRebirth ~= nil and snap.rebirthCount > lastRebirth
 	lastRebirth = snap.rebirthCount

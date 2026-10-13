@@ -37,6 +37,7 @@ local dustStockRemote = ReplicatedStorage:WaitForChild("DustStockUpdate", 5)
 
 local selected = nil -- { kind = "inv" | "grave", index = number }
 local confirmDismantle = false -- the Dismantle button was pressed once and waits for a second press
+local useCatalyst = { Fortune = false, Warding = false } -- switched on for the next upgrade attempt
 local rowFrames = {} -- row frames by "kind:index", for the selection highlight
 
 -- ============================================================
@@ -86,7 +87,7 @@ detail.Size = UDim2.new(1, -312, 1, -84)
 detail.ZIndex = Z + 2
 detail.Parent = body
 
-local portrait = UnitPortrait.attach(detail, { position = UDim2.new(0.5, -65, 0, 0), size = UDim2.fromOffset(130, 130), zIndex = Z + 3 })
+local portrait = UnitPortrait.attach(detail, { position = UDim2.new(0.5, -60, 0, 0), size = UDim2.fromOffset(120, 120), zIndex = Z + 3 })
 
 local function line(y, size, font)
 	local l = Theme.label(detail, { text = "", size = size or "Body", font = font or "Body", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 24) })
@@ -94,21 +95,21 @@ local function line(y, size, font)
 	l.ZIndex = Z + 3
 	return l
 end
-local nameLbl = line(132, "Heading", "Strong")
-local levelLbl = line(160)
-local nextLbl = line(182)
-local costLbl = line(210)
-local chanceLbl = line(232)
-local resultLbl = line(262, "Heading", "Strong")
+local nameLbl = line(120, "Heading", "Strong")
+local levelLbl = line(146)
+local nextLbl = line(166)
+local costLbl = line(188)
+local chanceLbl = line(208)
+local resultLbl = line(234, "Heading", "Strong")
 resultLbl.TextTransparency = 1
 
 local upgradeBtn = Theme.stoneButton(detail, {
 	text = "Upgrade", color = "green", size = UDim2.fromOffset(150, 46),
-	position = UDim2.new(0.5, -158, 0, 296), zIndex = Z + 3,
+	position = UDim2.new(0.5, -158, 0, 306), zIndex = Z + 3,
 	onClick = function()
 		if selected and upgradeRemote then
 			confirmDismantle = false
-			upgradeRemote:FireServer(selected.kind, selected.index)
+			upgradeRemote:FireServer(selected.kind, selected.index, useCatalyst.Fortune, useCatalyst.Warding)
 		end
 	end,
 })
@@ -116,7 +117,7 @@ local upgradeBtn = Theme.stoneButton(detail, {
 local dismantleBtn
 dismantleBtn = Theme.stoneButton(detail, {
 	text = "Dismantle", color = "red", size = UDim2.fromOffset(150, 46),
-	position = UDim2.new(0.5, 8, 0, 296), zIndex = Z + 3,
+	position = UDim2.new(0.5, 8, 0, 306), zIndex = Z + 3,
 	onClick = function()
 		if not (selected and selected.kind == "inv" and dismantleRemote) then
 			return
@@ -141,7 +142,77 @@ local hintLbl = Theme.label(detail, {
 	text = "A failed upgrade costs half the materials and never lowers the level. Every failure makes the next try more likely.",
 	size = "Small", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, -20, 0, 36),
 })
-hintLbl.Position = UDim2.fromOffset(10, 352)
+hintLbl.Position = UDim2.fromOffset(10, 354)
+hintLbl.Size = UDim2.new(1, -20, 0, 34)
+
+-- the catalysts: a toggle chip per catalyst (owned count, what it does; click to use it on the next attempt) and a small
+-- Buy button (gems)
+local buyCatalystRemote = ReplicatedStorage:WaitForChild("BuyCatalyst", 5)
+local catalystUi = {}
+local refreshDetails -- (forward-declared: toggling repaints the chance line)
+for i, key in ipairs(Economy.CATALYSTS) do
+	local info = Economy.CATALYST_INFO[key]
+	local x = (i == 1) and 0 or 236
+	local chip = Instance.new("TextButton")
+	chip.AutoButtonColor = false
+	chip.Text = ""
+	chip.BackgroundColor3 = C.StoneRaised
+	chip.BorderSizePixel = 0
+	chip.Position = UDim2.fromOffset(x, 262)
+	chip.Size = UDim2.fromOffset(150, 38)
+	chip.ZIndex = Z + 3
+	chip.Parent = detail
+	Theme.corner(chip, Theme.Radius.Small)
+	local stroke = Theme.stroke(chip, C.Border, 1)
+	local title = Theme.label(chip, { text = info.name, size = "Small", font = "Strong", color = C.Bone, frameSize = UDim2.new(1, -10, 0, 18) })
+	title.Position = UDim2.fromOffset(8, 2)
+	title.ZIndex = Z + 4
+	local sub = Theme.label(chip, { text = info.text, size = "Small", color = C.BoneDim, frameSize = UDim2.new(1, -10, 0, 16) })
+	sub.Position = UDim2.fromOffset(8, 19)
+	sub.ZIndex = Z + 4
+	sub.TextSize = 11
+	chip.Activated:Connect(function()
+		if ((State.catalysts or {})[key] or 0) > 0 then
+			useCatalyst[key] = not useCatalyst[key]
+			if refreshDetails then
+				refreshDetails()
+			end
+		end
+	end)
+	local buy = Theme.stoneButton(detail, {
+		text = info.price .. " Gems", color = "blue", size = UDim2.fromOffset(78, 34),
+		position = UDim2.fromOffset(x + 154, 264), zIndex = Z + 3,
+		onClick = function()
+			if buyCatalystRemote then
+				buyCatalystRemote:FireServer(key, 1)
+			end
+		end,
+	})
+	catalystUi[key] = { chip = chip, stroke = stroke, title = title, sub = sub, buy = buy }
+end
+
+refreshDetails = function()
+	ForgePanel.refresh() -- (defined further down; only called on a click)
+end
+
+local function paintCatalysts()
+	for key, ui in pairs(catalystUi) do
+		local info = Economy.CATALYST_INFO[key]
+		local owned = (State.catalysts or {})[key] or 0
+		if owned < 1 then
+			useCatalyst[key] = false
+		end
+		local on = useCatalyst[key]
+		ui.title.Text = info.name .. "  x" .. owned
+		ui.title.TextColor3 = owned > 0 and C.Bone or C.BoneDim
+		ui.stroke.Color = on and C.Soul or C.Border
+		ui.stroke.Thickness = on and 2 or 1
+		ui.chip.BackgroundColor3 = on and C.Void or C.StoneRaised
+		ui.sub.Text = on and "ON for the next try" or info.text
+		ui.sub.TextColor3 = on and C.Good or C.BoneDim
+		ui.buy.root:SetAttribute("Disabled", (State.gems or 0) < info.price)
+	end
+end
 hintLbl.TextWrapped = true
 hintLbl.ZIndex = Z + 3
 
@@ -383,6 +454,11 @@ end
 -- Drawing
 -- ============================================================
 local function showDetails(entry)
+	paintCatalysts()
+	for _, ui in pairs(catalystUi) do
+		ui.chip.Visible = entry ~= nil
+		ui.buy.root.Visible = entry ~= nil
+	end
 	if not entry then
 		portrait.set(nil)
 		nameLbl.Text = "Select a unit"
@@ -411,11 +487,16 @@ local function showDetails(entry)
 		local cost = Economy.unitUpgradeCost(entry.level, rarity)
 		local have = (State.materials and State.materials[dust]) or 0
 		local chance = Economy.upgradeChance(entry.level, entry.fails)
+		local boosted = useCatalyst.Fortune and chance < 1
+		if boosted then
+			chance = math.min(1, chance + Economy.FORTUNE_BONUS)
+		end
 		levelLbl.Text = "Level " .. entry.level .. " / " .. Economy.MAX_UNIT_LEVEL .. "   Damage x" .. string.format("%.1f", Economy.levelMultiplier(entry.level))
 		nextLbl.Text = "Next level: damage x" .. string.format("%.1f", Economy.levelMultiplier(entry.level + 1))
 		costLbl.Text = "Costs " .. cost .. " " .. material .. "   (you have " .. have .. ")"
 		costLbl.TextColor3 = (have >= cost) and C.Bone or C.Warn
 		chanceLbl.Text = "Success chance " .. math.floor(chance * 100 + 0.5) .. "%" .. (entry.fails > 0 and ("   (+" .. entry.fails * 10 .. "% from failed tries)") or "")
+			.. (boosted and "   (Fortune +25%)" or "")
 		chanceLbl.TextColor3 = chance >= 0.7 and C.Good or (chance >= 0.45 and C.Bone or C.Warn)
 		upgradeBtn.root:SetAttribute("Disabled", have < cost)
 	end

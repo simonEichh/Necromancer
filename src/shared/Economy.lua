@@ -153,6 +153,16 @@ function Economy.dismantleYield(rank)
 	return math.floor(DISMANTLE_BASE * DISMANTLE_GROWTH ^ (rank - 1) + 0.5)
 end
 
+-- Catalysts (bought with gems, kept as a saved count, switched on in the Forge before an upgrade attempt):
+--   Fortune: +FORTUNE_BONUS success chance on that attempt (capped at 100 %); used up by the attempt
+--   Warding: if the attempt fails, no dust is lost; used up only when it saved the dust (a success keeps it)
+Economy.CATALYSTS = { "Fortune", "Warding" } -- display order; saved under these keys
+Economy.CATALYST_INFO = {
+	Fortune = { name = "Fortune Catalyst", price = 30, text = "+25% chance" },
+	Warding = { name = "Warding Catalyst", price = 20, text = "No dust lost on a fail" },
+}
+Economy.FORTUNE_BONUS = 0.25
+
 -- The dust shop (Buy Dust tab at the Forge, stock rotates with the grave shop every 5 minutes; sim preset "dust").
 -- A dust is on sale from the ascension at which walls start dropping it (dust index d: 1 = Stone ... 5 = Star).
 Economy.DUST_SHOP_STOCK = 10 -- of each dust per restock

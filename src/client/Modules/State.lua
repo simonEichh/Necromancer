@@ -15,6 +15,7 @@ local State = {
 	placed = {},
 	-- Upgrade dusts: { Stone = 12, ... } (Economy.DUSTS lists them, Economy.DUST_NAMES has their names)
 	materials = {},
+	catalysts = {}, -- [Economy.CATALYSTS key] = count
 	selectedSlot = 1,
 
 	-- Owned (bought, unopened) graves

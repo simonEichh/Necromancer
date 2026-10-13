@@ -62,6 +62,7 @@ local function collect(player, profile)
 		upgrades = { luckBoost = profile.upgrades.luckBoost, coinBoost = profile.upgrades.coinBoost },
 		inventory = snapshot.inventory,
 		materials = snapshot.materials,
+		catalysts = snapshot.catalysts,
 		wallsBroken = profile.wallsBroken,
 		collector = profile.collector,
 		placed = placed,
