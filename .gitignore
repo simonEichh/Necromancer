@@ -9,3 +9,8 @@ sourcemap.json
 Packages/
 ServerPackages/
 __pycache__/
+
+# Roblox Open Cloud API key (never commit)
+tools/audio/.roblox_api_key
+# original sound files (large); the prepared ones in sounds/<type>/ are committed
+sounds/_source/
