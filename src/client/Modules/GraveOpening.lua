@@ -14,7 +14,10 @@
 --     g.frame is the ViewportFrame, g.destroy() removes it
 --
 -- Model conventions (see build_grave_mossy.lua): front faces -Z, models "Body" / "Lid" / "Pit", part "Core", parts named
--- "Glow" are the soul-light cracks, attributes OpenStyle and GlowColor.
+-- "Glow" are the soul-light cracks, attributes OpenStyle and GlowColor (optional DebrisColor).
+-- OpenStyles: "Mound" (earth vanishes, pieces fly), "Lid" (the whole Lid flies off as one piece), "Door" (Lid.Door falls flat
+-- forward round its invisible Hinge part by the model's FallAngle, the other Lid parts fly off, a broad ball of light bursts
+-- out of the doorway; opts.onDoorLand is called when it slams down; see build_grave_cursed.lua); "Levitate": the Lid lifts up (LiftHeight) and hovers, turning.
 -- TODO (agreed with the user): higher grave tiers get more opening effects; add them here, driven by the tier.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -70,6 +73,83 @@ function GraveOpening.attach(model, opts)
 		return not g.stopped and model.Parent ~= nil and (not opts.alive or opts.alive())
 	end
 
+	-- idle motion, wherever the model is attached:
+	--   attribute Float: the Lid hovers up and down and sways a little (stops when a burst throws the lid away; OpenStyle
+	--   "Summon" keeps floating)
+	--   every model named "Shard": bobs on its own and turns slowly
+	--   every model named "Spin": turns round its attribute SpinAxis (model space) through SpinCenter (model space, default
+	--   its bounding box centre) at SpinSpeed rad/s; a burst spins them up hard for a few seconds (the Celestial Abyss's ring)
+	local floatGroups, spinGroups = {}, {}
+	do
+		local pivot = model:GetPivot()
+		local function collect(container, center)
+			local list = {}
+			for _, p in ipairs(container:GetDescendants()) do
+				if p:IsA("BasePart") then
+					table.insert(list, { part = p, offset = center:Inverse() * pivot:ToObjectSpace(p.CFrame) })
+				end
+			end
+			return list
+		end
+		local function group(container, amp, speed, sway, spin, isLid)
+			local cf = container:GetBoundingBox()
+			local gr = { amp = amp, speed = speed, sway = sway, spin = spin, phase = math.random() * 6, isLid = isLid,
+				center = CFrame.new(pivot:PointToObjectSpace(cf.Position)) }
+			gr.parts = collect(container, gr.center)
+			table.insert(floatGroups, gr)
+		end
+		if lid and model:GetAttribute("Float") then
+			group(lid, 0.3 * S, 1.1, math.rad(3), 0, true)
+		end
+		for _, m in ipairs(model:GetDescendants()) do
+			if m:IsA("Model") and m.Name == "Shard" then
+				group(m, (0.18 + math.random() * 0.15) * S, 1.3 + math.random() * 0.8, math.rad(6), 0.5 + math.random() * 0.5)
+			elseif m:IsA("Model") and m.Name == "Spin" then
+				local c = m:GetAttribute("SpinCenter")
+				local center = c and CFrame.new(c * S) or CFrame.new(pivot:PointToObjectSpace(m:GetBoundingBox().Position))
+				local axis = m:GetAttribute("SpinAxis") or Vector3.yAxis
+				table.insert(spinGroups, { center = center, axis = axis.Unit, speed = m:GetAttribute("SpinSpeed") or 0.4,
+					angle = 0, parts = collect(m, center) })
+			end
+		end
+		if #floatGroups > 0 or #spinGroups > 0 then
+			local floatConn
+			local last = os.clock()
+			floatConn = RunService.RenderStepped:Connect(function()
+				if not alive() then
+					floatConn:Disconnect()
+					return
+				end
+				local now = os.clock()
+				local dt = now - last
+				last = now
+				local pv = model:GetPivot()
+				for _, gr in ipairs(floatGroups) do
+					if not (gr.isLid and g.floatStopped) then
+						local ph = now * gr.speed + gr.phase
+						local cf = pv * gr.center * CFrame.new(0, math.sin(ph) * gr.amp, 0)
+							* CFrame.Angles(math.sin(ph * 0.6) * gr.sway, now * gr.spin + math.sin(ph * 0.45) * gr.sway, math.sin(ph * 0.8) * gr.sway * 0.6)
+						for _, e in ipairs(gr.parts) do
+							if e.part.Parent then
+								e.part.CFrame = cf * e.offset
+							end
+						end
+					end
+				end
+				local boost = g.burstAt and (1 + 7 * math.exp(-(now - g.burstAt) * 0.9)) or 1
+				for _, sg in ipairs(spinGroups) do
+					sg.angle += dt * sg.speed * boost
+					local cf = pv * sg.center * CFrame.fromAxisAngle(sg.axis, sg.angle)
+					for _, e in ipairs(sg.parts) do
+						if e.part.Parent then
+							e.part.CFrame = cf * e.offset
+						end
+					end
+				end
+			end)
+		end
+	end
+
 	function g.setGlow(color, amount)
 		for _, p in ipairs(glowParts) do
 			if p.Parent then
@@ -81,6 +161,8 @@ function GraveOpening.attach(model, opts)
 	-- one flying piece: velocity, spin, fade
 	local flying = {}
 	local rigid = {} -- whole lids flying as one piece
+	local doors = {} -- doors falling flat or swinging open round their hinge (OpenStyle "Door")
+	local hovering = {} -- lids lifted up and hovering (OpenStyle "Levitate")
 	local LIFE = opts.world and 1.5 or 1
 	local function launch(p, vel, spin, fadeTime)
 		p.Anchored = true
@@ -111,9 +193,103 @@ function GraveOpening.attach(model, opts)
 	function g.burst(color, t)
 		t = t or 0
 		local style = model:GetAttribute("OpenStyle") or "Mound"
+		if style ~= "Summon" then
+			g.floatStopped = true
+		end
+		g.burstAt = os.clock()
 		local origin = corePos()
+		local ground = origin.Y - 0.6 * S -- the Core sits 0.6 above the floor in the model
+		local fogCenter = origin
+		local doorFlash = false -- doors: a broad burst of light out of the doorway instead of the column straight up
+		local front = model:GetPivot().LookVector -- the grave's front (-Z)
+		-- OpenStyle "Door": every child model of Lid with a Hinge part is a door: it falls flat forward round the hinge's X
+		-- axis (FallAngle), or, with the attribute Swing = +1 / -1 on the door model, swings open outwards round the hinge's
+		-- Y axis (SwingAngle) and bangs against the wall; the other Lid parts (chains, locks) fly off
+		-- OpenStyle "Chest" uses the same hinged pieces: Lid.<model> with attribute Tilt = +1 flips up and back round its
+		-- Hinge's X axis (TiltAngle), like a chest lid; the light column then rises straight out of the chest as usual
+		local doorModels = {}
+		if lid and (style == "Door" or style == "Chest") then
+			for _, child in ipairs(lid:GetChildren()) do
+				if child:IsA("Model") and child:FindFirstChild("Hinge") then
+					table.insert(doorModels, child)
+				end
+			end
+		end
+		local function inDoor(p)
+			for _, dm in ipairs(doorModels) do
+				if p:IsDescendantOf(dm) then
+					return true
+				end
+			end
+			return false
+		end
+		local hingePart = doorModels[1] and doorModels[1].Hinge
+		for _, dm in ipairs(doorModels) do
+			local hingeCf = dm.Hinge.CFrame
+			local swing = dm:GetAttribute("Swing")
+			local tilt = dm:GetAttribute("Tilt")
+			local group = { hinge = hingeCf, parts = {}, t0 = os.clock(), swing = swing, tilt = tilt,
+				fall = math.rad(swing and (model:GetAttribute("SwingAngle") or 105)
+					or tilt and (model:GetAttribute("TiltAngle") or 105) or (model:GetAttribute("FallAngle") or 90)),
+				length = (model:GetAttribute("DoorHeight") or 3) * S }
+			for _, p in ipairs(dm:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.Anchored = true
+					table.insert(group.parts, { part = p, offset = hingeCf:ToObjectSpace(p.CFrame) })
+				end
+			end
+			table.insert(doors, group)
+		end
+		if hingePart and style == "Door" then
+			local hingeCf = hingePart.CFrame
+			if #doorModels > 1 then -- double doors: the hinges sit at the sides, the doorway is between them
+				local sum = Vector3.zero
+				for _, dm in ipairs(doorModels) do
+					sum += dm.Hinge.Position
+				end
+				hingeCf = CFrame.new(sum / #doorModels) * hingeCf.Rotation
+			end
+			local doorLength = (model:GetAttribute("DoorHeight") or 3) * S
+			ground = hingeCf.Position.Y - (model:GetAttribute("FloorHeight") or 0) * S
+			origin = hingeCf.Position + Vector3.new(0, doorLength * 0.4, 0) + front * 0.3 * S
+			fogCenter = Vector3.new(hingeCf.Position.X, origin.Y, hingeCf.Position.Z) + front * 1.2 * S
+			doorFlash = true
+			for _, p in ipairs(lid:GetDescendants()) do
+				if p:IsA("BasePart") and not inDoor(p) then
+					local out = p.Position - corePos()
+					out = Vector3.new(out.X, 0, out.Z)
+					out = (out.Magnitude > 0.05 and out.Unit or front)
+					launch(p, (out + front * 0.6) * (6 + math.random() * 6) * S + Vector3.new(0, (9 + math.random() * 8) * math.sqrt(S), 0),
+						Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 16)
+				end
+			end
+		elseif hingePart then
+			-- chests: everything in Lid that is not a hinged piece flies off
+			for _, p in ipairs(lid:GetDescendants()) do
+				if p:IsA("BasePart") and not inDoor(p) then
+					local out = Vector3.new(p.Position.X - origin.X, 0, p.Position.Z - origin.Z)
+					out = (out.Magnitude > 0.05 and out.Unit or front)
+					launch(p, out * (6 + math.random() * 6) * S + Vector3.new(0, (11 + math.random() * 8) * math.sqrt(S), 0),
+						Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 16)
+				end
+			end
+		elseif style == "Summon" then
+			-- OpenStyle "Summon" (the Void Sanctum): nothing breaks, the grave keeps floating (GraveCinematic plays its own
+			-- summon; here only the light shows)
+		elseif lid and style == "Levitate" then
+			-- OpenStyle "Levitate" (the Eternal Throne): the lid lifts up slowly (LiftHeight) and keeps hovering and turning
+			-- over the open grave
+			local lidCf = lid:GetBoundingBox()
+			local group = { center = lidCf, parts = {}, t0 = os.clock(), lift = (model:GetAttribute("LiftHeight") or 3) * S }
+			for _, p in ipairs(lid:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.Anchored = true
+					table.insert(group.parts, { part = p, offset = lidCf:ToObjectSpace(p.CFrame) })
+				end
+			end
+			table.insert(hovering, group)
 		-- OpenStyle "Lid": the whole lid is blasted off in one piece, tumbling up and away (a rigid group)
-		if lid and style == "Lid" then
+		elseif lid and style == "Lid" then
 			local lidCf = lid:GetBoundingBox()
 			local side = Vector3.new(math.random() - 0.5, 0, math.random() - 0.5)
 			side = side.Magnitude > 0.01 and side.Unit or Vector3.xAxis
@@ -145,8 +321,10 @@ function GraveOpening.attach(model, opts)
 				end
 			end
 		end
-		-- clods of earth thrown up out of the hole (more for rarer pulls)
-		debris(origin, (style == "Mound") and Color3.fromRGB(96, 66, 46) or Color3.fromRGB(110, 112, 124), math.floor(10 + 14 * t), (10 + 6 * t) * math.sqrt(S), 0.25, 0.6)
+		-- clods of earth thrown up out of the hole (more for rarer pulls); a model can set its own DebrisColor
+		local debrisColor = model:GetAttribute("DebrisColor")
+			or ((style == "Mound") and Color3.fromRGB(96, 66, 46) or Color3.fromRGB(110, 112, 124))
+		debris(origin, debrisColor, (style == "Summon" or style == "Levitate") and 0 or math.floor(10 + 14 * t), (10 + 6 * t) * math.sqrt(S), 0.25, 0.6)
 		-- the pit and the cracks light up in the pull's colour
 		if pit then
 			for _, p in ipairs(pit:GetDescendants()) do
@@ -179,6 +357,13 @@ function GraveOpening.attach(model, opts)
 		local colStart = os.clock()
 		local width = (1.6 + 1.6 * t) * S
 		local height = (opts.world and (40 + 40 * t) or (10 + 8 * t)) * S
+		local flashRadius = (opts.world and (3.2 + 2 * t) or (1.6 + 1 * t)) * S
+		if doorFlash then
+			column.Shape = Enum.PartType.Ball
+			inner.Shape = Enum.PartType.Ball
+			column.Transparency = opts.world and 0.45 or 0.3
+			inner.Transparency = opts.world and 0.25 or 0.15
+		end
 		local holdColumn = opts.world and 2.2 or 1.2
 
 		-- in the world: a real light, dust, sparks and souls
@@ -213,11 +398,10 @@ function GraveOpening.attach(model, opts)
 			end)
 			-- ground fog: thick white smoke creeping slowly out of the grave in every direction, hugging the ground
 			-- (emitters sit just above the floor round the pit and blow sideways, so the smoke never rises)
-			local ground = origin.Y - 0.6 * S -- the Core sits 0.6 above the floor in the model
 			for k = 0, 7 do
 				local a = k / 8 * math.pi * 2
 				local outDir = Vector3.new(math.cos(a), 0, math.sin(a))
-				local at = Vector3.new(origin.X, ground + 0.15, origin.Z) + outDir * 1.1 * S
+				local at = Vector3.new(fogCenter.X, ground + 0.15, fogCenter.Z) + outDir * 1.1 * S
 				local src = Instance.new("Part")
 				src.Anchored = true
 				src.CanCollide = false
@@ -284,16 +468,100 @@ function GraveOpening.attach(model, opts)
 					table.remove(rigid, i)
 				end
 			end
+			-- levitating lids: rise with an ease-out, then bob gently and turn
+			for _, h in ipairs(hovering) do
+				local age = now - h.t0
+				local k = math.clamp(age / 1.1, 0, 1)
+				local y = h.lift * (1 - (1 - k) ^ 3) + math.sin(age * 1.6) * 0.15 * S * k
+				local cf = CFrame.new(h.center.Position + Vector3.new(0, y, 0)) * CFrame.Angles(0, age * 0.35 * k, 0) * h.center.Rotation
+				for _, e in ipairs(h.parts) do
+					if e.part.Parent then
+						e.part.CFrame = cf * e.offset
+					end
+				end
+			end
+			-- doors: fall forward faster and faster and slam down, or are blasted open and bang against the wall; then
+			-- they bounce a little (dust where they hit)
+			for _, d in ipairs(doors) do
+				local age = now - d.t0
+				local fast = d.swing or d.tilt
+				local T_FALL = fast and 0.28 or 0.6
+				local ang
+				if age < T_FALL then
+					local k = age / T_FALL
+					ang = fast and d.fall * (1 - (1 - k) ^ 2) or d.fall * (0.12 * k + 0.88 * k * k)
+				else
+					if not d.landed then
+						d.landed = true
+						if opts.world then
+							local hit = Instance.new("Part")
+							hit.Anchored = true
+							hit.CanCollide = false
+							hit.CanQuery = false
+							hit.CanTouch = false
+							hit.Transparency = 1
+							hit.Size = Vector3.one * 0.5
+							local at = Vector3.new(d.hinge.Position.X, ground + 0.3, d.hinge.Position.Z) + front * d.length * 0.6
+							if fast then -- at the foot of the open door / behind the open lid
+								local sum = Vector3.zero
+								for _, e in ipairs(d.parts) do
+									sum += e.part.Position
+								end
+								sum /= math.max(1, #d.parts)
+								at = Vector3.new(sum.X, ground + 0.3, sum.Z)
+							end
+							hit.CFrame = CFrame.new(at)
+							hit.Parent = model
+							local dust = emitter(hit, SMOKE, Color3.fromRGB(150, 140, 150), Color3.fromRGB(70, 62, 70), 1.5 * S, 5 * S, 1.8, 14 * S, 85, 0.1)
+							dust.Drag = 4
+							dust.EmissionDirection = Enum.NormalId.Top
+							dust:Emit(26)
+							Debris:AddItem(hit, 4)
+						end
+						if opts.onDoorLand then
+							task.spawn(opts.onDoorLand)
+						end
+					end
+					local b = age - T_FALL
+					if fast then
+						ang = d.fall - math.rad(16) * math.abs(math.sin(b * 8)) * math.exp(-b * 4.5)
+					else
+						ang = d.fall - math.rad(7) * math.abs(math.sin(b * 11)) * math.exp(-b * 6)
+					end
+				end
+				if age < 2.5 then
+					local cf = d.swing and d.hinge * CFrame.Angles(0, d.swing * ang, 0)
+						or d.hinge * CFrame.Angles(d.tilt and d.tilt * ang or -ang, 0, 0)
+					for _, e in ipairs(d.parts) do
+						if e.part.Parent then
+							e.part.CFrame = cf * e.offset
+						end
+					end
+				end
+			end
 			-- the column shoots up, widens, then thins out
 			local a = now - colStart
 			local up = math.clamp(a / 0.25, 0, 1)
 			local h = height * up
 			local w = width * (a < 0.3 and (0.4 + 2 * a) or math.max(0.15, 1 - (a - 0.3) * 0.9 / holdColumn))
 			column.Size = Vector3.new(h, w, w)
-			column.CFrame = CFrame.new(origin + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
-			inner.Size = Vector3.new(h, w * 0.45, w * 0.45)
-			inner.CFrame = column.CFrame
-			if a > holdColumn then
+			if doorFlash then
+				-- a ball of light bursts out of the doorway, swells and fades
+				local grow = 1 - (1 - math.clamp(a / 0.3, 0, 1)) ^ 3
+				local fadeK = math.clamp((a - 0.12) / 0.9, 0, 1)
+				local r = flashRadius * (0.25 + 0.75 * grow) * (1 + 0.25 * fadeK)
+				column.Size = Vector3.one * r * 2
+				column.CFrame = CFrame.new(origin)
+				column.Transparency = (opts.world and 0.45 or 0.3) + (1 - (opts.world and 0.45 or 0.3)) * fadeK
+				inner.Size = Vector3.one * r * 1.1
+				inner.CFrame = column.CFrame
+				inner.Transparency = (opts.world and 0.25 or 0.15) + (1 - (opts.world and 0.25 or 0.15)) * math.clamp((a - 0.05) / 0.6, 0, 1)
+			else
+				column.CFrame = CFrame.new(origin + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+				inner.Size = Vector3.new(h, w * 0.45, w * 0.45)
+				inner.CFrame = column.CFrame
+			end
+			if a > holdColumn and not doorFlash then
 				column.Transparency = math.min(1, column.Transparency + 0.03)
 				inner.Transparency = math.min(1, inner.Transparency + 0.03)
 			end

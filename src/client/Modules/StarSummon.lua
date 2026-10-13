@@ -372,12 +372,46 @@ function StarSummon.play(results, opts)
 	-- the opened grave's real model replaces the simple tombstone when it has one
 	local worldGrave
 	local graveTemplate = GraveOpening.template(opts.graveType)
+	-- OpenStyle "Door" (crypts): the unit WALKS out of the crypt instead of rising (like GraveCinematic); the crypt is
+	-- scaled up so the unit fits through the door; `focus` is where the unit stands now, `stand` where it stops
+	local isDoor = graveTemplate ~= nil and graveTemplate:GetAttribute("OpenStyle") == "Door"
+	local floorLift, stand, focus = 0, G, G
+	-- box graves (coffins, tombs) with HopOut: the risen unit hops out over the front wall (like GraveCinematic)
+	local hopOut = not isDoor and graveTemplate ~= nil and graveTemplate:GetAttribute("HopOut")
+	local HOP_TIME = graveTemplate ~= nil and graveTemplate:GetAttribute("HopTime") or 0.75
+	local unitInside = hopOut and graveTemplate:GetAttribute("UnitInside") -- (the unit already stands inside, see GraveCinematic)
+	local hopArc = 0
+	local unitRootHeight, arrived
 	if graveTemplate then
 		for _, p in ipairs(graveParts) do
 			p:Destroy()
 		end
 		graveParts = {}
 		local GRAVE_SCALE = 1.5
+		if isDoor and graveTemplate:GetAttribute("DoorHeight") then
+			local folder = ReplicatedStorage:FindFirstChild("UnitModels")
+			local tpl = folder and folder:FindFirstChild(best.unitType)
+			local def = Units.Stats[best.unitType]
+			local tall = tpl and tpl:GetAttribute("Height") and tpl:GetAttribute("Height") * (def and (def.size.X / 2 * 0.9) or 1) or 5
+			GRAVE_SCALE = math.clamp(tall * 1.15 / graveTemplate:GetAttribute("DoorHeight"), 1.5, 3)
+		end
+		if hopOut then
+			floorLift = (graveTemplate:GetAttribute("FloorHeight") or 0) * GRAVE_SCALE
+			stand = G - dir * hopOut * GRAVE_SCALE
+			hopArc = ((graveTemplate:GetAttribute("WallTop") or 1.5) - (graveTemplate:GetAttribute("FloorHeight") or 0)) * GRAVE_SCALE + 0.8
+			if unitInside then
+				-- the unit is already inside: it appears standing under the impact flash (no rise), then glides out
+				START_RISE = START_IMPACT + 0.05
+				T_RISE = 1.0
+				HOLD_AT = START_RISE + T_RISE + HOP_TIME
+			else
+				HOLD_AT += HOP_TIME
+			end
+		end
+		if isDoor then
+			floorLift = (graveTemplate:GetAttribute("FloorHeight") or 0) * GRAVE_SCALE
+			stand = G - dir * (graveTemplate:GetAttribute("WalkOut") or 5) * GRAVE_SCALE
+		end
 		local gm = graveTemplate:Clone()
 		gm:ScaleTo(GRAVE_SCALE)
 		local facing = CFrame.lookAt(G, G - dir) -- its front looks back towards the cameras
@@ -577,12 +611,23 @@ function StarSummon.play(results, opts)
 		local scale = def and (def.size.X / 2 * 0.9) or 1
 		model:ScaleTo(scale)
 		local rootHeight = (model:GetAttribute("RootHeight") or 2.2) * scale
-		model:PivotTo(CFrame.lookAt(G + Vector3.new(0, rootHeight, 0), G + Vector3.new(0, rootHeight, 0) - dir))
-		-- no attacking from the cinematic: only the rise animation and the idle pose
+		unitRootHeight = rootHeight
+		-- no attacking from the cinematic: only the rise (or walk-out) animation and the idle pose
 		model:SetAttribute("AttackStyle", nil)
-		model:SetAttribute("State", "idle")
-		model:SetAttribute("RiseTime", T_RISE)
-		model:SetAttribute("RiseStart", Workspace:GetServerTimeNow())
+		if isDoor then
+			local at = G + Vector3.new(0, rootHeight + floorLift, 0)
+			model:PivotTo(CFrame.lookAt(at, at - dir))
+			model:SetAttribute("State", "walk")
+			model:SetAttribute("Speed", 4)
+		else
+			local at = G + Vector3.new(0, rootHeight + floorLift, 0)
+			model:PivotTo(CFrame.lookAt(at, at - dir))
+			model:SetAttribute("State", "idle")
+			if not unitInside then
+				model:SetAttribute("RiseTime", T_RISE)
+				model:SetAttribute("RiseStart", Workspace:GetServerTimeNow())
+			end
+		end
 		model.Parent = fxFolder
 		CollectionService:AddTag(model, PROP_TAG)
 		unit = model
@@ -618,6 +663,11 @@ function StarSummon.play(results, opts)
 		end
 		local crater = newPart(fxFolder, Vector3.new(0.2, 14, 14), CFrame.new(G + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(16, 14, 20), Enum.Material.Slate, Enum.PartType.Cylinder)
 		local rim = newPart(fxFolder, Vector3.new(0.2, 15.5, 15.5), CFrame.new(G + Vector3.new(0, 0.04, 0)) * CFrame.Angles(0, 0, math.rad(90)), bestColor, Enum.Material.Neon, Enum.PartType.Cylinder)
+		if isDoor then
+			-- a crypt does not leave a crater (the light stays on the invisible crater part)
+			crater.Transparency = 1
+			rim.Transparency = 1
+		end
 		TweenService:Create(rim, TweenInfo.new(5, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
 
 		-- light, dust and flying debris
@@ -786,18 +836,19 @@ function StarSummon.play(results, opts)
 			else
 				-- after the crash: the camera sweeps from the chase position to a low hero shot of the grave
 				local k = smooth((T - START_IMPACT) / 1.9)
-				local hero = G - dir * heroDist + right * 6 + up * heroCamY
+				local hero = stand - dir * heroDist + right * 6 + up * heroCamY
 				camPos = lastChasePos:Lerp(hero, k)
-				camLook = lastChaseLook:Lerp(G + up * math.min(heroLookY, 3.5), k)
+				camLook = lastChaseLook:Lerp(focus + up * (isDoor and heroLookY or math.min(heroLookY, 3.5)), k)
 				fov = (92 - 38 * k)
 			end
 		else
 			-- the hero shot: slowly orbiting a little while the unit climbs out
-			local orbit = (T - START_HERO) * 0.12
-			local riseK = smooth((T - START_RISE) / T_RISE)
-			camPos = G + (dir * -heroDist) * math.cos(orbit) + right * (6 * math.cos(orbit) + 14 * math.sin(orbit)) + up * heroCamY
+			-- a slow sway round the unit, never a full orbit (it would end up behind the unit or inside the grave)
+			local orbit = 0.55 * math.sin((T - START_HERO) * 0.12 / 0.55)
+			local riseK = (isDoor or unitInside) and 1 or smooth((T - START_RISE) / T_RISE)
+			camPos = stand + (dir * -heroDist) * math.cos(orbit) + right * (6 * math.cos(orbit) + 14 * math.sin(orbit)) + up * heroCamY
 			-- the look point climbs with the unit, from the crater up to the middle of its body
-			camLook = G + up * (3.4 + (heroLookY - 3.4) * riseK)
+			camLook = focus + up * (3.4 + (heroLookY - 3.4) * riseK)
 			fov = HERO_FOV + 4 - 4 * riseK
 		end
 
@@ -812,6 +863,34 @@ function StarSummon.play(results, opts)
 		if impacted and not risen and T >= START_RISE then
 			risen = true
 			spawnUnit()
+		end
+		-- crypts: the unit walks out of the dark chamber, steps down over the fallen door and stops in front of it
+		if risen and isDoor and unit and unit.Parent then
+			local k = clamp01((T - START_RISE) / T_RISE)
+			local f = 1.25 * k - 0.25 * k * k
+			local lift = floorLift * (1 - smooth(clamp01((k - 0.35) / 0.4)))
+			focus = G:Lerp(stand, f)
+			local at = focus + up * (unitRootHeight + lift)
+			unit:PivotTo(CFrame.lookAt(at, at - dir))
+			if k >= 1 and not arrived then
+				arrived = true
+				unit:SetAttribute("State", "idle")
+				shakeAmount, shakeStart = 0.35, os.clock()
+			end
+		end
+		-- box graves (HopOut): once risen the unit jumps out over the front wall and lands in front of the grave
+		if risen and hopOut and unit and unit.Parent then
+			local h = (T - START_RISE - T_RISE * 0.95) / HOP_TIME
+			if h > 0 then
+				h = math.clamp(h, 0, 1)
+				focus = G:Lerp(stand, smooth(h))
+				local at = focus + up * (unitRootHeight + floorLift * (1 - h) + 4 * h * (1 - h) * hopArc)
+				unit:PivotTo(CFrame.lookAt(at, at - dir))
+				if h >= 1 and not arrived then
+					arrived = true
+					shakeAmount, shakeStart = 0.3, os.clock()
+				end
+			end
 		end
 		-- name and rarity fade in once the unit is up
 		if risen then

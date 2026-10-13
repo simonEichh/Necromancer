@@ -137,6 +137,9 @@ local function randomResults(count, rarityName)
 	return results
 end
 local previewRarity = nil -- nil = any
+-- the grave the previews open (cycled with the Grave button); graves without a 3D model fall back to the old show
+local GRAVE_ORDER = { "Mossy", "Stone", "Ancient", "Cursed", "Shadow", "Abyssal", "Eldritch", "Void", "Eternal", "Celestial" }
+local previewGrave = "Mossy"
 local previewBtn = makeButton(panel, "Reveal x1", Color3.fromRGB(200, 255, 210))
 previewBtn.Size = UDim2.new(0.3, -8, 0, 28)
 previewBtn.Position = UDim2.fromOffset(8, 66)
@@ -145,13 +148,13 @@ local GraveCinematic = require(script.Parent.GraveCinematic)
 local function previewOpening(count)
 	local results = randomResults(count, previewRarity)
 	panel.Visible = false
-	local started = GraveCinematic.play(results, { graveType = "Mossy", onDone = function()
+	local started = GraveCinematic.play(results, { graveType = previewGrave, onDone = function()
 		panel.Visible = true
-		GachaReveal.play(results, { graveType = "Mossy", skipShow = true })
+		GachaReveal.play(results, { graveType = previewGrave, skipShow = true })
 	end })
 	if not started then
 		panel.Visible = true
-		GachaReveal.play(results, { graveType = "Mossy" })
+		GachaReveal.play(results, { graveType = previewGrave })
 	end
 end
 previewBtn.MouseButton1Click:Connect(function()
@@ -190,14 +193,14 @@ starBtn.Size = UDim2.new(0.3, -8, 0, 28)
 starBtn.Position = UDim2.fromOffset(8, 100)
 starBtn.MouseButton1Click:Connect(function()
 	panel.Visible = false
-	StarSummon.play(randomResults(1, previewRarity), { graveType = "Mossy", onDone = function() panel.Visible = true end })
+	StarSummon.play(randomResults(1, previewRarity), { graveType = previewGrave, onDone = function() panel.Visible = true end })
 end)
 -- preview The Descent (the Signature cinematic); uses the chosen preview rarity, a Signature unit when there is one
 local SignatureDescent = require(script.Parent.SignatureDescent)
 local descentBtn = makeButton(panel, "Descent", Color3.fromRGB(255, 226, 150))
 descentBtn.Size = UDim2.new(0.4, -8, 0, 28)
 descentBtn.Position = UDim2.new(0.6, 4, 0, 100)
-descentBtn.MouseButton1Click:Connect(function()
+local function playDescent()
 	local results = randomResults(1, previewRarity)
 	for name in pairs(Units.Stats) do
 		if Units.isSignature(name) and (not previewRarity or Units.Rarity[name] == previewRarity) then
@@ -206,21 +209,68 @@ descentBtn.MouseButton1Click:Connect(function()
 		end
 	end
 	panel.Visible = false
-	if not SignatureDescent.play(results, { graveType = "Mossy", onDone = function() panel.Visible = true end }) then
+	if not SignatureDescent.play(results, { graveType = previewGrave, onDone = function() panel.Visible = true end }) then
 		panel.Visible = true
 	end
-end)
+end
+descentBtn.MouseButton1Click:Connect(playDescent)
 local starBtn10 = makeButton(panel, "Star x10", Color3.fromRGB(255, 240, 170))
 starBtn10.Size = UDim2.new(0.3, -8, 0, 28)
 starBtn10.Position = UDim2.new(0.3, 4, 0, 100)
 starBtn10.MouseButton1Click:Connect(function()
 	panel.Visible = false
-	StarSummon.play(randomResults(10, previewRarity), { graveType = "Mossy", onDone = function() panel.Visible = true end })
+	StarSummon.play(randomResults(10, previewRarity), { graveType = previewGrave, onDone = function() panel.Visible = true end })
+end)
+
+-- pick any grave and any summon animation, then Play (uses the chosen preview rarity too)
+local GraveModels = game:GetService("ReplicatedStorage"):FindFirstChild("GraveModels")
+local function graveLabel()
+	local has = GraveModels and GraveModels:FindFirstChild(previewGrave)
+	return "Grave: " .. previewGrave .. (has and "" or " (no model)")
+end
+local graveBtn = makeButton(panel, graveLabel(), Color3.fromRGB(200, 220, 255))
+graveBtn.Size = UDim2.new(0.4, -8, 0, 28)
+graveBtn.Position = UDim2.fromOffset(8, 134)
+graveBtn.MouseButton1Click:Connect(function()
+	local index = table.find(GRAVE_ORDER, previewGrave) or 0
+	previewGrave = GRAVE_ORDER[index % #GRAVE_ORDER + 1]
+	graveBtn.Text = graveLabel()
+end)
+local ANIMS = { "Grave", "Star", "Descent", "Overlay" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay
+local previewAnim = 1
+local animBtn = makeButton(panel, "Anim: " .. ANIMS[previewAnim], Color3.fromRGB(230, 200, 255))
+animBtn.Size = UDim2.new(0.4, -8, 0, 28)
+animBtn.Position = UDim2.new(0.4, 0, 0, 134)
+animBtn.MouseButton1Click:Connect(function()
+	previewAnim = previewAnim % #ANIMS + 1
+	animBtn.Text = "Anim: " .. ANIMS[previewAnim]
+end)
+for _, b in ipairs({ graveBtn, animBtn }) do
+	b.TextScaled = true
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = 14
+	limit.Parent = b
+end
+local playBtn = makeButton(panel, "Play", Color3.fromRGB(170, 255, 190))
+playBtn.Size = UDim2.new(0.2, -4, 0, 28)
+playBtn.Position = UDim2.new(0.8, 0, 0, 134)
+playBtn.MouseButton1Click:Connect(function()
+	local anim = ANIMS[previewAnim]
+	if anim == "Grave" then
+		previewOpening(1)
+	elseif anim == "Star" then
+		panel.Visible = false
+		StarSummon.play(randomResults(1, previewRarity), { graveType = previewGrave, onDone = function() panel.Visible = true end })
+	elseif anim == "Descent" then
+		playDescent()
+	else
+		GachaReveal.play(randomResults(1, previewRarity), { graveType = previewGrave })
+	end
 end)
 
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -142)
-list.Position = UDim2.fromOffset(8, 136)
+list.Size = UDim2.new(1, -16, 1, -176)
+list.Position = UDim2.fromOffset(8, 170)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6

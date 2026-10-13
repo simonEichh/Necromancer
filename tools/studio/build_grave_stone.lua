@@ -164,6 +164,10 @@ end
 -- Attributes and placement
 -- ============================================================
 model:SetAttribute("OpenStyle", "Lid")
+-- the risen unit hops out over the front wall and lands HopOut studs in front of the Core (Modules/GraveCinematic)
+model:SetAttribute("HopOut", 3.0)
+model:SetAttribute("FloorHeight", 0.5)
+model:SetAttribute("WallTop", SEAM_Y)
 model:SetAttribute("GlowColor", GLOW)
 model:SetAttribute("Height", LID_TOP)
 model.Parent = folder

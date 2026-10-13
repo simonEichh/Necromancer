@@ -86,58 +86,9 @@ local function newPart(parent, size, cf, color, material, shape)
 	return p
 end
 
--- A magic circle lying flat, built from neon parts with offsets from its hub (moved with BulkMoveTo every frame)
-local function buildCircle(parent, radius, gold, accent)
-	local c = { parts = {}, offsets = {}, base = {}, radius = radius }
-	local w = math.max(0.16, radius * 0.022)
-	local function add(size, offset, color)
-		local p = newPart(parent, size, offset, color)
-		p.Transparency = 1
-		table.insert(c.parts, p)
-		table.insert(c.offsets, offset)
-		return p
-	end
-	local function ring(r, count, width, color, phase)
-		local seg = 2 * math.pi * r / count * 0.86
-		for k = 0, count - 1 do
-			local a = (k / count) * 2 * math.pi + (phase or 0)
-			add(Vector3.new(seg, 0.08, width), CFrame.Angles(0, a, 0) * CFrame.new(0, 0, -r), color)
-		end
-	end
-	local n = math.clamp(math.floor(radius * 1.6), 24, 64)
-	ring(radius, n, w, gold)
-	ring(radius * 0.88, n, w * 0.6, accent, 0.05)
-	ring(radius * 0.36, math.max(12, math.floor(n / 2)), w * 0.6, accent)
-	-- glyphs between the two outer rings
-	local m = math.clamp(math.floor(radius * 0.6), 8, 24)
-	for k = 0, m - 1 do
-		local a = k / m * 2 * math.pi
-		local base = CFrame.Angles(0, a, 0) * CFrame.new(0, 0, -radius * 0.94)
-		add(Vector3.new(w * 0.7, 0.08, radius * 0.05), base, gold)
-		add(Vector3.new(radius * 0.035, 0.08, w * 0.7), base * CFrame.new(0, 0, (k % 2 == 0) and radius * 0.012 or -radius * 0.012), gold)
-	end
-	-- a hexagram inscribed in the inner ring
-	for tri = 0, 1 do
-		local pts = {}
-		for k = 0, 2 do
-			local a = (k / 3) * 2 * math.pi + tri * math.pi
-			pts[k + 1] = Vector3.new(math.sin(a), 0, -math.cos(a)) * radius * 0.86
-		end
-		for k = 1, 3 do
-			local a, b = pts[k], pts[k % 3 + 1]
-			add(Vector3.new(w * 0.6, 0.08, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b), gold)
-		end
-	end
-	-- rune stones riding the rim
-	for k = 0, 3 do
-		local s = math.max(0.5, w * 3)
-		add(Vector3.new(s, s, s), CFrame.Angles(0, k / 4 * 2 * math.pi + math.pi / 4, 0) * CFrame.new(0, 0, -radius * 1.06) * CFrame.Angles(math.rad(45), 0, math.rad(45)), accent)
-	end
-	for i, p in ipairs(c.parts) do
-		c.base[i] = 0
-	end
-	return c
-end
+-- A magic circle lying flat (shared module, also used by GraveCinematic's summon)
+local buildCircle = require(script.Parent.MagicCircle).build
+local Sfx = require(script.Parent.Sfx)
 
 function SignatureDescent.play(results, opts)
 	opts = opts or {}
@@ -474,6 +425,7 @@ function SignatureDescent.play(results, opts)
 	-- ── State ────────────────────────────────────────────────
 	local T = 0
 	local done = false
+	local rumbleSfx -- the grave's rumble during the bait (Sfx loop)
 	local connection, keyConn
 	local shakeAmount, shakeStart = 0, 0
 	local flashStart
@@ -490,6 +442,7 @@ function SignatureDescent.play(results, opts)
 			return
 		end
 		done = true
+		if rumbleSfx then rumbleSfx.stop(0) end
 		if connection then connection:Disconnect() end
 		if keyConn then keyConn:Disconnect() end
 		grave.stop()
@@ -652,12 +605,20 @@ function SignatureDescent.play(results, opts)
 		end
 
 		-- ── 1. The grave: rises, shakes ... and stops dead ──
+		-- (the rumble starts with it and cuts out dead with the silence)
+		if not rumbleSfx and T < START_SILENCE then
+			rumbleSfx = Sfx.loop("rumble", model.PrimaryPart)
+		elseif rumbleSfx and T >= START_SILENCE then
+			rumbleSfx.stop(0.04)
+		end
 		if T < 1.1 then
 			local k = smooth(T / 0.95)
+			if rumbleSfx then rumbleSfx.set(0.35 + 0.65 * (1 - k), 0.85) end
 			local rumble = (1 - k) * 0.12 * GRAVE_SCALE
 			model:PivotTo((rest - up * (graveSize.Y + 0.5) * (1 - k)) * CFrame.new((math.random() - 0.5) * rumble, 0, (math.random() - 0.5) * rumble))
 		elseif T < START_SILENCE then
 			local p = (T - 1.1) / (START_SILENCE - 1.1)
+			if rumbleSfx then rumbleSfx.set(0.3 + 0.7 * p, 0.88 + 0.25 * p) end
 			local amp = (0.03 + 0.16 * p) * GRAVE_SCALE
 			model:PivotTo(rest * CFrame.new((math.random() - 0.5) * amp, 0, (math.random() - 0.5) * amp))
 			grave.setGlow(ACCENT, p * p * 0.6)

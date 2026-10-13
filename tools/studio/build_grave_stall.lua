@@ -1,6 +1,6 @@
 -- Builds the grave shop stall on the plaza: Workspace.HubDecor.Stall_GraveShopkeeper (an undertaker's magic grave shop:
 -- a sarcophagus counter with a ledger, coins and a crystal ball inside two turning rune rings, a skeletal undertaker in
--- a top hat with a lantern staff, display shelves with one miniature tombstone per grave tier (Mossy..Celestial), a
+-- a top hat with a lantern staff, display shelves with a miniature of every grave tier's real model (Mossy..Celestial), a
 -- floating ornate tombstone on an altar in front of a turning summoning halo, an iron cemetery fence, coffins, a barrel
 -- of shovels, a freshly dug grave with souls rising, floating candles and an iron arch with the GRAVES sign) and places
 -- the invisible interaction anchor Workspace.Shops.GraveShopkeeper (with its ProximityPrompt; the server wires it in
@@ -316,10 +316,56 @@ lantern(m, at(STAFF.X - 0.85, TOP + 5.1, STAFF.Z), GLOW)
 particles(m:FindFirstChild("CoatTails"), "Wisps", SPIRIT, 3, 2, 0.6, 0.35)
 
 -- ============================================================
--- Display shelves at the back: a miniature tombstone for every grave tier, a glowing orb above each
+-- Display shelves at the back: a miniature of every grave tier's real 3D model (ReplicatedStorage.GraveModels, built by
+-- build_grave_<tier>.lua; re-run this script after changing one), a glowing orb above each; a simple tombstone stands in
+-- for a tier without a model
 -- ============================================================
+local GRAVE_KEYS = { "Mossy", "Stone", "Ancient", "Cursed", "Shadow", "Abyssal", "Eldritch", "Void", "Eternal", "Celestial" }
+local graveModels = game:GetService("ReplicatedStorage"):FindFirstChild("GraveModels")
+local MINI_FOOT, MINI_TALL = 1.3, 1.9 -- the space one mini may take on the shelf (across x along, height)
+local miniTomb
+-- the real grave model, scaled to fit its shelf spot, front facing -X like the stall; returns false when it has none
+local function miniGrave(x, yb, z, index)
+	local tpl = graveModels and graveModels:FindFirstChild(GRAVE_KEYS[index])
+	if not tpl then
+		return false
+	end
+	local g = tpl:Clone()
+	g.Name = "Mini_" .. GRAVE_KEYS[index]
+	-- no ground patch, no particles or lights (shelf decoration only)
+	for _, d in ipairs(g:GetDescendants()) do
+		if d:IsA("ParticleEmitter") or d:IsA("Light") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			d.CastShadow = false
+			if d.Name == "Base" or d.Name == "Motes" or d.Name == "Wisps" or d.Name == "Fire" or d.Name == "Core" then
+				d.Transparency = 1
+			end
+		end
+	end
+	-- fit: the extent of the visible parts round the pivot
+	local pivot = g:GetPivot()
+	local maxR, maxY = 0.5, 0.5
+	for _, d in ipairs(g:GetDescendants()) do
+		if d:IsA("BasePart") and d.Transparency < 1 then
+			local l = pivot:PointToObjectSpace(d.Position)
+			local r = math.max(d.Size.X, d.Size.Z) / 2
+			maxR = math.max(maxR, math.abs(l.X) + r, math.abs(l.Z) + r)
+			maxY = math.max(maxY, l.Y + d.Size.Y / 2)
+		end
+	end
+	g:ScaleTo(math.min(MINI_FOOT / (2 * maxR), MINI_TALL / maxY))
+	g:PivotTo(at(x, yb, z) * CFrame.Angles(0, math.rad(90), 0)) -- the grave's front (-Z) turned to -X
+	g.Parent = m
+	local _, size = g:GetBoundingBox()
+	part(m, "TierOrb", Vector3.new(0.22, 0.22, 0.22), at(x, yb + size.Y + 0.35, z), TIERS[index][3], Enum.Material.Neon, Enum.PartType.Ball)
+	return true
+end
 -- style 1 rounded slab, 2 cross, 3 obelisk; stands on `yb`, faces -X
-local function miniTomb(x, yb, z, tier, style)
+function miniTomb(x, yb, z, tier, style)
 	local stone, mat, glow = tier[1], tier[2], tier[3]
 	part(m, "TombBase", Vector3.new(0.7, 0.18, 1.2), at(x, yb + 0.09, z), stone, mat)
 	local b = yb + 0.18
@@ -355,10 +401,14 @@ for _, s in ipairs({ -1, 1 }) do
 	local lows = { 5.9, 4.4, 2.9 }
 	local highs = { 5.2, 3.6 }
 	for k = 1, 3 do
-		miniTomb(3.2, T1, s * lows[k], TIERS[first + k], k)
+		if not miniGrave(3.2, T1, s * lows[k], first + k) then
+			miniTomb(3.2, T1, s * lows[k], TIERS[first + k], k)
+		end
 	end
 	for k = 1, 2 do
-		miniTomb(4.6, T2, s * highs[k], TIERS[first + 3 + k], k + 1)
+		if not miniGrave(4.6, T2, s * highs[k], first + 3 + k) then
+			miniTomb(4.6, T2, s * highs[k], TIERS[first + 3 + k], k + 1)
+		end
 	end
 end
 
