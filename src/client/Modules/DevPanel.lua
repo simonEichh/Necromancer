@@ -192,6 +192,24 @@ starBtn.MouseButton1Click:Connect(function()
 	panel.Visible = false
 	StarSummon.play(randomResults(1, previewRarity), { graveType = "Mossy", onDone = function() panel.Visible = true end })
 end)
+-- preview The Descent (the Signature cinematic); uses the chosen preview rarity, a Signature unit when there is one
+local SignatureDescent = require(script.Parent.SignatureDescent)
+local descentBtn = makeButton(panel, "Descent", Color3.fromRGB(255, 226, 150))
+descentBtn.Size = UDim2.new(0.4, -8, 0, 28)
+descentBtn.Position = UDim2.new(0.6, 4, 0, 100)
+descentBtn.MouseButton1Click:Connect(function()
+	local results = randomResults(1, previewRarity)
+	for name in pairs(Units.Stats) do
+		if Units.isSignature(name) and (not previewRarity or Units.Rarity[name] == previewRarity) then
+			results = { { unitType = name, rarity = Units.Rarity[name], pity = 0, oneIn = Units.getBaseOneIn(name) } }
+			break
+		end
+	end
+	panel.Visible = false
+	if not SignatureDescent.play(results, { graveType = "Mossy", onDone = function() panel.Visible = true end }) then
+		panel.Visible = true
+	end
+end)
 local starBtn10 = makeButton(panel, "Star x10", Color3.fromRGB(255, 240, 170))
 starBtn10.Size = UDim2.new(0.3, -8, 0, 28)
 starBtn10.Position = UDim2.new(0.3, 4, 0, 100)

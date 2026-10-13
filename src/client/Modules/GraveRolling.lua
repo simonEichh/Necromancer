@@ -16,6 +16,7 @@ local Sync = require(script.Parent.Sync)
 local GachaReveal = require(script.Parent.GachaReveal)
 local StarSummon = require(script.Parent.StarSummon)
 local GraveCinematic = require(script.Parent.GraveCinematic)
+local SignatureDescent = require(script.Parent.SignatureDescent)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
@@ -70,6 +71,18 @@ local function playRollAnimation(results)
 	for _, r in ipairs(results) do
 		if (Rarities.Rank[r.rarity] or 0) == bestRank and Units.isSignature(r.unitType) then
 			signatureBest = true
+		end
+	end
+	-- a Signature as the best pull: one of the Signature cinematics at random (the star summon or The Descent)
+	if signatureBest and math.random() < 0.5 then
+		local okCall, started = pcall(SignatureDescent.play, results, {
+			graveType = graveType,
+			onDone = function()
+				showOverlay(true)
+			end,
+		})
+		if okCall and started then
+			return
 		end
 	end
 	if bestRank >= STAR_MIN_RANK or signatureBest then
