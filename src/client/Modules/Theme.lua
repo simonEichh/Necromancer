@@ -394,4 +394,81 @@ function Theme.stoneButton(parent, opts)
 	return { root = root, button = button, label = label, icon = icon }
 end
 
+-- ============================================================
+-- Icon tile: a square menu button (dark stone plate with a bronze rim, the painted icon filling it, a short outlined
+-- label across the bottom edge). Used for the menu buttons on the sides of the screen; actions keep the stone buttons.
+-- opts: icon (image id), text, size (pixels, default 68), position, anchor, zIndex, onClick.
+-- Returns { root, button, label, icon }: badges can be parented to `root`.
+-- ============================================================
+local BRONZE_RIM = Color3.fromRGB(122, 92, 58)
+
+function Theme.iconTile(parent, opts)
+	opts = opts or {}
+	local s = opts.size or 68
+	local z = opts.zIndex or 1
+
+	local root = Instance.new("Frame")
+	root.BackgroundTransparency = 1
+	root.Size = UDim2.fromOffset(s, s)
+	root.Position = opts.position or UDim2.new()
+	root.AnchorPoint = opts.anchor or Vector2.new()
+	root.ZIndex = z
+	root.Parent = parent
+
+	local button = Instance.new("TextButton")
+	button.AutoButtonColor = false
+	button.Text = ""
+	button.Size = UDim2.fromScale(1, 1)
+	button.BackgroundColor3 = Theme.Color.StoneRaised
+	button.BackgroundTransparency = 0.12
+	button.BorderSizePixel = 0
+	button.ZIndex = z
+	button.Parent = root
+	Theme.corner(button, Theme.Radius.Large)
+	local rim = Theme.stroke(button, BRONZE_RIM, 2)
+	local shade = Instance.new("UIGradient")
+	shade.Rotation = 90
+	shade.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 160))
+	shade.Parent = button
+
+	local icon = Instance.new("ImageLabel")
+	icon.Name = "Icon"
+	icon.BackgroundTransparency = 1
+	icon.Image = opts.icon or ""
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.ZIndex = z + 1
+	icon.Parent = root
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Size = UDim2.new(1, 40, 0, 18)
+	label.Font = Theme.Font.Strong
+	label.Text = opts.text or ""
+	label.TextSize = math.floor(s * 0.24)
+	label.TextColor3 = Color3.fromRGB(255, 250, 240)
+	label.ZIndex = z + 2
+	Theme.outlineText(label)
+	label.Parent = root
+
+	local function show(state)
+		local sink = (state == "Pressed") and 2 or 0
+		local grow = (state == "Hover") and 0.98 or 0.88
+		icon.Size = UDim2.fromOffset(s * grow, s * grow)
+		icon.Position = UDim2.new(0.5, 0, 0.5, sink - 5)
+		label.Position = UDim2.new(0.5, 0, 1, sink - 3)
+		rim.Color = (state == "Default") and BRONZE_RIM or Theme.Color.Soul
+		button.BackgroundColor3 = (state == "Default") and Theme.Color.StoneRaised or Theme.Color.StoneHover
+	end
+	button.MouseEnter:Connect(function() show("Hover") end)
+	button.MouseLeave:Connect(function() show("Default") end)
+	button.MouseButton1Down:Connect(function() show("Pressed") end)
+	button.MouseButton1Up:Connect(function() show("Hover") end)
+	button.Activated:Connect(function()
+		if opts.onClick then opts.onClick() end
+	end)
+	show("Default")
+	return { root = root, button = button, label = label, icon = icon }
+end
+
 return Theme

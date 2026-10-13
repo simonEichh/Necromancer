@@ -18,11 +18,12 @@ local function makePillBtn(parent, text, color, x, callback)
 	}).root
 end
 
--- ── Helper: make a side button (stone button with its painted icon, see Theme.Image.Icon) ──
-local function makeIconBtn(parent, icon, label, yPos, color, callback)
-	return Theme.stoneButton(parent, {
-		text = label, color = color, size = UDim2.fromOffset(166, 44), icon = icon,
-		position = UDim2.fromOffset(0, yPos), zIndex = 5, onClick = callback,
+-- ── Helper: make a side menu tile (square icon tile, see Theme.iconTile / Theme.Image.Icon) ──
+-- tiles are 68 px, one every TILE_STEP px down a column (the label hangs over the bottom edge)
+local TILE_STEP = 84
+local function makeIconBtn(parent, icon, label, row, callback)
+	return Theme.iconTile(parent, {
+		icon = icon, text = label, position = UDim2.fromOffset(0, row * TILE_STEP), zIndex = 5, onClick = callback,
 	}).root
 end
 
@@ -101,23 +102,23 @@ function HUD.init(screenGui, deps)
 
 	-- ── Left side: icon buttons ──────────────────────────────
 	local leftPanel = Instance.new("Frame", screenGui)
-	leftPanel.Size = UDim2.new(0, 166, 0, 400)
-	leftPanel.Position = UDim2.new(0, 16, 0.5, -150)
+	leftPanel.Size = UDim2.new(0, 68, 0, 400)
+	leftPanel.Position = UDim2.new(0, 16, 0.5, -200) -- GravesDock puts its tile in row 3 (0.5, -32)
 	leftPanel.BackgroundTransparency = 1
 	leftPanel.ZIndex = 5
 
-	makeIconBtn(leftPanel, Theme.Image.Icon.Ascend, "Ascend", 0, "purple", deps.onAscend)
-	makeIconBtn(leftPanel, Theme.Image.Icon.Inventory, "Inventory", 62, "blue", deps.onInventory)
+	makeIconBtn(leftPanel, Theme.Image.Icon.Ascend, "Ascend", 0, deps.onAscend)
+	makeIconBtn(leftPanel, Theme.Image.Icon.Inventory, "Inventory", 1, deps.onInventory)
 
 	-- ── Right side: icon buttons ─────────────────────────────
 	local rightPanel = Instance.new("Frame", screenGui)
-	rightPanel.Size = UDim2.new(0, 166, 0, 400)
-	rightPanel.Position = UDim2.new(1, -176, 0.5, -50)
+	rightPanel.Size = UDim2.new(0, 68, 0, 400)
+	rightPanel.Position = UDim2.new(1, -84, 0.5, -100)
 	rightPanel.BackgroundTransparency = 1
 	rightPanel.ZIndex = 5
 
-	makeIconBtn(rightPanel, Theme.Image.Icon.Quests, "Quests", 0, "blue", deps.onQuests)
-	makeIconBtn(rightPanel, Theme.Image.Icon.Friends, "Friends", 62, nil, deps.onFriends or function() end)
+	makeIconBtn(rightPanel, Theme.Image.Icon.Quests, "Quests", 0, deps.onQuests)
+	makeIconBtn(rightPanel, Theme.Image.Icon.Friends, "Friends", 1, deps.onFriends or function() end)
 
 	-- ── Bottom left: currency display ────────────────────────
 	local currencyFrame = Instance.new("Frame", screenGui)

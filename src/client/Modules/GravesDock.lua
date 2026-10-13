@@ -227,10 +227,10 @@ function GravesDock.init(screenGui, ownedGravesRef, graveData, openGrave)
 	build(screenGui)
 
 	-- the small side button with a badge showing how many graves you own
-	-- (the left HUD column starts at 0.5, -150 with Ascend and Inventory, 62 studs apart: this one comes third)
-	graveButton = Theme.stoneButton(screenGui, {
-		text = "Graves", color = "gold", size = UDim2.fromOffset(166, 44), icon = Theme.Image.Icon.Graves,
-		position = UDim2.new(0, 16, 0.5, -26), zIndex = 5,
+	-- (the left HUD column of icon tiles starts at 0.5, -200 with Ascend and Inventory, 84 px apart: this one comes third)
+	graveButton = Theme.iconTile(screenGui, {
+		text = "Graves", icon = Theme.Image.Icon.Graves,
+		position = UDim2.new(0, 16, 0.5, -32), zIndex = 5,
 		onClick = function() GravesDock.toggle() end,
 	})
 	badge = Instance.new("Frame")
