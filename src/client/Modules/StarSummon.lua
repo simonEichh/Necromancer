@@ -28,6 +28,7 @@ local mainGui = require(script.Parent.Gui)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Theme = require(script.Parent.Theme)
+local SignatureName = require(script.Parent.SignatureName)
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
@@ -313,12 +314,18 @@ function StarSummon.play(results, opts)
 	nameLbl.TextTransparency = 1
 	nameLbl.TextStrokeTransparency = 1
 	nameLbl.Text = best.unitType
+	SignatureName.apply(nameLbl, best.unitType)
 	nameLbl.ZIndex = 6
 	nameLbl.Parent = ui
 	local rarityLbl = nameLbl:Clone()
 	rarityLbl.Position = UDim2.fromScale(0.5, 0.9)
 	rarityLbl.TextSize = 24
 	rarityLbl.Text = string.upper(best.rarity)
+	if Units.isSignature(best.unitType) then
+		local sc = Units.SIGNATURE_COLOR
+		rarityLbl.RichText = true
+		rarityLbl.Text = string.upper(best.rarity) .. string.format('  <font color="rgb(%d,%d,%d)">SIGNATURE</font>', sc.R * 255, sc.G * 255, sc.B * 255)
+	end
 	rarityLbl.TextTransparency = 1
 	rarityLbl.TextStrokeTransparency = 1
 	rarityLbl.Parent = ui

@@ -28,6 +28,8 @@ local Theme = require(script.Parent.Theme)
 local GameData = require(script.Parent.GameData)
 local screenGui = require(script.Parent.Gui)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local Units = require(ReplicatedStorage.Shared.Units)
+local SignatureName = require(script.Parent.SignatureName)
 
 local C = Theme.Color
 local Z = 60 -- base ZIndex (the UI uses global z-ordering; this is above the panels)
@@ -423,7 +425,15 @@ function GachaReveal.play(results, opts)
 		tween(plinth, 0.4, { BackgroundTransparency = 0 })
 
 		nameLbl.Text = best.unitType
-		rarityLbl.Text = tostring(best.rarity):upper()
+		SignatureName.apply(nameLbl, best.unitType)
+		if Units.isSignature(best.unitType) then
+			local sc = Units.SIGNATURE_COLOR
+			rarityLbl.RichText = true
+			rarityLbl.Text = tostring(best.rarity):upper() .. string.format('  <font color="rgb(%d,%d,%d)">SIGNATURE</font>', sc.R * 255, sc.G * 255, sc.B * 255)
+		else
+			rarityLbl.RichText = false
+			rarityLbl.Text = tostring(best.rarity):upper()
+		end
 		infoLbl.Text = "1 in " .. tostring(best.oneIn or GameData.UNIT_ONE_IN[best.unitType] or "?") .. "     Pity " .. tostring(best.pity or 0) .. " / 60"
 		tween(nameLbl, 0.35, { TextTransparency = 0, TextStrokeTransparency = 0 })
 		tween(rarityLbl, 0.35, { TextTransparency = 0, TextStrokeTransparency = 0 })

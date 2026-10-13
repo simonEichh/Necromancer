@@ -3,6 +3,8 @@ local Theme = require(script.Parent.Theme)
 local C = Theme.Color
 local UnitPortrait = require(script.Parent.UnitPortrait)
 local LevelBadge = require(script.Parent.LevelBadge)
+local SignatureName = require(script.Parent.SignatureName)
+local Units = require(game:GetService("ReplicatedStorage").Shared.Units)
 local LevelEconomy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 local Rarities = require(game:GetService("ReplicatedStorage").Shared.Rarities)
 local State = require(script.Parent.State)
@@ -121,7 +123,8 @@ ensureInvSlots = function()
 			if not u then tooltip.Visible = false return end
 			local ui = UNIT_INFO[u.unitType] or {}
 			ttName.Text   = u.unitType .. ((u.level or 0) > 0 and ("  Lv " .. u.level) or "")
-			ttRarity.Text = ui.rarity or ""
+			SignatureName.apply(ttName, u.unitType)
+			ttRarity.Text = (ui.rarity or "") .. (Units.isSignature(u.unitType) and "  ·  Signature" or "")
 			ttRarity.TextColor3 = RARITY_COLORS[ui.rarity] or Color3.fromRGB(200, 200, 200)
 			ttDps.Text    = (UNIT_DPS[u.unitType] and math.floor(UNIT_DPS[u.unitType] * LevelEconomy.levelMultiplier(u.level)) or "?") .. " DPS"
 			ttOneIn.Text  = "1 in " .. (u.oneIn or UNIT_ONE_IN[u.unitType] or "?")
@@ -208,6 +211,7 @@ refresh = function()
 			sd.badge.set(unit.level)
 			sd.name.Text      = unit.unitType
 			sd.name.TextColor3 = C.Bone
+			SignatureName.apply(sd.name, unit.unitType)
 			sd.ind.Text       = (invIdx <= 10) and tostring(invIdx % 10) or ""
 			sd.lock.Visible   = unit.locked == true
 		else
@@ -219,6 +223,7 @@ refresh = function()
 				sd.portrait.set(nil)
 			end
 			sd.badge.set(0)
+			SignatureName.apply(sd.name, nil)
 			sd.name.Text      = ""
 			sd.ind.Text       = ""
 			sd.lock.Visible   = false

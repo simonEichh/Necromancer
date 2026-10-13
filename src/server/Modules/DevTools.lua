@@ -9,6 +9,7 @@ if not RunService:IsStudio() then
 end
 
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
 local Army = require(script.Parent.Army)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local PlotFrame = require(script.Parent.PlotFrame)
@@ -27,6 +28,11 @@ Remotes.DevSpawnUnit.OnServerEvent:Connect(function(player, unitType, atGraves, 
 		return
 	end
 	level = (type(level) == "number" and level == level) and math.clamp(math.floor(level), 0, 10) or 0
+	if atGraves == "inventory" then
+		-- into the inventory like a pulled unit (it is saved like one; the usual test-save reset clears it)
+		PlayerData.addUnit(player, unitType, nil, level, 0)
+		return
+	end
 	local plotState = PlotRegistry.getPlot(player)
 	if not plotState then
 		return

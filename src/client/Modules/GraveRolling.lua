@@ -16,6 +16,7 @@ local Sync = require(script.Parent.Sync)
 local GachaReveal = require(script.Parent.GachaReveal)
 local StarSummon = require(script.Parent.StarSummon)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local Units = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 
 -- Pulls whose best result has at least this rarity rank (5 = Legendary) play the star summon cinematic first; the
@@ -63,7 +64,14 @@ local function playRollAnimation(results)
 	for _, r in ipairs(results) do
 		bestRank = math.max(bestRank, Rarities.Rank[r.rarity] or 0)
 	end
-	if bestRank >= STAR_MIN_RANK then
+	-- Signature units always get the cinematic (when one of them is the best pull)
+	local signatureBest = false
+	for _, r in ipairs(results) do
+		if (Rarities.Rank[r.rarity] or 0) == bestRank and Units.isSignature(r.unitType) then
+			signatureBest = true
+		end
+	end
+	if bestRank >= STAR_MIN_RANK or signatureBest then
 		-- a rare pull: the cinematic first (the data update stays held back), then the result in the overlay
 		local ok = pcall(StarSummon.play, results, {
 			onDone = function()

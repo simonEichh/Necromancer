@@ -52,8 +52,8 @@ def load_game_data():
     pools = {}
     pool_src = units_src[units_src.index("local RARITY_UNITS = {"): units_src.index("-- Reverse lookup")]
     for m in re.finditer(r"\n\t(\w+) = \{(.*?)\n\t\},", pool_src, re.S):
-        entries = re.findall(r'unit = "(\w+)", weight = (\d+)', m.group(2))
-        pools[m.group(1)] = [(u, int(w)) for u, w in entries]
+        entries = re.findall(r'unit = "(\w+)", weight = ([\d.]+)', m.group(2))
+        pools[m.group(1)] = [(u, float(w)) for u, w in entries]  # (Signature units have fractional weights)
 
     rar_src = read("Rarities.lua")
     odds_block = rar_src[rar_src.index("local BASE_ODDS = {"): rar_src.index("local RARITY_RANK")]

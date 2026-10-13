@@ -85,13 +85,21 @@ title.Parent = panel
 
 -- where spawned units start: right in front of the wall (attacking at once) or at the graves (they march to their
 -- formation slot, so you can watch the army form up)
-local atGraves = false
+local atGraves = false -- false = WALL, true = GRAVES, "inventory" = put it in the inventory (to test slots, Forge, ...)
 local mode = makeButton(panel, "Spawn at: WALL (click to switch)", Color3.fromRGB(160, 220, 255))
 mode.Size = UDim2.new(0.46, -10, 0, 30)
 mode.Position = UDim2.fromOffset(8, 32)
 mode.MouseButton1Click:Connect(function()
-	atGraves = not atGraves
-	mode.Text = atGraves and "Spawn at: GRAVES (march in)" or "Spawn at: WALL (click to switch)"
+	if atGraves == false then
+		atGraves = true
+	elseif atGraves == true then
+		atGraves = "inventory"
+	else
+		atGraves = false
+	end
+	mode.Text = (atGraves == true and "Spawn at: GRAVES (march in)")
+		or (atGraves == "inventory" and "Give to: INVENTORY")
+		or "Spawn at: WALL (click to switch)"
 end)
 
 -- the level spawned units get (to preview the level auras: 3, 6, 9, 10)

@@ -79,11 +79,11 @@ local function rollUnit(rarity)
 	for _, entry in ipairs(pool) do
 		totalWeight += entry.weight
 	end
-	local roll = math.random(1, totalWeight)
+	local roll = math.random() * totalWeight -- (weights may be fractions: Signature units have very low ones)
 	local cumulative = 0
 	for _, entry in ipairs(pool) do
 		cumulative += entry.weight
-		if roll <= cumulative then
+		if roll < cumulative then
 			return entry.unit
 		end
 	end

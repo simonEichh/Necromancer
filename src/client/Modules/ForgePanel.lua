@@ -15,6 +15,7 @@ local State = require(script.Parent.State)
 local Sync = require(script.Parent.Sync)
 local GameData = require(script.Parent.GameData)
 local UnitPortrait = require(script.Parent.UnitPortrait)
+local SignatureName = require(script.Parent.SignatureName)
 local screenGui = require(script.Parent.Gui)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
@@ -97,7 +98,9 @@ local upgradeBtn = Theme.stoneButton(detail, {
 		end
 	end,
 })
-local dismantleBtn = Theme.stoneButton(detail, {
+-- (declared first: the click handler below refers to the button, and `local x = f(function() x end)` would see nil)
+local dismantleBtn
+dismantleBtn = Theme.stoneButton(detail, {
 	text = "Dismantle", color = "red", size = UDim2.fromOffset(150, 46),
 	position = UDim2.new(0.5, 8, 0, 296), zIndex = Z + 3,
 	onClick = function()
@@ -230,7 +233,9 @@ local function showDetails(entry)
 	local material = Economy.DUST_NAMES[dust]
 	portrait.set(entry.unitType)
 	nameLbl.Text = entry.unitType
+	SignatureName.apply(nameLbl, nil) -- (reset, then the rarity colour below, then the burn for Signature units)
 	nameLbl.TextColor3 = Theme.rarityColor(rarity)
+	SignatureName.apply(nameLbl, entry.unitType)
 	upgradeBtn.root.Visible = true
 	dismantleBtn.root.Visible = (entry.kind == "inv")
 

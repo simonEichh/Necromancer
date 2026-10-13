@@ -220,7 +220,7 @@ local UNITS = {
 	Hush = {
 		color = BrickColor.new("Royal purple"),
 		size = Vector3.new(2.2, 4, 2.2),
-		damage = 76000,
+		damage = 90000, -- 45K DPS: a Signature unit is among the strongest of its rarity (but stays below the next tier)
 		speed = 12,
 		attackRange = 20,
 		attackCD = 2.0,
@@ -316,7 +316,7 @@ local RARITY_UNITS = {
 	Eternal = {
 		{ unit = "TheUndying", weight = 2 },
 		{ unit = "DeathIncarnate", weight = 1 },
-		{ unit = "Hush", weight = 1 },
+		{ unit = "Hush", weight = 0.2 }, -- Signature: very low weight
 	},
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
@@ -395,8 +395,22 @@ local function getBaseOneIn(unitType)
 	return math.max(2, math.round(1 / chance))
 end
 
+-- Signature units: every unit with its own special attack (`special` in its def). Their NAME burns everywhere it is
+-- shown (client Modules/SignatureName: an ember gradient shimmering through the letters, on slots, tooltips, the reveal,
+-- the star cinematic, the Forge and the nameplate in the world); the reveal and the tooltip also say "Signature". They
+-- always get the star cinematic. Rules: their DPS is at the TOP of their rarity's range (one of the strongest of the tier, never into the
+-- next tier), and they ALWAYS get a very low weight in RARITY_UNITS (e.g. 0.2 against 1-4 for normal units), so they
+-- are the chase within each tier. (Planned: a "guaranteed Rare Signature" box for new players.)
+local SIGNATURE_COLOR = Color3.fromRGB(255, 226, 150)
+local function isSignature(unitType)
+	local def = UNITS[unitType]
+	return def ~= nil and def.special ~= nil
+end
+
 return {
 	Stats = UNITS,
+	isSignature = isSignature,
+	SIGNATURE_COLOR = SIGNATURE_COLOR,
 	Pools = RARITY_UNITS,
 	Rarity = UNIT_RARITY,
 	Emoji = UNIT_EMOJIS,
