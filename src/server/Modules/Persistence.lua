@@ -62,6 +62,8 @@ local function collect(player, profile)
 		upgrades = { luckBoost = profile.upgrades.luckBoost, coinBoost = profile.upgrades.coinBoost },
 		inventory = snapshot.inventory,
 		materials = snapshot.materials,
+		wallsBroken = profile.wallsBroken,
+		collector = profile.collector,
 		placed = placed,
 		pity = Rolling.exportPity(player),
 		wheelSpins = Wheel.getWheelData(player).spins,

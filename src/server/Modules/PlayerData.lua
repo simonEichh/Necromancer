@@ -42,6 +42,8 @@ function PlayerData.create(player, saved)
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
+		wallsBroken = 0, -- walls ever broken (the first objective: Drops.COLLECTOR_WALLS earns the Soul Wisp)
+		collector = false, -- has the Soul Wisp (collects the loot drops, see Drops)
 		saved = saved, -- raw saved data, for modules that restore their own state
 		syncQueued = false,
 		dirty = false,
@@ -52,6 +54,8 @@ function PlayerData.create(player, saved)
 		profile.gold = clampNumber(saved.gold, START_GOLD, 0)
 		profile.gems = clampNumber(saved.gems, 0, 0)
 		profile.rebirthCount = math.floor(clampNumber(saved.rebirthCount, 0, 0))
+		profile.wallsBroken = math.floor(clampNumber(saved.wallsBroken, 0, 0))
+		profile.collector = saved.collector == true
 
 		if type(saved.ownedGraves) == "table" then
 			for key in pairs(profile.ownedGraves) do
@@ -146,6 +150,8 @@ function PlayerData.snapshot(profile)
 		coinBoostLevel = profile.upgrades.coinBoost,
 		inventory = inventory,
 		materials = materials,
+		wallsBroken = profile.wallsBroken,
+		collector = profile.collector,
 		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}
 end

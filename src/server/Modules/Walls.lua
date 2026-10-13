@@ -7,6 +7,7 @@ local Collision = require(script.Parent.Collision)
 local PlotFrame = require(script.Parent.PlotFrame)
 local Quests = require(script.Parent.Quests)
 local PlayerData = require(script.Parent.PlayerData)
+local Drops = require(script.Parent.Drops)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
@@ -307,6 +308,7 @@ end
 local function breakWall(plotState)
 	if plotState.wallLayer > NUM_WALLS then return end -- the gate already fell (late arrows, last barrage hits)
 	local brokenLayer = plotState.wallLayer
+	local brokenFaceFwd = plotState.wallFaceFwd -- where the loot bursts out
 	plotState.wallLayer += 1
 	crumbleWall(plotState.wallQueue[brokenLayer], plotState)
 
@@ -329,11 +331,10 @@ local function breakWall(plotState)
 			local profile = PlayerData.get(p)
 			if profile then
 				local mult = Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost)
-				PlayerData.addGold(p, math.floor(goldReward * mult))
-				-- the wall drops upgrade materials (boss walls and the gate drop better ones)
-				for _, drop in ipairs(Economy.wallMaterials(brokenLayer, profile.rebirthCount)) do
-					PlayerData.addMaterial(p, drop.dust, drop.amount)
-				end
+				-- the wall bursts into gold coins and dust crystals that lie on the lane until they are collected
+				-- (boss walls and the gate drop better dust), see Drops
+				Drops.spawnWallDrops(p, plotState, math.floor(goldReward * mult), Economy.wallMaterials(brokenLayer, profile.rebirthCount), brokenFaceFwd)
+				Drops.wallBroken(p)
 			end
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)
 			if Economy.isGate(brokenLayer) then
@@ -349,6 +350,7 @@ local function breakWall(plotState)
 end
 
 local function resetWall(plotState)
+	Drops.clearPlot(plotState)
 	for _, w in pairs(plotState.wallQueue or {}) do
 		if w and w.Parent then w:Destroy() end
 	end

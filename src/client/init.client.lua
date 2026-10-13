@@ -180,6 +180,7 @@ require(Modules.SellPanel)
 require(Modules.ForgePanel)
 require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
 require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 / 10
+require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
 require(Modules.UpgradePanel)
 WheelPanel = require(Modules.WheelPanel)
 require(Modules.DevPanel) -- Studio only, drawn on top
