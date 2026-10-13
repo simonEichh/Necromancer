@@ -20,6 +20,7 @@ local EVENTS = {
 	"SwapInventory",
 	"UpgradeUnit", -- (kind "inv" | "grave", index): the Forge, see UnitUpgrades
 	"DismantleUnit", -- (inventory slot)
+	"BuyDust", -- (dust key, quantity): the Forge's Buy Dust tab, see UnitUpgrades
 	"WheelSpin",
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync
@@ -37,6 +38,7 @@ local EVENTS = {
 	"RollResult",
 	"SelectGrave",
 	"ShopStockUpdate",
+	"DustStockUpdate", -- (stock {dust = count}, seconds until the restock): the Forge's Buy Dust tab
 	"WallBreak",
 	"WheelResult",
 	"WheelSpinsUpdate",

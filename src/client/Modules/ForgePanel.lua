@@ -5,6 +5,9 @@
 -- Upgrade. The row at the bottom shows your dusts (one per pair of rarities: a unit is upgraded with the dust of its own
 -- rarity, Economy.dustOf). Dismantle turns a spare inventory unit into materials of its rarity. The server does everything (see
 -- server UnitUpgrades): this panel only sends UpgradeUnit(kind, index) / DismantleUnit(slot) and shows what comes back.
+-- Two tabs in the header: Upgrade (the above) and Buy Dust (gold for dust: Economy.dustPrice, a limited stock that refills
+-- with the grave shop every 5 minutes, each dust unlocked at Economy.dustShopUnlock ascensions; the server checks
+-- everything in UnitUpgrades, BuyDust). The dust row at the bottom stays visible on both tabs.
 -- Builds its UI when required (no init call).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -16,6 +19,7 @@ local Sync = require(script.Parent.Sync)
 local GameData = require(script.Parent.GameData)
 local UnitPortrait = require(script.Parent.UnitPortrait)
 local SignatureName = require(script.Parent.SignatureName)
+local Format = require(script.Parent.Format)
 local screenGui = require(script.Parent.Gui)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
@@ -28,6 +32,8 @@ local ForgePanel = {}
 local upgradeRemote = ReplicatedStorage:WaitForChild("UpgradeUnit", 5)
 local dismantleRemote = ReplicatedStorage:WaitForChild("DismantleUnit", 5)
 local resultRemote = ReplicatedStorage:WaitForChild("UpgradeResult", 5)
+local buyDustRemote = ReplicatedStorage:WaitForChild("BuyDust", 5)
+local dustStockRemote = ReplicatedStorage:WaitForChild("DustStockUpdate", 5)
 
 local selected = nil -- { kind = "inv" | "grave", index = number }
 local confirmDismantle = false -- the Dismantle button was pressed once and waits for a second press
@@ -187,6 +193,148 @@ for i, dust in ipairs(Economy.DUSTS) do
 	countText.ZIndex = Z + 4
 	chips[dust] = { frame = chip, stroke = stroke, count = countText }
 end
+
+-- ============================================================
+-- Buy Dust tab: one row per dust (icon, name, price, stock, Buy 1 / Buy 10), the restock timer on top
+-- ============================================================
+local dustStock = {} -- from the server (DustStockUpdate)
+local restockAt = nil -- os.clock() of the next restock
+local shop = Instance.new("Frame")
+shop.BackgroundTransparency = 1
+shop.Size = UDim2.new(1, 0, 1, -84)
+shop.ZIndex = Z + 2
+shop.Visible = false
+shop.Parent = body
+local restockLbl = Theme.label(shop, { text = "", size = "Body", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(1, 0, 0, 24) })
+restockLbl.ZIndex = Z + 3
+local shopRows = {}
+local paintShop -- (forward-declared: the Buy buttons repaint)
+for i, dust in ipairs(Economy.DUSTS) do
+	local row = Instance.new("Frame")
+	row.BackgroundColor3 = C.StoneRaised
+	row.BorderSizePixel = 0
+	row.Position = UDim2.fromOffset(20, 30 + (i - 1) * 70)
+	row.Size = UDim2.new(1, -40, 0, 62)
+	row.ZIndex = Z + 3
+	Theme.corner(row, Theme.Radius.Small)
+	Theme.stroke(row, C.Border, 1)
+	row.Parent = shop
+	local color = DUST_COLORS[dust] or C.Bone
+	local icon = Instance.new("ImageLabel")
+	icon.BackgroundTransparency = 1
+	icon.Image = Theme.Image.Dust[dust] or ""
+	icon.Size = UDim2.fromOffset(50, 50)
+	icon.Position = UDim2.fromOffset(8, 6)
+	icon.ZIndex = Z + 4
+	icon.Parent = row
+	local nameText = Theme.label(row, { text = Economy.DUST_NAMES[dust], size = "Heading", font = "Strong", color = color, frameSize = UDim2.new(0, 190, 0, 30) })
+	nameText.Position = UDim2.fromOffset(68, 4)
+	nameText.ZIndex = Z + 4
+	local priceText = Theme.label(row, { text = "", size = "Body", color = C.Bone, frameSize = UDim2.new(0, 190, 0, 24) })
+	priceText.Position = UDim2.fromOffset(68, 32)
+	priceText.ZIndex = Z + 4
+	local stockText = Theme.label(row, { text = "", size = "Body", font = "Strong", color = C.Bone, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(0, 120, 1, 0) })
+	stockText.Position = UDim2.fromOffset(268, 0)
+	stockText.ZIndex = Z + 4
+	local function buy(qty)
+		if buyDustRemote then
+			buyDustRemote:FireServer(dust, qty)
+		end
+	end
+	local buy1 = Theme.stoneButton(row, {
+		text = "Buy 1", color = "green", size = UDim2.fromOffset(96, 40),
+		position = UDim2.new(1, -212, 0.5, 0), anchor = Vector2.new(0, 0.5), zIndex = Z + 4,
+		onClick = function() buy(1) end,
+	})
+	local buyAll = Theme.stoneButton(row, {
+		text = "Buy 10", color = "gold", size = UDim2.fromOffset(96, 40),
+		position = UDim2.new(1, -108, 0.5, 0), anchor = Vector2.new(0, 0.5), zIndex = Z + 4,
+		onClick = function() buy(Economy.DUST_SHOP_STOCK) end,
+	})
+	shopRows[dust] = { index = i, row = row, price = priceText, stock = stockText, buy1 = buy1, buyAll = buyAll, name = nameText, icon = icon }
+end
+
+function paintShop()
+	local ascension = State.rebirthCount or 0
+	local gold = State.gold or 0
+	for dust, r in pairs(shopRows) do
+		local price = Economy.dustPrice(r.index)
+		local unlock = Economy.dustShopUnlock(r.index)
+		local left = dustStock[dust] or 0
+		if ascension < unlock then
+			r.price.Text = "Unlocks at ascension " .. unlock
+			r.stock.Text = ""
+			r.name.TextTransparency = 0.5
+			r.icon.ImageTransparency = 0.6
+			r.buy1.root.Visible = false
+			r.buyAll.root.Visible = false
+		else
+			r.price.Text = Format.fmtGold(price) .. " Gold each"
+			r.stock.Text = left > 0 and (left .. " / " .. Economy.DUST_SHOP_STOCK .. " left") or "Sold out"
+			r.stock.TextColor3 = left > 0 and C.Bone or C.BoneDim
+			r.name.TextTransparency = 0
+			r.icon.ImageTransparency = 0
+			r.buy1.root.Visible = true
+			r.buyAll.root.Visible = true
+			local most = math.min(left, math.floor(gold / price))
+			r.buy1.root:SetAttribute("Disabled", most < 1)
+			r.buyAll.root:SetAttribute("Disabled", most < 1)
+			-- the second button buys as many as you can (up to the stock left); sold out it keeps its full label
+			r.buyAll.label.Text = "Buy " .. ((most >= 1) and most or Economy.DUST_SHOP_STOCK)
+		end
+	end
+end
+
+local function paintRestock()
+	if not restockAt then
+		restockLbl.Text = ""
+		return
+	end
+	local secs = math.max(0, math.floor(restockAt - os.clock()))
+	restockLbl.Text = string.format("Restocks in %d:%02d", secs // 60, secs % 60)
+end
+
+if dustStockRemote then
+	dustStockRemote.OnClientEvent:Connect(function(stock, secsLeft)
+		dustStock = stock or {}
+		restockAt = os.clock() + (secsLeft or 0)
+		paintShop()
+		paintRestock()
+	end)
+end
+
+-- the two tabs in the header: each has a green (selected) and a grey version, one of them shown
+local tab = "upgrade"
+local tabButtons = {}
+local setTab
+local function makeTab(key, text, x)
+	local t = {}
+	for _, state in ipairs({ "on", "off" }) do
+		t[state] = Theme.stoneButton(panel, {
+			text = text, color = state == "on" and "green" or "stone", size = UDim2.fromOffset(120, 30),
+			position = UDim2.fromOffset(x, 5), zIndex = Z + 2,
+			onClick = function() setTab(key) end,
+		})
+	end
+	tabButtons[key] = t
+end
+function setTab(name)
+	tab = name
+	list.Visible = name == "upgrade"
+	detail.Visible = name == "upgrade"
+	shop.Visible = name == "dust"
+	for key, t in pairs(tabButtons) do
+		t.on.root.Visible = key == name
+		t.off.root.Visible = key ~= name
+	end
+	if name == "dust" then
+		paintShop()
+		paintRestock()
+	end
+end
+makeTab("upgrade", "Upgrade", 110)
+makeTab("dust", "Buy Dust", 238)
+setTab("upgrade")
 
 -- ============================================================
 -- Data
@@ -382,6 +530,9 @@ end
 task.spawn(function()
 	while true do
 		task.wait(0.5)
+		if panel.Visible and tab == "dust" then
+			paintRestock()
+		end
 		if panel.Visible then
 			local shops = workspace:FindFirstChild("Shops")
 			local anchor = shops and shops:FindFirstChild("ForgeKeeper")
@@ -397,6 +548,9 @@ end)
 -- new data from the server: redraw (also keeps the numbers right after an upgrade)
 Sync.onApplied(function()
 	ForgePanel.refresh()
+	if tab == "dust" then
+		paintShop()
+	end
 end)
 
 -- the result of an upgrade attempt

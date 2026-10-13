@@ -153,6 +153,24 @@ function Economy.dismantleYield(rank)
 	return math.floor(DISMANTLE_BASE * DISMANTLE_GROWTH ^ (rank - 1) + 0.5)
 end
 
+-- The dust shop (Buy Dust tab at the Forge, stock rotates with the grave shop every 5 minutes; sim preset "dust").
+-- A dust is on sale from the ascension at which walls start dropping it (dust index d: 1 = Stone ... 5 = Star).
+Economy.DUST_SHOP_STOCK = 10 -- of each dust per restock
+function Economy.dustPrice(d)
+	return 20 * 50 ^ (d - 1) -- gold per dust: Stone 20, Silver 1K, Gold 50K, Diamond 2.5M, Star 125M
+end
+function Economy.dustShopUnlock(d)
+	return math.max(0, 2 * d - 3) -- the ascension that unlocks dust d in the shop: 0, 1, 3, 5, 7
+end
+function Economy.dustIndex(dust)
+	for i, key in ipairs(Economy.DUSTS) do
+		if key == dust then
+			return i
+		end
+	end
+	return nil
+end
+
 -- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { dust, amount }.
 -- Mostly the dust of the best rarity the player has reached (one higher than their ascensions), sometimes of the rarity
 -- below; boss walls and the gate add three times as much of the dust of the rarity above.

@@ -3,6 +3,7 @@
 --
 --   UpgradeUnit(kind, index)   kind "inv" (inventory slot) or "grave" (grave slot with a unit standing on it)
 --   DismantleUnit(slot)        inventory units only
+--   BuyDust(dust, qty)         the Buy Dust tab: gold for dust, limited stock per restock (GraveShop), unlocked by ascension
 --
 -- Rules (numbers in Economy, tuned with tools/sim/economy_sim.py): a unit is upgraded with the dust of ITS rarity
 -- (Economy.dustOf); going from level L to L + 1 costs Economy.unitUpgradeCost(L, rarity) dust and works with Economy.upgradeChance(L, fails). A failure
@@ -16,6 +17,7 @@ local Economy = require(ReplicatedStorage.Shared.Economy)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local ShopNpcs = require(script.Parent.ShopNpcs)
+local GraveShop = require(script.Parent.GraveShop)
 
 local lastRequest = {} -- [UserId] = os.clock() of the last upgrade/dismantle request (a little rate limit)
 local MIN_INTERVAL = 0.12
@@ -31,6 +33,33 @@ end
 
 game:GetService("Players").PlayerRemoving:Connect(function(player)
 	lastRequest[player.UserId] = nil
+end)
+
+Remotes.BuyDust.OnServerEvent:Connect(function(player, dust, qty)
+	local profile = PlayerData.get(player)
+	if not profile or throttled(player) or type(dust) ~= "string" or type(qty) ~= "number" or qty ~= qty then
+		return
+	end
+	if not ShopNpcs.nearForge(player) then
+		Remotes.Notice:FireClient(player, "Visit the Forge to buy dust.")
+		return
+	end
+	local d = Economy.dustIndex(dust)
+	local stock = GraveShop.dustStock(player)
+	if not d or not stock or (profile.rebirthCount or 0) < Economy.dustShopUnlock(d) then
+		return
+	end
+	local price = Economy.dustPrice(d)
+	local amount = math.min(math.floor(qty), stock[dust] or 0, math.floor(profile.gold / price))
+	if amount <= 0 then
+		return
+	end
+	if not PlayerData.spendGold(player, price * amount) then
+		return
+	end
+	stock[dust] -= amount
+	PlayerData.addMaterial(player, dust, amount)
+	GraveShop.sendDustStock(player)
 end)
 
 Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index)

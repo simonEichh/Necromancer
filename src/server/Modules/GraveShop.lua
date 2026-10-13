@@ -1,8 +1,10 @@
--- Per-player grave shop stock rotation and purchases.
+-- Per-player grave shop stock rotation and purchases. Also holds the dust shop's stock (the Forge's Buy Dust tab, bought
+-- in UnitUpgrades): it refills with the same 5-minute rotation.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local Graves = require(ReplicatedStorage.Shared.Graves)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 -- Tuned with tools/sim/economy_sim.py: cheap graves are limited too, so pulls come from gold earned, not from spam.
 local GRAVE_STOCK_BASE = {
@@ -31,9 +33,14 @@ local function generateRotation(player)
 			inRotation[key] = false
 		end
 	end
+	local dustStock = {}
+	for _, dust in ipairs(Economy.DUSTS) do
+		dustStock[dust] = Economy.DUST_SHOP_STOCK
+	end
 	playerShopData[id] = {
 		stock = stock,
 		inRotation = inRotation,
+		dustStock = dustStock,
 		nextRestock = tick() + SHOP_RESTOCK_TIME,
 	}
 end
@@ -44,6 +51,19 @@ local function sendShopUpdate(player)
 	if not data then return end
 	local secsLeft = math.max(0, math.floor(data.nextRestock - tick()))
 	Remotes.ShopStockUpdate:FireClient(player, data.stock, data.inRotation, secsLeft)
+	Remotes.DustStockUpdate:FireClient(player, data.dustStock, secsLeft)
+end
+
+-- the dust shop's stock table of a player (nil before their first rotation)
+local function dustStock(player)
+	local data = playerShopData[tostring(player.UserId)]
+	return data and data.dustStock
+end
+local function sendDustStock(player)
+	local data = playerShopData[tostring(player.UserId)]
+	if data then
+		Remotes.DustStockUpdate:FireClient(player, data.dustStock, math.max(0, math.floor(data.nextRestock - tick())))
+	end
 end
 
 Remotes.BuyGraveRequest.OnServerEvent:Connect(function(player, graveType, qty)
@@ -81,4 +101,6 @@ return {
 	sendShopUpdate = sendShopUpdate,
 	update = update,
 	remove = remove,
+	dustStock = dustStock,
+	sendDustStock = sendDustStock,
 }
