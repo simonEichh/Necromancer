@@ -30,6 +30,7 @@ local screenGui = require(script.Parent.Gui)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 local SignatureName = require(script.Parent.SignatureName)
+local GraveOpening = require(script.Parent.GraveOpening)
 
 local C = Theme.Color
 local Z = 60 -- base ZIndex (the UI uses global z-ordering; this is above the panels)
@@ -262,7 +263,7 @@ function GachaReveal.play(results, opts)
 	gg.Parent = ground
 	ground.Parent = stage
 
-	-- ── The grave (a picture, or a stone block) ──────────────
+	-- ── The grave (its 3D model when it has one, else its picture, else a stone block) ──
 	-- (GameData.GRAVE_DATA is an ordered list, so look the grave up by its key)
 	local graveUi
 	for _, g in ipairs(GameData.GRAVE_DATA or {}) do
@@ -272,7 +273,10 @@ function GachaReveal.play(results, opts)
 		end
 	end
 	local grave
-	if graveUi and graveUi.image and graveUi.image ~= "" then
+	local grave3d = GraveOpening.create(stage, opts.graveType, UDim2.fromOffset(400, 330), Z + 4)
+	if grave3d then
+		grave = grave3d.frame
+	elseif graveUi and graveUi.image and graveUi.image ~= "" then
 		grave = Instance.new("ImageLabel")
 		grave.Image = graveUi.image
 		grave.BackgroundTransparency = 1
@@ -301,7 +305,9 @@ function GachaReveal.play(results, opts)
 		stone(UDim2.fromScale(0.26, 0.07), UDim2.fromScale(0.37, 0.3), C.Border, false)
 	end
 	grave.AnchorPoint = Vector2.new(0.5, 0.5)
-	grave.Size = UDim2.fromOffset(140, 170)
+	if not grave3d then
+		grave.Size = UDim2.fromOffset(140, 170)
+	end
 	grave.Position = UDim2.fromScale(0.5, 0.46)
 	grave.ZIndex = Z + 4
 	grave.Parent = stage
@@ -415,7 +421,11 @@ function GachaReveal.play(results, opts)
 		if opts.onRevealed then
 			opts.onRevealed()
 		end
-		grave.Visible = false
+		if grave3d and not o.skipped then
+			tween(grave, 0.6, { ImageTransparency = 1 }) -- the opened grave fades out behind the rising unit
+		else
+			grave.Visible = false
+		end
 		for _, g in ipairs(glows) do
 			g.BackgroundColor3 = rc
 			tween(g, 0.4, { BackgroundTransparency = 0.88 - 0.1 * t })
@@ -564,10 +574,13 @@ function GachaReveal.play(results, opts)
 			-- shake grows towards the end
 			local amp = (2 + 12 * p * (0.5 + t)) * ((fake and p > 0.84) and 0.2 or 1)
 			grave.Position = graveBase + UDim2.fromOffset((math.random() - 0.5) * amp, (math.random() - 0.5) * amp)
-			grave.Rotation = (math.random() - 0.5) * amp * 0.5
+			grave.Rotation = (math.random() - 0.5) * amp * (grave3d and 0.2 or 0.5)
 			-- the glow hints at the rarity (more and more) and pulses faster
 			local hint = math.clamp((p - 0.25) / 0.75, 0, 1)
 			local colour = grey:Lerp(rc, hint ^ 2 * (0.55 + 0.45 * t))
+			if grave3d then
+				grave3d.setGlow(rc, hint ^ 2 * (0.55 + 0.45 * t))
+			end
 			local pulse = 0.5 + 0.5 * math.sin(os.clock() * (6 + 18 * p))
 			local silent = fake and p > 0.84
 			for i, g in ipairs(glows) do
@@ -585,7 +598,11 @@ function GachaReveal.play(results, opts)
 		if not o.skipped then
 			-- burst: flash, rings, sparks, panel shake
 			playSound("burst")
-			grave.Visible = false
+			if grave3d then
+				grave3d.burst(rc, t) -- the grave itself opens; it fades out when the unit appears
+			else
+				grave.Visible = false
+			end
 			flash.BackgroundColor3 = Color3.new(1, 1, 1):Lerp(rc, 0.25)
 			flash.BackgroundTransparency = 0.15 - 0.15 * t
 			tween(flash, 0.4 + 0.5 * t, { BackgroundTransparency = 1 })
@@ -612,7 +629,7 @@ function GachaReveal.play(results, opts)
 				RunService.RenderStepped:Wait()
 			end
 			panel.Position = basePos
-			task.wait(0.12)
+			task.wait(grave3d and (0.55 + 0.3 * t) or 0.12) -- let the opened grave and its light column be seen
 		end
 		if o.dead then
 			return
