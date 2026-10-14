@@ -75,4 +75,14 @@ Remotes.DevClearUnits.OnServerEvent:Connect(function(player)
 	spawned[player.UserId] = 0
 end)
 
+-- ============================================================
+-- Gems
+-- ============================================================
+Remotes.DevGiveGems.OnServerEvent:Connect(function(player, amount)
+	if type(amount) ~= "number" or amount ~= amount then
+		return
+	end
+	PlayerData.addGems(player, math.clamp(math.floor(amount), 1, 100000))
+end)
+
 return {}

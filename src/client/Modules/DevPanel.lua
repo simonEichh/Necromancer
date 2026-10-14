@@ -14,6 +14,7 @@ local Rarities = require(ReplicatedStorage.Shared.Rarities)
 
 local spawnEvent = ReplicatedStorage:WaitForChild("DevSpawnUnit")
 local clearEvent = ReplicatedStorage:WaitForChild("DevClearUnits")
+local gemsEvent = ReplicatedStorage:WaitForChild("DevGiveGems")
 
 local BG = Color3.fromRGB(24, 22, 34)
 local BTN = Color3.fromRGB(44, 40, 62)
@@ -268,9 +269,23 @@ playBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- free gems for testing the Gem Shop, catalysts and the Remote Forge
+local gems100 = makeButton(panel, "+100 Gems", Color3.fromRGB(140, 200, 255))
+gems100.Size = UDim2.new(0.3, -8, 0, 28)
+gems100.Position = UDim2.fromOffset(8, 168)
+gems100.MouseButton1Click:Connect(function()
+	gemsEvent:FireServer(100)
+end)
+local gems1000 = makeButton(panel, "+1000 Gems", Color3.fromRGB(140, 200, 255))
+gems1000.Size = UDim2.new(0.3, -8, 0, 28)
+gems1000.Position = UDim2.new(0.3, 4, 0, 168)
+gems1000.MouseButton1Click:Connect(function()
+	gemsEvent:FireServer(1000)
+end)
+
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -176)
-list.Position = UDim2.fromOffset(8, 170)
+list.Size = UDim2.new(1, -16, 1, -210)
+list.Position = UDim2.fromOffset(8, 204)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6
