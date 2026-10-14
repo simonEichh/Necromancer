@@ -211,7 +211,7 @@ local TITAN_IMPACT = 3.1
 local TITAN_WEAVE_RISE = 5.6
 local TITAN_RISE_TIME = 3.2
 local TITAN_SEQUENCE = 10.4 -- the whole SlamWeave, until he rests again
-local TITAN_GATE_SEQUENCE = 6 -- only the slam (the gate fell)
+local TITAN_RETURN = 7.6 -- after an ascension he pulls himself back up over the wall
 local TREMOR_SPEED = 140 -- studs per second the tremor runs down the lane from the outer wall
 
 -- `rise`: the wall rises out of the ground, starting `riseDelay` seconds from now and taking `riseTime` (default
@@ -409,24 +409,27 @@ local function breakWall(plotState)
 
 	-- the realm's titan slams the outer wall in anger (the tremor stuns the army), then weaves the next wall
 	-- (Modules/TitanAnimator on the clients, Army reads plotState.stun). Never twice at once: a wall broken while he is
-	-- still busy just rises on its own, without a stun.
+	-- still busy just rises on its own, without a stun. The gate is his defeat: he sinks behind the outer wall (always
+	-- played, even if he was busy) and stays down until the player ascends (resetWall: "Return").
 	local riseDelay, riseTime = 0, nil
 	local gateFell = plotState.wallLayer > NUM_WALLS
-	if plotState.titan and os.clock() >= (plotState.titanBusyUntil or 0) then
+	if plotState.titan and gateFell then
+		plotState.titan:SetAttribute("SummonKind", "Defeat")
+		plotState.titan:SetAttribute("SummonAt", workspace:GetServerTimeNow())
+		plotState.titanBusyUntil = math.huge
+	elseif plotState.titan and os.clock() >= (plotState.titanBusyUntil or 0) then
 		local at = workspace:GetServerTimeNow()
-		plotState.titan:SetAttribute("SummonKind", gateFell and "Slam" or "SlamWeave")
+		plotState.titan:SetAttribute("SummonKind", "SlamWeave")
 		plotState.titan:SetAttribute("SummonAt", at)
-		plotState.titanBusyUntil = os.clock() + (gateFell and TITAN_GATE_SEQUENCE or TITAN_SEQUENCE)
-		if not gateFell then
-			riseDelay, riseTime = TITAN_WEAVE_RISE, TITAN_RISE_TIME
-			plotState.stun = {
-				id = at,
-				impact = at + TITAN_IMPACT, -- the tremor leaves the outer wall
-				speed = TREMOR_SPEED,
-				originFwd = LANE_END_FWD, -- and runs down the lane from there
-				untilT = at + TITAN_WEAVE_RISE + TITAN_RISE_TIME + 0.2, -- the new wall stands
-			}
-		end
+		plotState.titanBusyUntil = os.clock() + TITAN_SEQUENCE
+		riseDelay, riseTime = TITAN_WEAVE_RISE, TITAN_RISE_TIME
+		plotState.stun = {
+			id = at,
+			impact = at + TITAN_IMPACT, -- the tremor leaves the outer wall
+			speed = TREMOR_SPEED,
+			originFwd = LANE_END_FWD, -- and runs down the lane from there
+			untilT = at + TITAN_WEAVE_RISE + TITAN_RISE_TIME + 0.2, -- the new wall stands
+		}
 	end
 
 	if not gateFell then
@@ -469,6 +472,13 @@ end
 
 local function resetWall(plotState)
 	Drops.clearPlot(plotState)
+	-- the titan comes back over the wall for the new run
+	plotState.stun = nil
+	if plotState.titan then
+		plotState.titan:SetAttribute("SummonKind", "Return")
+		plotState.titan:SetAttribute("SummonAt", workspace:GetServerTimeNow())
+		plotState.titanBusyUntil = os.clock() + TITAN_RETURN
+	end
 	for _, w in pairs(plotState.wallQueue or {}) do
 		if w and w.Parent then w:Destroy() end
 	end

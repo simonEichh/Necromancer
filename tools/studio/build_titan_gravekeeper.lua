@@ -48,6 +48,9 @@ local STONE_DARK = Color3.fromRGB(100, 100, 98)
 local MOSS = Color3.fromRGB(74, 98, 52)
 local ROOT = Color3.fromRGB(70, 52, 38)
 local LAMP = Color3.fromRGB(255, 190, 110)
+local TRIM = Color3.fromRGB(30, 36, 30) -- the dark edge of the cloak
+local NAIL = Color3.fromRGB(120, 110, 92)
+local CRACK = Color3.fromRGB(70, 70, 68)
 local SOUL = Color3.fromRGB(50, 220, 130) -- saturated: paler greens blow out to white under the bloom
 
 local rng = Random.new(9019)
@@ -190,9 +193,21 @@ local torsoParts = collect(function()
 	for _, side in ipairs({ -1, 1 }) do
 		part(model, "Mantle", Vector3.new(1.8, 1.2, 3.2), T * CFrame.new(side * 2.5, 4.5, 0) * CFrame.Angles(0, 0, math.rad(side * -28)), CLOAK, Enum.Material.Fabric)
 	end
-	for k = -2, 2 do
-		rag(model, T * CFrame.new(k * 0.85, 4.6, -1.35), 1, rng:NextNumber(3.5, 5.2), k % 2 == 0 and CLOAK or CLOAK_DARK)
-		rag(model, T * CFrame.new(k * 0.85, 4.6, 1.35) * CFrame.Angles(0, math.pi, 0), 1, rng:NextNumber(4, 6), k % 2 == 0 and CLOAK_DARK or CHARCOAL_2)
+	-- ragged cloak panels in three tiers down the front and back, darker trim along the mantle's edge
+	for tier = 0, 2 do
+		local y = 4.6 - tier * 1.6
+		local z = 1.35 + tier * 0.05
+		for k = -2, 2 do
+			local x = k * 0.85 + (tier % 2) * 0.42
+			rag(model, T * CFrame.new(x, y, -z), 0.95, rng:NextNumber(2.2, 3.4) + tier * 0.6, (k + tier) % 2 == 0 and CLOAK or CLOAK_DARK)
+			rag(model, T * CFrame.new(x, y, z) * CFrame.Angles(0, math.pi, 0), 0.95, rng:NextNumber(2.6, 3.8) + tier * 0.6, (k + tier) % 2 == 0 and CLOAK_DARK or CHARCOAL_2)
+		end
+	end
+	part(model, "Trim", Vector3.new(5.7, 0.3, 3.5), T * CFrame.new(0, 4.25, 0) * CFrame.Angles(math.rad(-6), 0, 0), TRIM, Enum.Material.Fabric)
+	-- a few torn holes in the cloak (dark patches)
+	for _ = 1, 4 do
+		part(model, "Hole", Vector3.new(rng:NextNumber(0.4, 0.8), rng:NextNumber(0.5, 1), 0.06), T * CFrame.new(rng:NextNumber(-1.6, 1.6), rng:NextNumber(1.5, 3.8), -1.47)
+			* CFrame.Angles(0, 0, rng:NextNumber(-0.5, 0.5)), CHARCOAL, Enum.Material.Fabric)
 	end
 	-- rope belt with iron keys
 	part(model, "Belt", Vector3.new(4.4, 0.35, 2.8), T * CFrame.new(0, 0.9, 0), ROPE, Enum.Material.Fabric)
@@ -203,25 +218,50 @@ local torsoParts = collect(function()
 		part(model, "Key", Vector3.new(0.14, 1.1, 0.12), key * CFrame.new(0, -0.8, 0), RUST, Enum.Material.CorrodedMetal)
 		part(model, "KeyBit", Vector3.new(0.35, 0.22, 0.12), key * CFrame.new(0.15, -1.25, 0), RUST, Enum.Material.CorrodedMetal)
 	end
-	-- the gravestone strapped to his back, the cross rising over his left shoulder
-	local stone = T * CFrame.new(-0.7, 3.6, 1.75) * CFrame.Angles(0, 0, math.rad(8))
-	part(model, "Gravestone", Vector3.new(2.8, 5.6, 0.8), stone, STONE, Enum.Material.Slate)
-	part(model, "Gravestone", Vector3.new(1.1, 2.6, 0.8), stone * CFrame.new(0, 3.9, 0), STONE, Enum.Material.Slate)
-	part(model, "Gravestone", Vector3.new(2.6, 0.9, 0.8), stone * CFrame.new(0, 4.3, 0), STONE, Enum.Material.Slate)
-	part(model, "GravestoneEdge", Vector3.new(3, 0.5, 0.9), stone * CFrame.new(0, -2.6, 0), STONE_DARK, Enum.Material.Slate)
-	for _, y in ipairs({ -1.2, 1.2 }) do
-		part(model, "Strap", Vector3.new(3.1, 0.3, 1), stone * CFrame.new(0, y, 0), ROPE, Enum.Material.Fabric)
+	-- the gravestone strapped to his back, its cross rising over his RIGHT shoulder beside the hood (seen from the front)
+	local stone = T * CFrame.new(1.5, 5.2, 1.7) * CFrame.Angles(math.rad(-8), 0, math.rad(-14))
+	part(model, "Gravestone", Vector3.new(2.6, 6.6, 0.9), stone, STONE, Enum.Material.Slate)
+	part(model, "Gravestone", Vector3.new(1.2, 2.8, 0.9), stone * CFrame.new(0, 4.6, 0), STONE, Enum.Material.Slate)
+	part(model, "Gravestone", Vector3.new(2.8, 1, 0.9), stone * CFrame.new(0, 5.0, 0), STONE, Enum.Material.Slate)
+	part(model, "GravestoneEdge", Vector3.new(2.9, 0.5, 1), stone * CFrame.new(0, -3.1, 0), STONE_DARK, Enum.Material.Slate)
+	-- carved cross lines and cracks on the front face (towards his back: it faces +Z, the camera sees the edges and top)
+	part(model, "Carving", Vector3.new(0.18, 3.4, 0.08), stone * CFrame.new(0, 0.6, 0.47), CRACK, Enum.Material.Slate)
+	part(model, "Carving", Vector3.new(1.4, 0.18, 0.08), stone * CFrame.new(0, 1.4, 0.47), CRACK, Enum.Material.Slate)
+	part(model, "Carving", Vector3.new(0.18, 1.6, 0.08), stone * CFrame.new(0, 4.6, -0.47), CRACK, Enum.Material.Slate)
+	part(model, "Carving", Vector3.new(1.6, 0.18, 0.08), stone * CFrame.new(0, 5.0, -0.47), CRACK, Enum.Material.Slate)
+	for _ = 1, 3 do
+		part(model, "Crack", Vector3.new(0.1, rng:NextNumber(0.8, 1.6), 0.08), stone * CFrame.new(rng:NextNumber(-1, 1), rng:NextNumber(-2.5, 2.5), -0.47)
+			* CFrame.Angles(0, 0, rng:NextNumber(-0.7, 0.7)), CRACK, Enum.Material.Slate)
 	end
+	-- a thick rope binding it to his back
+	for _, y in ipairs({ -1.6, 1.0 }) do
+		part(model, "Strap", Vector3.new(3, 0.42, 1.1), stone * CFrame.new(0, y, 0), ROPE, Enum.Material.Fabric)
+	end
+	span(model, "Strap", (stone * CFrame.new(-1.3, 1.0, 0)).Position, (T * CFrame.new(-1.6, 4.4, -0.6)).Position, 0.38, 0.38, ROPE, Enum.Material.Fabric)
+	-- roots winding round the stone, moss on its top
+	for k = 1, 4 do
+		local a1 = (stone * CFrame.new(rng:NextNumber(-1.3, 1.3), rng:NextNumber(-2.8, 3), (k % 2 == 0) and 0.5 or -0.5)).Position
+		local b1 = a1 + Vector3.new(rng:NextNumber(-1.4, 1.4), rng:NextNumber(-1.8, -0.6), rng:NextNumber(-0.4, 0.4))
+		span(model, "Root", a1, b1, 0.3, 0.3, ROOT, Enum.Material.Wood)
+	end
+	part(model, "Moss", Vector3.new(1.4, 0.5, 1.1), stone * CFrame.new(0, 6.1, 0), MOSS, Enum.Material.Grass)
+	part(model, "Moss", Vector3.new(1.8, 0.6, 1.2), stone * CFrame.new(-0.6, 3.4, 0) * CFrame.Angles(0, 0, 0.3), MOSS, Enum.Material.Grass)
 	-- roots wrapping the stone and shoulders, moss clumps
 	for _ = 1, 5 do
 		local a = (T * CFrame.new(rng:NextNumber(-2.6, 1.6), rng:NextNumber(3, 6.5), rng:NextNumber(0.4, 2.3))).Position
 		local b = a + Vector3.new(rng:NextNumber(-1.8, 1.8), rng:NextNumber(-2.2, -0.6), rng:NextNumber(-1, 0.6))
 		span(model, "Root", a, b, 0.28, 0.28, ROOT, Enum.Material.Wood)
 	end
-	for _ = 1, 7 do
-		local s = rng:NextNumber(0.6, 1.2)
-		part(model, "Moss", Vector3.new(s * 1.3, s * 0.7, s), T * CFrame.new(rng:NextNumber(-2.8, 2.6), rng:NextNumber(4.8, 5.8), rng:NextNumber(-0.8, 1.8))
-			* CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 3), rng:NextNumber(-0.4, 0.4)), MOSS, Enum.Material.Grass)
+	for _ = 1, 9 do
+		local sz = rng:NextNumber(0.7, 1.5)
+		local at = T * CFrame.new(rng:NextNumber(-2.9, 2.7), rng:NextNumber(4.9, 5.7), rng:NextNumber(-1, 1.6))
+			* CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 3), rng:NextNumber(-0.4, 0.4))
+		part(model, "Moss", Vector3.new(sz * 1.4, sz * 0.75, sz), at, rng:NextNumber() < 0.5 and MOSS or CLOAK, Enum.Material.Grass)
+		if rng:NextNumber() < 0.6 then
+			-- a strand hanging down from the mound
+			local top = at.Position
+			span(model, "MossStrand", top, top + Vector3.new(rng:NextNumber(-0.3, 0.3), -rng:NextNumber(1.2, 2.4), rng:NextNumber(-0.3, 0.3)), 0.22, 0.22, MOSS, Enum.Material.Grass)
+		end
 	end
 end)
 weldAll(torsoParts, torso)
@@ -242,8 +282,32 @@ local headParts = collect(function()
 		part(model, "HoodRim", Vector3.new(0.4, 3.4, 0.5), H * CFrame.new(side * 1.25, 1.7, -1.25) * CFrame.Angles(0, 0, math.rad(side * 6)), CLOAK_DARK, Enum.Material.Fabric)
 		part(model, "Eye", Vector3.new(0.6, 0.17, 0.12), H * CFrame.new(side * 0.55, 2.05, -0.95) * CFrame.Angles(0, 0, math.rad(-side * 14)), SOUL, Enum.Material.Neon)
 	end
-	-- the peak of the hood leans forward over the face
-	wedge(model, "HoodPeak", Vector3.new(2.6, 1.3, 1.8), H * CFrame.new(0, 3.55, -1.15) * CFrame.Angles(0, math.pi, 0), CLOAK, Enum.Material.Fabric)
+	-- the peak of the hood leans forward over the face, a sharper tip on top, folds down the sides
+	wedge(model, "HoodPeak", Vector3.new(2.8, 1.5, 2), H * CFrame.new(0, 3.6, -1.2) * CFrame.Angles(0, math.pi, 0), CLOAK, Enum.Material.Fabric)
+	wedge(model, "HoodTip", Vector3.new(1.2, 1.4, 1.6), H * CFrame.new(0, 4.5, -0.2) * CFrame.Angles(math.rad(-20), math.pi, 0), CLOAK_DARK, Enum.Material.Fabric)
+	for _, side in ipairs({ -1, 1 }) do
+		part(model, "HoodFold", Vector3.new(0.3, 3.2, 0.5), H * CFrame.new(side * 1.85, 1.6, -0.9) * CFrame.Angles(0, 0, math.rad(side * 10)), CLOAK_DARK, Enum.Material.Fabric)
+		part(model, "HoodTrim", Vector3.new(0.25, 3.6, 0.3), H * CFrame.new(side * 1.45, 1.75, -1.5) * CFrame.Angles(0, 0, math.rad(side * 7)), TRIM, Enum.Material.Fabric)
+	end
+	-- a faint green glow inside the hood and thin smoke drifting from its rim
+	local glow = Instance.new("PointLight")
+	glow.Name = "HoodGlow"
+	glow.Color = SOUL
+	glow.Brightness = 0.8
+	glow.Shadows = false
+	glow.Parent = model:FindFirstChild("Face", true)
+	local smokeAt = part(model, "HoodSmoke", Vector3.new(2.6, 0.3, 0.6), H * CFrame.new(0, 3.3, -1.5), CLOAK, Enum.Material.Fabric)
+	smokeAt.Transparency = 1
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Color = ColorSequence.new(Color3.fromRGB(120, 160, 135))
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 3) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.85), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(3, 5)
+	smoke.Speed = NumberRange.new(0.5, 1.2)
+	smoke.Rate = 3
+	smoke.SpreadAngle = Vector2.new(30, 30)
+	smoke.Parent = smokeAt
 	-- the hood drapes down over the shoulders
 	rag(model, H * CFrame.new(0, 0.6, 1.3) * CFrame.Angles(0, math.pi, 0), 2.6, 1.6, CLOAK_DARK)
 end)
@@ -267,6 +331,11 @@ local function arm(prefix, side, elbowPos, wristPos, handDir, fingerDirs, thumbD
 		local mid = CFrame.lookAt((sh + elbowPos) / 2, elbowPos)
 		for k = 1, 3 do
 			rag(model, mid * CFrame.new((k - 2) * 0.45, -0.6, (k - 2) * 0.6) * CFrame.Angles(0, 0, 0), 0.6, rng:NextNumber(1.2, 2), k % 2 == 0 and CLOAK_DARK or CLOAK)
+		end
+		part(model, "Trim", Vector3.new(1.65, 1.65, 0.3), mid * CFrame.new(0, 0, -((sh - elbowPos).Magnitude / 2 - 0.2)), TRIM, Enum.Material.Fabric) -- the cuff at the elbow
+		if side == 1 then
+			-- a root creeping down the right upper arm from the gravestone
+			span(model, "Root", (mid * CFrame.new(0.5, 0.75, 1.2)).Position, (mid * CFrame.new(-0.3, 0.8, -1.4)).Position, 0.25, 0.25, ROOT, Enum.Material.Wood)
 		end
 	end)
 	weldAll(upperParts, upper)
@@ -294,6 +363,9 @@ local function arm(prefix, side, elbowPos, wristPos, handDir, fingerDirs, thumbD
 	local handParts = collect(function()
 		part(model, "Palm", Vector3.new(1.5, 0.45, 1.5), handCf * CFrame.new(0, 0, -0.75), BONE, Enum.Material.SmoothPlastic)
 		part(model, "Wrist", Vector3.new(0.7, 0.5, 0.5), handCf * CFrame.new(0, 0, -0.05), BONE_DARK, Enum.Material.SmoothPlastic)
+		for _, x in ipairs({ -0.4, 0.4 }) do
+			part(model, "WristBone", Vector3.new(0.32, 0.32, 0.32), handCf * CFrame.new(x, 0.05, -0.1), BONE_DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+		end
 	end)
 	weldAll(handParts, hand)
 	joint(prefix .. "Wrist", fore, hand, wristPos)
@@ -305,8 +377,10 @@ local function arm(prefix, side, elbowPos, wristPos, handDir, fingerDirs, thumbD
 		local c = b + handCf:VectorToWorldSpace(d2.Unit) * len2
 		local s1 = span(model, name .. "a", a, b, thick, thick, BONE, Enum.Material.SmoothPlastic, handCf.UpVector)
 		local s2 = span(model, name .. "b", b, c, thick * 0.85, thick * 0.85, BONE, Enum.Material.SmoothPlastic, handCf.UpVector)
-		local tip = part(model, name .. "Tip", Vector3.new(thick * 0.7, thick * 0.7, 0.3), CFrame.lookAt(c, c + (c - b)) * CFrame.new(0, 0, -0.1), BONE_DARK, Enum.Material.SmoothPlastic)
+		local tip = part(model, name .. "Tip", Vector3.new(thick * 0.7, thick * 0.7, 0.36), CFrame.lookAt(c, c + (c - b)) * CFrame.new(0, 0, -0.12), NAIL, Enum.Material.SmoothPlastic)
+		local knuckle = part(model, name .. "Knuckle", Vector3.new(thick * 1.25, thick * 1.25, thick * 1.25), CFrame.new(b), BONE_DARK, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
 		weldAll({ tip }, s2)
+		weldAll({ knuckle }, s1)
 		joint(name .. "a", hand, s1, a)
 		joint(name .. "b", s1, s2, b)
 	end
@@ -357,6 +431,10 @@ do
 		wedge(model, "LanternRoof", Vector3.new(1.2, 0.5, 0.6), c * CFrame.new(0, 1.25, -0.3), RUST_DARK, Enum.Material.CorrodedMetal)
 		wedge(model, "LanternRoof", Vector3.new(1.2, 0.5, 0.6), c * CFrame.new(0, 1.25, 0.3) * CFrame.Angles(0, math.pi, 0), RUST_DARK, Enum.Material.CorrodedMetal)
 		part(model, "LanternBottom", Vector3.new(1.2, 0.3, 1.2), c * CFrame.new(0, -0.85, 0) * CFrame.Angles(0, math.rad(45), 0), RUST_DARK, Enum.Material.CorrodedMetal)
+		part(model, "LanternRing", Vector3.new(0.14, 0.7, 0.7), c * CFrame.new(0, 1.65, 0), RUST_DARK, Enum.Material.CorrodedMetal, Enum.PartType.Cylinder)
+		for _, k in ipairs({ -1, 1 }) do
+			part(model, "LanternFinial", Vector3.new(0.25, 0.5, 0.25), c * CFrame.new(k * 0.65, 1.1, 0) * CFrame.Angles(0, 0, math.rad(45)), RUST, Enum.Material.CorrodedMetal)
+		end
 		part(model, "LanternSpike", Vector3.new(0.35, 0.6, 0.35), c * CFrame.new(0, -1.25, 0) * CFrame.Angles(0, math.rad(45), math.rad(45)), RUST_DARK, Enum.Material.CorrodedMetal)
 		for k = 0, 3 do
 			local a = k * math.pi / 2 + math.pi / 4
@@ -382,7 +460,14 @@ do
 	local shovel = collect(function()
 		span(model, "ShovelHandle", foot + (topP - foot).Unit * 3.2, topP, 0.35, 0.35, ROPE, Enum.Material.Wood)
 		part(model, "ShovelGrip", Vector3.new(1.4, 0.3, 0.3), CFrame.lookAt(topP, topP + (topP - foot)) * CFrame.new(0, 0, -0.1) * CFrame.Angles(0, 0, math.rad(90)), ROPE, Enum.Material.Wood)
+		for k = 0, 2 do
+			local at = foot + (topP - foot) * (0.55 + k * 0.08)
+			part(model, "ShovelWrap", Vector3.new(0.5, 0.5, 0.3), CFrame.lookAt(at, topP), ROPE, Enum.Material.Fabric)
+		end
 		local bladeCf = CFrame.lookAt(foot + (topP - foot).Unit * 1.7, topP)
+		for _ = 1, 3 do
+			part(model, "Rust", Vector3.new(rng:NextNumber(0.4, 0.8), 0.17, rng:NextNumber(0.4, 0.9)), bladeCf * CFrame.new(rng:NextNumber(-0.7, 0.7), 0, rng:NextNumber(-1, 1)), RUST_DARK, Enum.Material.CorrodedMetal)
+		end
 		part(model, "ShovelBlade", Vector3.new(2.2, 0.15, 3), bladeCf, RUST, Enum.Material.CorrodedMetal)
 		wedge(model, "ShovelTip", Vector3.new(0.15, 1, 1.1), bladeCf * CFrame.new(-0.55, 0, 1.95) * CFrame.Angles(0, 0, math.rad(90)), RUST, Enum.Material.CorrodedMetal)
 		wedge(model, "ShovelTip", Vector3.new(0.15, 1, 1.1), bladeCf * CFrame.new(0.55, 0, 1.95) * CFrame.Angles(0, 0, math.rad(-90)), RUST, Enum.Material.CorrodedMetal)
@@ -404,8 +489,14 @@ model:ScaleTo(SCALE) -- (scales round the root)
 root.PivotOffset = CFrame.new(0, -HIP.Position.Y * SCALE, 0) -- the model's pivot is his feet (WorldPivot is ignored with a PrimaryPart)
 for _, d in ipairs(model:GetDescendants()) do
 	if d:IsA("PointLight") then
-		d.Range = 60
-		d.Brightness = 2.5
+		-- (ScaleTo scales the ranges; set them by hand) the lantern lights the wall, the hood only glows faintly inside
+		if d.Name == "HoodGlow" then
+			d.Range = 14
+			d.Brightness = 0.6
+		else
+			d.Range = 60
+			d.Brightness = 2.5
+		end
 	end
 end
 local parts = 0

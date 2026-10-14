@@ -167,6 +167,19 @@ Several titans around the coliseum = a strong image for clips.
 - **Colours:** moss green, grey fieldstone, rusty iron, warm lantern gold, green soul light (matches the plots and the
   Mossy grave).
 
+#### The end of a run: the titan's defeat and the portal (agreed 2026-10-14)
+
+- **Defeat (built):** when the gate falls the titan rears back, reaches over the lane once more while his eyes go out,
+  and sinks behind the outer wall; his lantern falls into the arena and goes out. **Return (built):** after the
+  ascension his hands come over the wall first, then his head, the lantern is pulled back up, he rests again.
+- **The portal behind the gate (planned):** when the gate falls the gate tower's sealed door bursts open and the portal
+  to the next realm appears behind it. It shows how far the player still has to go (a ring of runes, one per ascension
+  of the realm, the done ones lit; text like "2 more ascensions until the Cathedral"). Before that it **rejects** the
+  player (a shockwave throws them back, the runes flare): a visible long-term goal. Normal ascensions stay on the Ascend
+  button. At the realm's last ascension all runes are lit, the portal opens fully with a glimpse of the next realm, and
+  **walking through it is the ascension into the new realm** (its own cinematic).
+- On hold: a victory moment when the gate falls (banner, light, pulsing Ascend tile).
+
 Later realms escalate, e.g. the cathedral (the Last Saint), the golden threshold of the living (the Warden), the
 spectral choir (the Hollow Choir), the abyss.
 
