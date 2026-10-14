@@ -442,6 +442,41 @@ function ForgeScene.playDismantle(opts)
 	return anim
 end
 
+-- a batch dismantle: the anvil flares, one stream of dust flies into the crucible of every dust gained (~2 s)
+function ForgeScene.playBatchDismantle(opts)
+	if not scene then
+		if opts.onDone then
+			opts.onDone()
+		end
+		return nil
+	end
+	if scene.anim then
+		ForgeScene.finishAnim()
+	end
+	local from = spotWorld() + Vector3.new(0, 0.6, 0)
+	local anim = {
+		kind = "batch", t = 0, speed = opts.quick and QUICK_SPEED or 1, onDone = opts.onDone, resolved = true,
+		from = from, streams = {}, motes = {},
+	}
+	for i, dust in ipairs(opts.dusts or {}) do
+		local crucible = scene.crucibles[table.find(Economy.DUSTS, dust) or 1]
+		local to = crucible and (crucible.Position + Vector3.new(0, 0.3, 0)) or (from + Vector3.new(-2, 2, -3))
+		local stream = { to = to, mid = from:Lerp(to, 0.5) + Vector3.new(0, 3.2, 0), delay = (i - 1) * 0.16, motes = {} }
+		for k = 1, 12 do
+			local p = newPart({ size = Vector3.new(0.22, 0.22, 0.22), color = Theme.DustColor[dust] or GLOW, transparency = 1 })
+			stream.motes[k] = p
+			table.insert(anim.motes, p)
+		end
+		table.insert(anim.streams, stream)
+	end
+	anim.flash = newPart({ size = Vector3.new(1, 1, 1), color = GLOW, transparency = 1 })
+	function anim.skip()
+		anim.skipping = true
+	end
+	scene.anim = anim
+	return anim
+end
+
 -- ends the running animation at once (its final state, then onDone)
 function ForgeScene.finishAnim()
 	local anim = scene and scene.anim
@@ -671,6 +706,31 @@ local function stepUpgrade(anim, dt)
 	end
 end
 
+local function stepBatch(anim)
+	local T = anim.t
+	if anim.skipping then
+		ForgeScene.finishAnim()
+		return
+	end
+	-- the anvil flares, a flash, then the streams fly out one after another
+	local k = T / 0.45
+	anim.flash.CFrame = CFrame.new(anim.from)
+	anim.flash.Size = Vector3.one * (0.6 + math.clamp(k, 0, 1) * 3.2)
+	anim.flash.Transparency = (k > 0 and k < 1) and (0.15 + k * 0.85) or 1
+	scene.fireLight.Brightness = math.max(0, 3 * (1 - T / 0.9))
+	if T < 0.05 then
+		scene.shake = math.max(scene.shake, 0.25)
+	end
+	local last = 0
+	for _, s in ipairs(anim.streams) do
+		placeMotes(s.motes, anim.from, s.mid, s.to, (T - 0.3 - s.delay) / 0.85)
+		last = math.max(last, s.delay)
+	end
+	if T >= 1.5 + last then
+		ForgeScene.finishAnim()
+	end
+end
+
 local function stepDismantle(anim)
 	local T = anim.t
 	if anim.skipping then
@@ -705,6 +765,8 @@ RunService.RenderStepped:Connect(function(dt)
 		anim.t += dt * anim.speed
 		if anim.kind == "upgrade" then
 			stepUpgrade(anim, dt)
+		elseif anim.kind == "batch" then
+			stepBatch(anim)
 		else
 			stepDismantle(anim)
 		end

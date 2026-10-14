@@ -1,5 +1,7 @@
 # Backlog, state and open issues
 
+**On hold (2026-10-14, the user's idea, discussed):** raise the quality floor of the standard units with a reusable "attack kit" (4-5 attack styles + hit effects, one per unit, scaled by rarity: Common/Uncommon own attack motion + hit effect, Rare/Cursed visible ranged/area attack, Legendary+ a small in-world special, Signature cinematic specials + a second skill unlocked by awakening (Forge level 10 or Star Dust)). Keep the current Signatures as Signatures. Proposal per unit to be made and approved batch by batch when the user picks it up.
+
 Moved out of CLAUDE.md: what was built when, the agreed next steps, small known issues, the before-publishing checklist and discarded ideas.
 
 ## Next steps (backlog, in the order we discussed)

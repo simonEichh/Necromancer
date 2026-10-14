@@ -2,7 +2,9 @@
 -- sends requests (UpgradeUnit, DismantleUnit) and receives UpgradeResult plus the usual DataSync snapshot.
 --
 --   UpgradeUnit(kind, index)   kind "inv" (inventory slot) or "grave" (grave slot with a unit standing on it)
---   DismantleUnit(slot)        inventory units only
+--   DismantleUnit(slot)        inventory units only; an upgraded unit also gives back part of its levels' dust
+--   DismantleAll(maxRank, keepUpgraded)  every unlocked inventory unit of that rarity rank or lower (keepUpgraded: not
+--                              the ones above level 0); answers DismantleAllResult(count, totals {[dust] = amount})
 --   BuyCatalyst(key, qty)      gems for catalysts (Economy.CATALYST_INFO); UpgradeUnit's useFortune / useWarding use them
 --   BuyDust(dust, qty)         the Buy Dust tab: gold for dust, limited stock per restock (GraveShop), unlocked by ascension
 --
@@ -163,11 +165,60 @@ Remotes.DismantleUnit.OnServerEvent:Connect(function(player, slot)
 		return
 	end
 	local rarity = Units.Rarity[unit.unitType]
-	local amount = Economy.dismantleYield(Rarities.Rank[rarity] or 1)
+	local amount = Economy.dismantleDust(rarity, unit.level)
 	PlayerData.takeUnit(player, slot)
 	local dust = Economy.dustOf(rarity)
 	PlayerData.addMaterial(player, dust, amount)
 	Remotes.Notice:FireClient(player, "Dismantled " .. unit.unitType .. ": +" .. amount .. " " .. Economy.DUST_NAMES[dust])
+end)
+
+-- Dismantle many units at once (the Forge's Dismantle tab): every unlocked inventory unit whose rarity rank is `maxRank`
+-- or lower; with `keepUpgraded` the ones above level 0 stay. Units on graves are not in the inventory: never touched.
+local lastDismantleAll = {}
+Remotes.DismantleAll.OnServerEvent:Connect(function(player, maxRank, keepUpgraded)
+	local profile = PlayerData.get(player)
+	if not profile or type(maxRank) ~= "number" or maxRank ~= maxRank then
+		return
+	end
+	local now = os.clock()
+	if lastDismantleAll[player.UserId] and now - lastDismantleAll[player.UserId] < 1 then
+		return
+	end
+	lastDismantleAll[player.UserId] = now
+	if not ShopNpcs.nearForge(player) then
+		Remotes.Notice:FireClient(player, "Visit the Forge to dismantle units.")
+		return
+	end
+	local count, totals = 0, {}
+	for slot, unit in pairs(profile.inventory) do
+		local rarity = Units.Rarity[unit.unitType]
+		local rank = Rarities.Rank[rarity] or 1
+		if not unit.locked and rank <= maxRank and not (keepUpgraded == true and (unit.level or 0) > 0) then
+			if PlayerData.takeUnit(player, slot) then
+				count += 1
+				local dust = Economy.dustOf(rarity)
+				totals[dust] = (totals[dust] or 0) + Economy.dismantleDust(rarity, unit.level)
+			end
+		end
+	end
+	if count == 0 then
+		Remotes.Notice:FireClient(player, "Nothing to dismantle.")
+		return
+	end
+	local parts = {}
+	for _, dust in ipairs(Economy.DUSTS) do
+		if totals[dust] then
+			PlayerData.addMaterial(player, dust, totals[dust])
+			table.insert(parts, "+" .. totals[dust] .. " " .. Economy.DUST_NAMES[dust])
+		end
+	end
+	-- (sent before the deferred DataSync: the Forge holds the sync back until its burst has played)
+	Remotes.DismantleAllResult:FireClient(player, count, totals)
+	Remotes.Notice:FireClient(player, "Dismantled " .. count .. " units: " .. table.concat(parts, ", "))
+end)
+
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+	lastDismantleAll[player.UserId] = nil
 end)
 
 return {}

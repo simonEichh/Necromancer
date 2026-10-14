@@ -36,6 +36,8 @@ local ForgePanel = {}
 
 local upgradeRemote = ReplicatedStorage:WaitForChild("UpgradeUnit", 5)
 local dismantleRemote = ReplicatedStorage:WaitForChild("DismantleUnit", 5)
+local dismantleAllRemote = ReplicatedStorage:WaitForChild("DismantleAll", 5)
+local dismantleAllResult = ReplicatedStorage:WaitForChild("DismantleAllResult", 5)
 local resultRemote = ReplicatedStorage:WaitForChild("UpgradeResult", 5)
 local buyDustRemote = ReplicatedStorage:WaitForChild("BuyDust", 5)
 local dustStockRemote = ReplicatedStorage:WaitForChild("DustStockUpdate", 5)
@@ -392,6 +394,208 @@ if dustStockRemote then
 	end)
 end
 
+-- ============================================================
+-- Dismantle tab: dismantle many inventory units at once (like the inventory's Sell All), with a preview of the dust
+-- ============================================================
+local salvage = Instance.new("Frame")
+salvage.BackgroundTransparency = 1
+salvage.Size = UDim2.new(1, 0, 1, -84)
+salvage.ZIndex = Z + 2
+salvage.Visible = false
+salvage.Parent = body
+local salvageMaxRank = 1 -- dismantle up to this rarity rank (1 = Common)
+local salvageKeep = true -- keep units above level 0
+local confirmSalvage = false
+local paintSalvage -- (forward-declared: the buttons repaint)
+
+local salvageIntro = Theme.label(salvage, { text = "Dismantle many units at once. Locked units and units on graves are never touched. Upgraded units give back "
+	.. math.floor(Economy.DISMANTLE_REFUND * 100) .. "% of the dust their levels cost.", size = "Body", color = C.BoneDim, frameSize = UDim2.new(1, -40, 0, 44) })
+salvageIntro.Position = UDim2.fromOffset(20, 4)
+salvageIntro.TextWrapped = true
+salvageIntro.ZIndex = Z + 3
+local upToLbl = Theme.label(salvage, { text = "Up to", size = "Heading", font = "Strong", color = C.Bone, frameSize = UDim2.fromOffset(90, 44) })
+upToLbl.Position = UDim2.fromOffset(20, 58)
+upToLbl.ZIndex = Z + 3
+local rarityBtn = Theme.stoneButton(salvage, {
+	text = "Common", color = "stone", size = UDim2.fromOffset(190, 44), position = UDim2.fromOffset(110, 58), zIndex = Z + 3,
+	onClick = function()
+		salvageMaxRank = salvageMaxRank % #Economy.RARITIES_ASC + 1
+		confirmSalvage = false
+		paintSalvage()
+	end,
+})
+local keepBtn = Theme.stoneButton(salvage, {
+	text = "Keep Lv 1+: On", color = "green", size = UDim2.fromOffset(190, 44), position = UDim2.fromOffset(316, 58), zIndex = Z + 3,
+	onClick = function()
+		salvageKeep = not salvageKeep
+		confirmSalvage = false
+		paintSalvage()
+	end,
+})
+local keepOffBtn = Theme.stoneButton(salvage, {
+	text = "Keep Lv 1+: Off", color = "stone", size = UDim2.fromOffset(190, 44), position = UDim2.fromOffset(316, 58), zIndex = Z + 3,
+	onClick = function()
+		salvageKeep = not salvageKeep
+		confirmSalvage = false
+		paintSalvage()
+	end,
+})
+local countLbl = Theme.label(salvage, { text = "", size = "Heading", font = "Strong", color = C.Bone, frameSize = UDim2.fromOffset(400, 30) })
+countLbl.Position = UDim2.fromOffset(20, 116)
+countLbl.ZIndex = Z + 3
+-- one line per dust the batch would give
+local salvageRows = {}
+for i, dust in ipairs(Economy.DUSTS) do
+	local icon = Instance.new("ImageLabel")
+	icon.BackgroundTransparency = 1
+	icon.Image = Theme.Image.Dust[dust] or ""
+	icon.Size = UDim2.fromOffset(34, 34)
+	icon.ZIndex = Z + 3
+	icon.Parent = salvage
+	local text = Theme.label(salvage, { text = "", size = "Body", font = "Strong", color = DUST_COLORS[dust] or C.Bone, frameSize = UDim2.fromOffset(300, 34) })
+	text.ZIndex = Z + 3
+	salvageRows[dust] = { icon = icon, text = text }
+end
+-- which units it would take (right side): one row per unit type and level, grouped ("Skelly  x3")
+local salvageList = Instance.new("ScrollingFrame")
+salvageList.BackgroundColor3 = C.Void
+salvageList.BackgroundTransparency = 0.3
+salvageList.BorderSizePixel = 0
+salvageList.Position = UDim2.new(0, 400, 0, 116)
+salvageList.Size = UDim2.new(1, -420, 1, -196)
+salvageList.ScrollBarThickness = 6
+salvageList.ScrollBarImageColor3 = C.Verdigris
+salvageList.CanvasSize = UDim2.new()
+salvageList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+salvageList.ZIndex = Z + 3
+Theme.corner(salvageList, Theme.Radius.Small)
+Theme.stroke(salvageList, C.Border, 1)
+salvageList.Parent = salvage
+do
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 4)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = salvageList
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 6)
+	pad.PaddingBottom = UDim.new(0, 6)
+	pad.PaddingLeft = UDim.new(0, 6)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.Parent = salvageList
+end
+
+local function salvageRow(order, unitType, rarity, level, count)
+	local row = Instance.new("Frame")
+	row.Name = "SalvageRow"
+	row.LayoutOrder = order
+	row.BackgroundColor3 = C.StoneRaised
+	row.BorderSizePixel = 0
+	row.Size = UDim2.new(1, 0, 0, 30)
+	row.ZIndex = Z + 4
+	Theme.corner(row, Theme.Radius.Small)
+	row.Parent = salvageList
+	local stripe = Instance.new("Frame")
+	stripe.BackgroundColor3 = Rarities.Color[rarity] or C.Bone
+	stripe.BorderSizePixel = 0
+	stripe.Size = UDim2.new(0, 4, 1, -8)
+	stripe.Position = UDim2.fromOffset(4, 4)
+	stripe.ZIndex = Z + 5
+	stripe.Parent = row
+	local name = Theme.label(row, { text = unitType .. (count > 1 and ("  x" .. count) or ""), size = "Body", font = "Strong", color = C.Bone, frameSize = UDim2.new(1, -80, 1, 0) })
+	name.Position = UDim2.fromOffset(14, 0)
+	name.ZIndex = Z + 5
+	if level > 0 then
+		local lv = Theme.label(row, { text = "Lv " .. level, size = "Small", font = "Strong", color = C.Gold, align = Enum.TextXAlignment.Right, frameSize = UDim2.new(0, 60, 1, 0) })
+		lv.Position = UDim2.new(1, -66, 0, 0)
+		lv.ZIndex = Z + 5
+	end
+end
+
+local salvageBtn = Theme.stoneButton(salvage, {
+	text = "Dismantle all", color = "red", size = UDim2.fromOffset(220, 52), position = UDim2.new(1, -240, 1, -64), zIndex = Z + 3,
+	onClick = function()
+		if not confirmSalvage then
+			confirmSalvage = true
+			paintSalvage()
+			task.delay(3, function()
+				if confirmSalvage then
+					confirmSalvage = false
+					paintSalvage()
+				end
+			end)
+			return
+		end
+		confirmSalvage = false
+		paintSalvage()
+		if dismantleAllRemote then
+			dismantleAllRemote:FireServer(salvageMaxRank, salvageKeep)
+		end
+	end,
+})
+
+function paintSalvage()
+	local rarity = Economy.RARITIES_ASC[salvageMaxRank]
+	rarityBtn.label.Text = rarity
+	rarityBtn.label.TextColor3 = Rarities.Color[rarity] or C.Bone
+	keepBtn.root.Visible = salvageKeep
+	keepOffBtn.root.Visible = not salvageKeep
+	local count, totals, groups = 0, {}, {}
+	for _, u in pairs(State.inventory or {}) do
+		if u and not u.locked then
+			local r = (GameData.UNIT_INFO[u.unitType] or {}).rarity or "Common" -- (rarityOf is defined further down)
+			local rank = Rarities.Rank[r] or 1
+			if rank <= salvageMaxRank and not (salvageKeep and (u.level or 0) > 0) then
+				count += 1
+				local dust = Economy.dustOf(r)
+				totals[dust] = (totals[dust] or 0) + Economy.dismantleDust(r, u.level or 0)
+				local key = u.unitType .. "#" .. (u.level or 0)
+				if not groups[key] then
+					groups[key] = { unitType = u.unitType, rarity = r, rank = rank, level = u.level or 0, count = 0 }
+				end
+				groups[key].count += 1
+			end
+		end
+	end
+	-- the list: highest rarity first (what you would miss most), then name, then level
+	for _, child in ipairs(salvageList:GetChildren()) do
+		if child.Name == "SalvageRow" then
+			child:Destroy()
+		end
+	end
+	local sorted = {}
+	for _, g in pairs(groups) do
+		table.insert(sorted, g)
+	end
+	table.sort(sorted, function(a, b)
+		if a.rank ~= b.rank then
+			return a.rank > b.rank
+		elseif a.unitType ~= b.unitType then
+			return a.unitType < b.unitType
+		end
+		return a.level > b.level
+	end)
+	for i, g in ipairs(sorted) do
+		salvageRow(i, g.unitType, g.rarity, g.level, g.count)
+	end
+	salvageList.Visible = #sorted > 0
+	countLbl.Text = count == 0 and "Nothing to dismantle" or (count .. (count == 1 and " unit" or " units") .. " give:")
+	local y = 152
+	for _, dust in ipairs(Economy.DUSTS) do
+		local row = salvageRows[dust]
+		local n = totals[dust]
+		row.icon.Visible = n ~= nil
+		row.text.Visible = n ~= nil
+		if n then
+			row.icon.Position = UDim2.fromOffset(24, y)
+			row.text.Position = UDim2.fromOffset(66, y)
+			row.text.Text = "+" .. n .. " " .. Economy.DUST_NAMES[dust]
+			y += 40
+		end
+	end
+	salvageBtn.label.Text = confirmSalvage and "Sure?" or "Dismantle all"
+	salvageBtn.root:SetAttribute("Disabled", count == 0 or (ForgeScene.active() and ForgeScene.busy()))
+end
+
 -- the two tabs in the header: each has a green (selected) and a grey version, one of them shown
 local tab = "upgrade"
 local tabButtons = {}
@@ -412,6 +616,7 @@ function setTab(name)
 	list.Visible = name == "upgrade"
 	detail.Visible = name == "upgrade"
 	shop.Visible = name == "dust"
+	salvage.Visible = name == "salvage"
 	for key, t in pairs(tabButtons) do
 		t.on.root.Visible = key == name
 		t.off.root.Visible = key ~= name
@@ -419,10 +624,14 @@ function setTab(name)
 	if name == "dust" then
 		paintShop()
 		paintRestock()
+	elseif name == "salvage" then
+		confirmSalvage = false
+		paintSalvage()
 	end
 end
 makeTab("upgrade", "Upgrade", 110)
 makeTab("dust", "Buy Dust", 238)
+makeTab("salvage", "Dismantle", 366)
 setTab("upgrade")
 
 -- ============================================================
@@ -521,7 +730,8 @@ local function showDetails(entry)
 	if entry.kind == "inv" then
 		local rank = Rarities.Rank[rarity] or 1
 		dismantleBtn.label.Text = confirmDismantle and "Sure?" or "Dismantle"
-		hintLbl.Text = "Dismantle gives " .. Economy.dismantleYield(rank) .. " " .. material .. ". A failed upgrade costs half the materials and never lowers the level; every failure makes the next try more likely."
+		local refund = (entry.level > 0) and (" (" .. math.floor(Economy.DISMANTLE_REFUND * 100) .. "% of its upgrades back)") or ""
+		hintLbl.Text = "Dismantle gives " .. Economy.dismantleDust(rarity, entry.level) .. " " .. material .. refund .. ". A failed upgrade costs half the materials and never lowers the level; every failure makes the next try more likely."
 	else
 		hintLbl.Text = "A failed upgrade costs half the materials and never lowers the level. Every failure makes the next try more likely. (Units on graves cannot be dismantled.)"
 	end
@@ -809,8 +1019,37 @@ Sync.onApplied(function()
 	ForgePanel.refresh()
 	if tab == "dust" then
 		paintShop()
+	elseif tab == "salvage" then
+		paintSalvage()
 	end
 end)
+
+-- a batch dismantle went through: at the anvil one combined burst (the dust row updates when it ends)
+if dismantleAllResult then
+	dismantleAllResult.OnClientEvent:Connect(function(count, totals)
+		if not (panel.Visible and ForgeScene.active()) or type(totals) ~= "table" then
+			return
+		end
+		local dusts = {}
+		for _, dust in ipairs(Economy.DUSTS) do
+			if totals[dust] then
+				table.insert(dusts, dust)
+			end
+		end
+		Sync.hold()
+		ForgeScene.playBatchDismantle({
+			dusts = dusts,
+			quick = quick,
+			onDone = function()
+				Sync.release()
+				ForgePanel.refresh()
+				if tab == "salvage" then
+					paintSalvage()
+				end
+			end,
+		})
+	end)
+end
 
 -- the result of an upgrade attempt
 if resultRemote then

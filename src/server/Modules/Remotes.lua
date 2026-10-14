@@ -11,6 +11,8 @@ local EVENTS = {
 	"DevClearUnits", -- Studio-only dev tools (see DevTools / client DevPanel)
 	"DevGiveGems",
 	"DevGiveGold",
+	"DismantleAll",
+	"DismantleAllResult",
 	"DevSpawnUnit",
 	"DigGrave",
 	"PlaceAtGrave",

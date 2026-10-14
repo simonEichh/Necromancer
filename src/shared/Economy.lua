@@ -227,6 +227,19 @@ function Economy.dismantleYield(rank)
 	return math.floor(DISMANTLE_BASE * DISMANTLE_GROWTH ^ (rank - 1) + 0.5)
 end
 
+-- Dismantling an UPGRADED unit gives back this share of the dust its levels cost (the successful steps; failed tries
+-- are not counted): low-rarity units fall off fast, and an upgrade should not feel wasted when the unit is outgrown.
+Economy.DISMANTLE_REFUND = 0.5
+
+-- all the dust dismantling a unit of `rarity` at `level` gives: the base yield plus the refund of its levels
+function Economy.dismantleDust(rarity, level)
+	local spent = 0
+	for l = 0, (level or 0) - 1 do
+		spent += Economy.unitUpgradeCost(l, rarity)
+	end
+	return Economy.dismantleYield(RARITY_INDEX[rarity] or 1) + math.floor(spent * Economy.DISMANTLE_REFUND)
+end
+
 -- Catalysts (bought with gems, kept as a saved count, switched on in the Forge before an upgrade attempt):
 --   Fortune: +FORTUNE_BONUS success chance on that attempt (capped at 100 %); used up by the attempt
 --   Warding: if the attempt fails, no dust is lost; used up only when it saved the dust (a success keeps it)
