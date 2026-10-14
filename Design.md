@@ -82,6 +82,17 @@ Scale 1-5. **Fit** = matches the identity; **Impact** = retention / growth / rev
    "Boss" travel tile teleports players to a separate battlefield where a raid squad (your best 5 units) fights next
    to everyone else's. Most social and spectacular, but a new map and squad logic.
 
+**Boss designs** (best fit: a body with 8 limbs, one per plot, so each lane's "wall" is part of the boss). A rotation
+of 2-3 bosses later keeps the event fresh.
+
+| Boss | The "wall" in each lane | Score | Notes |
+|---|---|---|---|
+| **The Shroud Weaver** (giant spectral spider) | its 8 legs stab down into the 8 lanes, soul-silk webs between the leg segments | **5 (first boss)** | Hangs high above the centre on a glowing thread; cracked bone carapace, cluster of green eyes. Legs crack and bleed light as HP drops; at the end it falls toward the plaza and dissolves before it lands. Spice: shakes the web, every army stumbles back a few studs. |
+| **The Hollow Matriarch** (veiled giantess, 8 arms) | a giant skeletal hand plants its fingers in each lane | **4** | Floats above the centre in a tattered veil; fingers twitch and clench, at low HP the hands rise and slam down again. |
+| **The Buried King** (crowned corpse on a throne of tombstones) | giant sarcophagi hurled into the lanes, standing upright | **4** | Strongest tie to the grave theme: could drop graves as loot. Less "8 limbs", more throwing walls. |
+| **The Death Knell** (cathedral bell rung by a skeleton) | chains from the bell hold an iron wrecking weight in each lane | **3** | Every ring sends a shockwave; great for sound later, less of a creature. |
+| **The Watcher Beyond** (giant eye with tentacles) | tentacles in the lanes | **2** | Eldritch, not undead, and the Eldritch grave already uses tentacles. |
+
 Rejected: the boss breaching one gate (armies leave their lanes, messy pathing), a bigger plaza (rebuilds the whole
 world, the shop conflict stays).
 
