@@ -1,9 +1,11 @@
 -- Damage stages of the modelled walls (models tagged "StagedWall", attribute `Stage` set by the server's Walls.lua from
 -- the wall's HP; the model is built by tools/studio/build_wall_cemetery.lua):
 --   1 (75 % HP)  the fence bends, some pickets fall, tombstones topple, loose fieldstones drop
---   2 (50 %)     cracks with soul light open in the middle, the cross tilts
---   3 (25 %)     the middle caves in, its coping slides off, the middle fence falls, the lanterns drop
---   4 (broken)   everything collapses, the middle first and the wings last, then it fades (the server removes it)
+--   2 (50 %)     cracks with soul light open in the middle, the cross / angel tilts, the gate's chains fall
+--   3 (25 %)     the middle caves in (a segment's `Sink` attribute limits it: the mausoleum only sags), its coping slides
+--                off, the middle fence and the cross / angel fall, the lanterns drop, braziers topple, the gate's doors sag
+--   4 (broken)   the gate's doors burst open, everything collapses (the middle first, the wings last), then it fades
+-- Pieces are found by name: Segment, Picket, Grave, Lantern, Cross / Angel (toppers), Door, Chains, Brazier models.
 -- A new wall (attributes RiseStart / RiseTime, set by the server when the next wall is conjured) first rises out of the
 -- ground with dust and a tremble; its stages are applied after the rise.
 -- Purely cosmetic and client side. A wall first seen at a later stage gets the earlier stages instantly.
@@ -160,7 +162,7 @@ end
 STAGES[2] = function(w, t)
 	local soul = w.model:GetAttribute("SoulColor") or Color3.fromRGB(120, 255, 190)
 	for i, seg in ipairs(w.segments) do
-		if angleOf(seg) <= MIDDLE_ANGLE then
+		if angleOf(seg) <= MIDDLE_ANGLE and not seg:GetAttribute("NoCracks") then
 			local h = seg:GetAttribute("Height") or 20
 			local th = seg:GetAttribute("Thickness") or 4
 			local width = seg:GetAttribute("Width") or 6
@@ -201,8 +203,11 @@ STAGES[2] = function(w, t)
 	if lightPart then
 		light.Parent = lightPart
 	end
-	if w.cross then
-		moveModel(w.cross, w.cross:GetPivot() * CFrame.Angles(0, 0, math.rad(18)), t, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	for _, top in ipairs(w.toppers) do
+		moveModel(top, top:GetPivot() * CFrame.Angles(0, 0, math.rad(18)), t, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	end
+	for i, c in ipairs(w.chains) do
+		fallToGround(w, c, 40 + i, t)
 	end
 	if t > 0 then
 		dust(w.center + Vector3.new(0, 8, 0) + w.front * 2, 25)
@@ -221,7 +226,8 @@ STAGES[3] = function(w, t)
 				movePart(coping, CFrame.lookAt(pos, pos + w.front) * CFrame.Angles(0, 0, math.rad((hash(i, 21) - 0.5) * 30)), t * 1.2,
 					Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
 			end
-			local sink = seg:GetPivot() * CFrame.new(0, -h * (0.35 + hash(i, 22) * 0.2), 0)
+			local share = seg:GetAttribute("Sink") or (0.35 + hash(i, 22) * 0.2)
+			local sink = seg:GetPivot() * CFrame.new(0, -h * share, 0)
 				* CFrame.Angles(math.rad((hash(i, 23) - 0.5) * 10), 0, math.rad((hash(i, 24) - 0.5) * 10))
 			moveModel(seg, sink, t, Enum.EasingStyle.Quad, Enum.EasingDirection.In, t > 0 and hash(i, 25) * 0.25 or 0)
 		end
@@ -231,8 +237,19 @@ STAGES[3] = function(w, t)
 			fallToGround(w, p, i, t)
 		end
 	end
-	if w.cross then
-		fallToGround(w, w.cross, 99, t)
+	for i, top in ipairs(w.toppers) do
+		fallToGround(w, top, 90 + i, t)
+	end
+	for _, door in ipairs(w.doors) do
+		moveModel(door, door:GetPivot() * CFrame.Angles(-math.rad(7), 0, 0), t, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	end
+	for i, b in ipairs(w.braziers) do
+		fallToGround(w, b, 60 + i, t)
+		for _, d in ipairs(b:GetDescendants()) do
+			if d:IsA("Light") or d:IsA("ParticleEmitter") then
+				d.Enabled = false
+			end
+		end
 	end
 	for i, l in ipairs(w.lanterns) do
 		local drop = l:GetAttribute("Drop") or 8
@@ -276,6 +293,16 @@ STAGES[4] = function(w, t)
 	end
 	for i, g in ipairs(w.graves) do
 		moveModel(g, g:GetPivot() * CFrame.Angles(-math.rad(60), 0, 0), 0.7, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out, 0.3 + hash(i, 32) * 0.4)
+	end
+	for i, door in ipairs(w.doors) do
+		-- the gate bursts open: the doors are thrown forward onto the ground
+		fallToGround(w, door, 70 + i, 0.45)
+		dust(door:GetPivot().Position + w.front * 3, 25)
+	end
+	for i, top in ipairs(w.toppers) do
+		if not top:GetAttribute("Fallen") then
+			fallToGround(w, top, 90 + i, 0.8)
+		end
 	end
 	dust(w.center + w.front * 3, 50)
 	chunks(w.center + Vector3.new(0, 8, 0), w.front, w.stoneColor, 14)
@@ -334,7 +361,8 @@ local function register(model)
 		task.wait(0.2)
 	end
 	if not model.Parent then return end
-	local w = { model = model, applied = 0, segments = {}, pickets = {}, graves = {}, lanterns = {}, fieldstones = {} }
+	local w = { model = model, applied = 0, segments = {}, pickets = {}, graves = {}, lanterns = {}, fieldstones = {},
+		toppers = {}, doors = {}, chains = {}, braziers = {} }
 	w.pivot = model:GetPivot()
 	w.front = w.pivot.LookVector -- the model's front (-Z) faces the army
 	w.center = w.pivot.Position
@@ -349,8 +377,14 @@ local function register(model)
 				table.insert(w.graves, d)
 			elseif d.Name == "Lantern" then
 				table.insert(w.lanterns, d)
-			elseif d.Name == "Cross" then
-				w.cross = d
+			elseif d.Name == "Cross" or d.Name == "Angel" then
+				table.insert(w.toppers, d)
+			elseif d.Name == "Door" then
+				table.insert(w.doors, d)
+			elseif d.Name == "Chains" then
+				table.insert(w.chains, d)
+			elseif d.Name == "Brazier" then
+				table.insert(w.braziers, d)
 			end
 		elseif d.Name == "Fieldstone" then
 			table.insert(w.fieldstones, d)

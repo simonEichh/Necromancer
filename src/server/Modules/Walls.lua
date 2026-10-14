@@ -75,13 +75,13 @@ local function layerText(layer)
 end
 
 -- The realm's wall model (ServerStorage.WallModels, built by tools/studio/build_wall_cemetery.lua). The wall part stays
--- as the invisible collider and the model is cloned into it as "WallModel". The gate keeps the plain slab until its own
--- model exists.
+-- as the invisible collider and the model is cloned into it as "WallModel". The gate has its own model
+-- (CemeteryGate, tools/studio/build_wall_cemetery_gate.lua); a missing model falls back to the plain slab.
 local WALL_MODEL_GUI_LIFT = 8 -- the model is taller than the slab (fence, cross): lift the HP bar and the tag
 local function wallModelFor(layer)
 	local models = ServerStorage:FindFirstChild("WallModels")
-	if Economy.isGate(layer) or not models then return nil end
-	return models:FindFirstChild("Cemetery")
+	if not models then return nil end
+	return models:FindFirstChild(Economy.isGate(layer) and "CemeteryGate" or "Cemetery")
 end
 
 -- Damage stage of a modelled wall from its HP (0 intact, 1 at 75 %, 2 at 50 %, 3 at 25 %; 4 = collapse when it breaks).
