@@ -60,7 +60,7 @@ Scale 1-5. **Fit** = matches the identity; **Impact** = retention / growth / rev
 |---|---|---|---|---|---|---|
 | **Rare-pull broadcast** | 5 | 4 | 5 | 5 | **5** | Legendary+: everyone in the server sees the star fall over that plot (the star summon is already in the world) + banner "X pulled Hush (1 in 50,000)". Primordial / Signature: banner in all servers (MessagingService). Makes others want to roll. |
 | **Server luck** | 5 | 5 | 4 | 4 | **5** | One player buys it, the whole server gets 2x luck for 15 min, banner "X blessed the server". A genre best seller. Free version: gate clears fill a shared server-luck meter. Paid luck: odds disclosure check first. |
-| **World boss in the plaza** (your idea) | 5 | 5 | 3 | 4 | **5** | Every 20-30 min a giant boss rises at the central monument, countdown banner, everyone sends their army (or a raid squad). Rewards by damage share + a minimum for showing up; boss-only drops (dust, later a boss unit / mutation). HP scales with players. Reuses walls, barrages, beams. The signature social feature. |
+| **World boss** (your idea) | 5 | 5 | 3 | 4 | **5** | Every 20-30 min, countdown banner. Rewards by damage share + a minimum for showing up; boss-only drops (dust, later a boss unit / mutation). HP scales with players. The signature social feature. NOT in the plaza (too small, it would bother the shops): see "World boss plan" below. |
 | **Friend boost** | 4 | 4 | 5 | 5 | **4** | +10 % gold per friend in the server (cap). Invites are free advertising. |
 | **Leaderboard on the monument** | 4 | 3 | 5 | 5 | **4** | Highest ascension, rarest unit, most walls. Cheap showing off. |
 | **Best-unit statue on each plot arch** | 4 | 3 | 4 | 5 | **4** | Your best unit stands on your arch, others see it walking by. |
@@ -69,6 +69,21 @@ Scale 1-5. **Fit** = matches the identity; **Impact** = retention / growth / rev
 | **Live PvP with fixed slots** (your idea, full form) | 3 | 4 | 1 | 2 | **2** | Needs unit-vs-unit combat (HP, targeting, counters): a new game inside the game. Only after the async arena proves people want PvP. |
 | **Unit trading** (your idea) | 4 | 5 | 1 | 1 | **3 (later)** | The strongest long-term driver (Adopt Me, Pet Sim) but scams, dupes, value lists, a changed economy. Needs session locking first (known issue). Last, once the economy is stable. A one-way "gift to a friend" could come earlier. |
 | **Coin stealing on lanes** ("Steal a..." touch) | 3 | 3 | 4 | 2 | **2** | Uncollected coins on your lane can be picked up by others walking through. Gives the wisp more value, copies what the top games do, but AFK players losing gold feels bad. Only as an experiment. |
+
+#### World boss plan (agreed 2026-10-14)
+
+1. **First: the sky boss with limbs in every lane.** A colossal undead appears high above the coliseum centre, far
+   bigger than anything on the ground, visible from every plot; the plaza and shops stay untouched. It slams a hand /
+   claw / tendril into every player's lane right in front of their army (rising out of the ground like the Last
+   Lantern), standing in for the wall being fought. Every army keeps fighting in its own lane with its normal
+   formation; all damage goes to ONE shared HP bar at the top of the screen. Reuses walls, formation, barrages, beams,
+   hit coins; idle players join automatically. The giant overhead is the shared moment (and the clip).
+2. **Later: a boss arena outside the ring** as the bigger event version (weekend boss, harder, better drops). A
+   "Boss" travel tile teleports players to a separate battlefield where a raid squad (your best 5 units) fights next
+   to everyone else's. Most social and spectacular, but a new map and squad logic.
+
+Rejected: the boss breaching one gate (armies leave their lanes, messy pathing), a bigger plaza (rebuilds the whole
+world, the shop conflict stays).
 
 ### Monetization
 
@@ -103,7 +118,7 @@ Scale 1-5. **Fit** = matches the identity; **Impact** = retention / growth / rev
 1. Rare-pull broadcast, server luck (free meter first, Robux later), luck potions from wheel / quests.
 2. Friend boost, monument leaderboard, plot statues.
 3. Tutorial and gradual unlocks.
-4. World boss in the plaza.
+4. World boss: the sky boss with limbs in every lane; later the arena outside the ring.
 5. Run upgrades + Souls (sim first).
 6. Game passes and gem packs (after the odds disclosure check).
 7. Async ranked arena, events with limited units, mutations.
