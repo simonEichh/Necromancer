@@ -10,6 +10,7 @@ local EVENTS = {
 	"ClaimQuest",
 	"DevClearUnits", -- Studio-only dev tools (see DevTools / client DevPanel)
 	"DevGiveGems",
+	"DevGiveGold",
 	"DevSpawnUnit",
 	"DigGrave",
 	"PlaceAtGrave",

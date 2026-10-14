@@ -85,4 +85,14 @@ Remotes.DevGiveGems.OnServerEvent:Connect(function(player, amount)
 	PlayerData.addGems(player, math.clamp(math.floor(amount), 1, 100000))
 end)
 
+-- ============================================================
+-- Gold
+-- ============================================================
+Remotes.DevGiveGold.OnServerEvent:Connect(function(player, amount)
+	if type(amount) ~= "number" or amount ~= amount then
+		return
+	end
+	PlayerData.addGold(player, math.clamp(math.floor(amount), 1, 1e18))
+end)
+
 return {}

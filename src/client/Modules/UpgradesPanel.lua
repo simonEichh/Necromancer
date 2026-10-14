@@ -4,7 +4,11 @@
 --   ascensions of a realm, reset with the gold when a new realm starts (BuyRealmUpgrade).
 --   Permanent: Luck Boost and Coin Boost (BuyUpgrade, the old upgrade panel's).
 -- The server checks everything (Upgrades); this panel only sends the requests and paints what DataSync brings back.
+-- Near your Soul Altar (your plot, the bridge, the island; Modules/AltarScene) it opens in the world: the camera glides
+-- to the altar, the panel stands on the right, hovering a realm upgrade lights its brazier (AltarFx), buying makes it
+-- flare. Elsewhere (and at the plaza's upgrade stall) it is the plain centred panel. The altar's prompt opens it too.
 -- Builds its UI when required (no init call).
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Theme = require(script.Parent.Theme)
@@ -13,6 +17,8 @@ local Sync = require(script.Parent.Sync)
 local screenGui = require(script.Parent.Gui)
 local Format = require(script.Parent.Format)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local AltarScene = require(script.Parent.AltarScene)
+local AltarFx = require(script.Parent.AltarFx)
 
 local C = Theme.Color
 local Z = 36
@@ -30,7 +36,14 @@ end
 -- ============================================================
 -- Frame
 -- ============================================================
-local themed = Theme.panel(screenGui, { title = "Upgrades", size = UDim2.fromOffset(640, 600), zIndex = Z })
+-- (its own ScreenGui: the in-world view switches every other one off; the tile stays in the main one)
+local upgradesGui = Instance.new("ScreenGui")
+upgradesGui.Name = "UpgradesUI"
+upgradesGui.ResetOnSpawn = false
+upgradesGui.DisplayOrder = 5
+upgradesGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local PANEL_W, PANEL_H = 640, 600
+local themed = Theme.panel(upgradesGui, { title = "Upgrades", size = UDim2.fromOffset(PANEL_W, PANEL_H), zIndex = Z })
 local panel = themed.frame
 panel.Name = "UpgradesPanel"
 panel.Visible = false
@@ -119,6 +132,14 @@ for _, u in ipairs(Economy.REALM_UPGRADES) do
 		if buyRealmRemote then
 			buyRealmRemote:FireServer(u.key)
 		end
+	end)
+	-- in the world: hovering the card lights its brazier on the altar
+	local f = realmCards[u.key].frame
+	f.MouseEnter:Connect(function()
+		AltarFx.highlight(u.key)
+	end)
+	f.MouseLeave:Connect(function()
+		AltarFx.highlight(nil)
 	end)
 end
 
@@ -236,6 +257,59 @@ local function refresh()
 	if panel.Visible then
 		paint()
 	end
+end
+
+-- ============================================================
+-- In the world (at your Soul Altar)
+-- ============================================================
+local view = nil
+local panelScale = panel:FindFirstChildOfClass("UIScale")
+
+local function layoutInWorld()
+	if not view then
+		return
+	end
+	local screen = upgradesGui.AbsoluteSize
+	panel.AnchorPoint = Vector2.new(1, 0.5)
+	panel.Position = UDim2.new(1, -40, 0.5, 0)
+	if panelScale and screen.X > 0 then
+		panelScale.Scale = math.clamp(math.min(screen.X * 0.5 / (PANEL_W + 56), (screen.Y - 60) / (PANEL_H + 56)), 0.4, 1)
+	end
+end
+upgradesGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	task.defer(layoutInWorld) -- (after Theme's own fit)
+end)
+
+local function openInWorld()
+	if view or not AltarScene.available() then
+		return
+	end
+	view = AltarScene.open(upgradesGui, function(v)
+		if view == v then
+			view = nil
+		end
+		panel.Visible = false
+		-- back to the plain centred panel: nudging the size makes Theme's fit place and scale it again
+		panel.AnchorPoint = Vector2.new(0.5, 0.5)
+		panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H + 1)
+		panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
+	end)
+	layoutInWorld()
+end
+
+panel:GetPropertyChangedSignal("Visible"):Connect(function()
+	if panel.Visible then
+		openInWorld()
+	else
+		AltarFx.highlight(nil)
+		if view then
+			view:close()
+		end
+	end
+end)
+
+AltarScene.onPrompt = function()
+	UpgradesPanel.open()
 end
 
 function UpgradesPanel.toggle()

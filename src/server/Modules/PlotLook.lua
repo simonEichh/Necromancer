@@ -4,8 +4,9 @@
 -- it replaces (the model's attribute Hides) are hidden meanwhile, and the Base is recoloured (FloorColor / FloorMaterial).
 -- It also places the Soul Altar beside the plot (tools/studio/build_altar.lua): LaneModels.AltarCore (the same in every
 -- realm: altar, braziers, floating runes, the bone bridge) and the realm's island (LaneModels.CemeteryAltarIsland).
--- The altar (tag SoulAltar) carries the owner's realm upgrade levels as attributes Level_<key>, kept up to date after
--- every data sync; the client module AltarFx sizes the braziers' flames from them.
+-- The altar (tag SoulAltar) carries the owner's realm upgrade levels as attributes Level_<key> and the permanent ones as
+-- Perm_<key>, kept up to date after every data sync; the client module AltarFx sizes the braziers' flames from them and
+-- writes a new permanent level into the tome.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,6 +56,13 @@ local function updateAltar(plotState, profile)
 		local level = profile.realmUpgrades[u.key] or 0
 		if altar:GetAttribute("Level_" .. u.key) ~= level then
 			altar:SetAttribute("Level_" .. u.key, level)
+		end
+	end
+	-- the permanent upgrades (Luck Boost, Coin Boost): a new level is written into the altar's tome (AltarFx)
+	for key in pairs(Economy.UPGRADE_MAX) do
+		local level = profile.upgrades[key] or 0
+		if altar:GetAttribute("Perm_" .. key) ~= level then
+			altar:SetAttribute("Perm_" .. key, level)
 		end
 	end
 end

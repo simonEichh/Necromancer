@@ -416,6 +416,10 @@ for k = 0, DECK_SEGMENTS - 1 do
 		end
 	end
 end
+-- a landing under the bridge start (invisible, walkable): it closes the gap between the lane shoulder and the first
+-- vertebra, where a foot could drop to the hazard (CemeteryAltarIsland draws the earth foot it stands on)
+local LANDING_CF = CFrame.lookAt(Sb, Sb + dir) * CFrame.new(0, -0.2, 1.6)
+collider(bridge, "BridgeLanding", Vector3.new(6.5, 0.4, 5.5), LANDING_CF)
 
 -- the skull at the island end: half sunk, facing the bridge, the spine running into its teeth
 local skullCF = CFrame.lookAt(Eb - dir * -1.7 + up * 0, Eb - dir * -1.7 - dir) -- (front, -Z, towards the bridge)
@@ -539,6 +543,17 @@ for _ = 1, 4 do
 	part(island, "Bone", Vector3.new(0.2, 0.2, 1.2), cf, BONE_MID)
 	part(island, "Bone", Vector3.new(0.35, 0.3, 0.3), cf * CFrame.new(0, 0, 0.6), BONE)
 	part(island, "Bone", Vector3.new(0.35, 0.3, 0.3), cf * CFrame.new(0, 0, -0.6), BONE)
+end
+-- the earth foot under the bridge start, where the spine is anchored in the shore
+do
+	local foot = LANDING_CF * CFrame.new(0, -1.3, 0)
+	part(island, "BridgeFoot", Vector3.new(6.2, 2.2, 5.2), foot, EARTH, Enum.Material.Ground)
+	part(island, "BridgeFoot", Vector3.new(7.4, 2.2, 6.0), foot * CFrame.new(0, -1.2, 0.3) * CFrame.Angles(0, 0.15, 0), BASALT[1], Enum.Material.Slate)
+	for _, spec in ipairs({ { -3.3, 1.2 }, { 3.2, 0.4 }, { -2.6, -2.4 }, { 2.9, -2.2 } }) do
+		local s0 = rng:NextNumber(1.1, 1.7)
+		part(island, "Rock", Vector3.new(s0 * 1.3, s0 * 0.8, s0), LANDING_CF * CFrame.new(spec[1], -0.1, spec[2])
+			* CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, 6), rng:NextNumber(-0.3, 0.3)), BASALT[rng:NextInteger(1, 3)], Enum.Material.Slate)
+	end
 end
 island.WorldPivot = CFrame.new()
 
