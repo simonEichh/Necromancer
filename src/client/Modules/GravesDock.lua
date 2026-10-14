@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local Theme = require(script.Parent.Theme)
 local State = require(script.Parent.State)
 local GraveOpening = require(script.Parent.GraveOpening)
+local GraveScene = require(script.Parent.GraveScene)
 
 local C = Theme.Color
 local Z = 35 -- base ZIndex of the panel (the UI uses global z-ordering)
@@ -328,11 +329,57 @@ function GravesDock.refresh()
 	themed.setTitle("Graves  (" .. total .. ")")
 end
 
-function GravesDock.toggle()
-	panel.Visible = not panel.Visible
-	if panel.Visible then
-		GravesDock.refresh()
+-- the graves you can open rise in the world in front of you (Modules/GraveScene); false when there is no free spot
+-- or nothing to open (the plain panel opens then)
+local function openInWorld()
+	GravesDock.refresh() -- (picks a selection)
+	local entries = {}
+	for _, gd in ipairs(GRAVE_DATA) do
+		if owned(gd.key) > 0 and not isLocked(gd) then
+			table.insert(entries, { key = gd.key, name = gd.name })
+		end
 	end
+	local byKey = {}
+	for _, gd in ipairs(GRAVE_DATA) do
+		byKey[gd.key] = gd
+	end
+	local ok, started = pcall(GraveScene.open, {
+		entries = entries,
+		selected = selected,
+		count = owned,
+		hint = function(key)
+			local gd = byKey[key]
+			return "Best: " .. gd.bestRarity .. " " .. string.format("%.2f", gd.bestPercent) .. "%"
+		end,
+		onOpen = function(key, count)
+			selected = key
+			return openGraveFn(key, count)
+		end,
+		onList = function()
+			panel.Visible = true
+			GravesDock.refresh()
+		end,
+	})
+	if not ok then
+		warn("GraveScene failed: " .. tostring(started))
+	end
+	return ok and started
+end
+
+function GravesDock.toggle()
+	if GraveScene.isOpen() then
+		GraveScene.close()
+		return
+	end
+	if panel.Visible then
+		panel.Visible = false
+		return
+	end
+	if openInWorld() then
+		return
+	end
+	panel.Visible = true
+	GravesDock.refresh()
 end
 
 function GravesDock.isVisible()

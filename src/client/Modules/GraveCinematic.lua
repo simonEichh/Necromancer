@@ -3,6 +3,8 @@
 --   local started = GraveCinematic.play(results, opts)
 --     results: list of { unitType, rarity, pity, oneIn } from the server's RollResult (one entry per grave opened)
 --     opts:    graveType  the grave that was opened (needs a model in ReplicatedStorage.GraveModels)
+--              stage      optional { G, dir, risen }: the grave's spot from GraveScene (risen: it already stands there
+--                         at full size, so it does not rise)
 --              onDone     function(), called when the cinematic ends (also when it is skipped)
 --     returns false (and does nothing) when it cannot play: no model for that grave, no character, or a cinematic runs.
 --
@@ -56,6 +58,103 @@ end
 local function smooth(x)
 	x = math.clamp(x, 0, 1)
 	return x * x * (3 - 2 * x)
+end
+
+-- ── Where the show can play ────────────────────────────────
+-- The checks for a stage (the grave's spot g, the direction d from the player to it, r = right): clear views for every
+-- camera shot and free camera spots. Shared with GraveScene, which only offers spots that pass them, so the grave it
+-- already raised can be handed over without rising again. Invisible markers / colliders, units and rubble never count.
+local function stageChecker(template, graveScale)
+	local isDoor = template:GetAttribute("OpenStyle") == "Door"
+	local hopOut = not isDoor and template:GetAttribute("HopOut")
+	local isSummon = template:GetAttribute("OpenStyle") == "Summon"
+	local up = Vector3.yAxis
+	local ignore = {}
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other.Character then
+			table.insert(ignore, other.Character)
+		end
+	end
+	local drops = Workspace:FindFirstChild("Drops")
+	if drops then
+		table.insert(ignore, drops)
+	end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = ignore
+	local function blocks(part)
+		return part.Transparency < 0.9 and part.CollisionGroup ~= "Units" and part.CollisionGroup ~= "Debris"
+	end
+	local function viewIsClear(from, to)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local skip = table.clone(ignore)
+		for _ = 1, 8 do
+			params.FilterDescendantsInstances = skip
+			local hit = Workspace:Raycast(from, to - from, params)
+			if not hit then
+				return true
+			elseif blocks(hit.Instance) then
+				return false
+			end
+			table.insert(skip, hit.Instance)
+		end
+		return true
+	end
+	-- a camera spot must also be free space (a ray can slip between fence bars while the camera sits inside the fence)
+	local overlap = OverlapParams.new()
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	overlap.FilterDescendantsInstances = ignore
+	local function spotIsFree(pos)
+		for _, part in ipairs(Workspace:GetPartBoundsInRadius(pos, 1.3, overlap)) do
+			if blocks(part) then
+				return false
+			end
+		end
+		return true
+	end
+	-- does the whole show fit with the grave on g, seen from direction d?
+	local function stageFits(g, d, r)
+		local eye = g + up * 3
+		local ok = viewIsClear(eye, g - d * 16 + r * 6 + up * 7) and viewIsClear(eye, g - d * 20 + r * 6 + up * 5)
+			and viewIsClear(eye, g + up * 12) and viewIsClear(eye, g + d * 6 + up * 3)
+		-- graves the unit leaves (hops or walks out): the hero shot is taken further forward, check that view too
+		local sd = (hopOut or (isDoor and template:GetAttribute("WalkOut")) or 0) * graveScale
+		if ok and sd > 0 then
+			ok = viewIsClear(g - d * sd + up * 3, g - d * (sd + 15) + r * 6 + up * 4)
+		end
+		-- the camera spots: arriving, close, the hero shot and both ends of its sway
+		if ok then
+			local s0 = g - d * sd
+			for _, spot in ipairs({ g - d * 16 + r * 6 + up * 7, g - d * 10 + r * 3.5 + up * 4.5,
+				s0 - d * 14 + r * 6 + up * 4, s0 - d * 12 + r * 12.4 + up * 4, s0 - d * 12 - r * 2.2 + up * 4 }) do
+				if not spotIsFree(spot) then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok and isSummon then
+			-- the summon also needs flat floor where the circle opens, a clear side and low view of it, and open sky
+			local c = g - d * 12
+			local cHit = Workspace:Raycast(c + up * 20, Vector3.new(0, -60, 0), rayParams)
+			ok = cHit ~= nil and math.abs(cHit.Position.Y - g.Y) < 1 and viewIsClear(eye, c + up * 3)
+				and viewIsClear(c + up * 2, c + r * 17 - d * 4 + up * 6)
+				and viewIsClear(c + up * 2, c - d * 15 + r * 6 + up * 2.2)
+				and viewIsClear(c + up * 3, c + up * 80)
+		end
+		return ok
+	end
+	return { fits = stageFits, viewIsClear = viewIsClear, spotIsFree = spotIsFree, rayParams = rayParams }
+end
+
+-- can the grave cinematic play with this grave standing on g, the player looking along d? (used by GraveScene)
+function GraveCinematic.fits(graveType, g, d)
+	local template = GraveOpening.template(graveType)
+	if not template then
+		return false
+	end
+	return stageChecker(template, GRAVE_SCALE).fits(g, d, Vector3.new(-d.Z, 0, d.X))
 end
 
 function GraveCinematic.play(results, opts)
@@ -137,67 +236,33 @@ function GraveCinematic.play(results, opts)
 
 	-- ── The place: in front of the player, with a clear view ──
 	local up = Vector3.yAxis
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	local ignore = {}
-	for _, other in ipairs(Players:GetPlayers()) do
-		if other.Character then
-			table.insert(ignore, other.Character)
-		end
-	end
-	rayParams.FilterDescendantsInstances = ignore
-	local function viewIsClear(from, to)
-		return Workspace:Raycast(from, to - from, rayParams) == nil
-	end
-	-- a camera spot must also be free space (a ray can slip between fence bars while the camera sits inside the fence)
-	local overlap = OverlapParams.new()
-	overlap.FilterType = Enum.RaycastFilterType.Exclude
-	overlap.FilterDescendantsInstances = ignore
-	local function spotIsFree(pos)
-		return #Workspace:GetPartBoundsInRadius(pos, 1.3, overlap) == 0
-	end
+	local checker = stageChecker(template, graveScale)
+	local stageFits, viewIsClear, spotIsFree, rayParams = checker.fits, checker.viewIsClear, checker.spotIsFree, checker.rayParams
 	local flatLook = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
 	local lookDir = flatLook.Magnitude > 0.1 and flatLook.Unit or Vector3.new(0, 0, -1)
 	local dir, right, G
+	-- opened from the graves standing in the world (GraveScene): the grave is already there, no rise
+	local preRisen = false
+	if opts.stage then
+		local d = opts.stage.dir
+		local r = Vector3.new(-d.Z, 0, d.X)
+		if stageFits(opts.stage.G, d, r) then
+			dir, right, G = d, r, opts.stage.G
+			preRisen = opts.stage.risen == true
+		end
+	end
 	for _, degrees in ipairs({ 0, 45, -45, 90, -90, 135, -135, 180 }) do
+		if G then
+			break
+		end
 		local a = math.rad(degrees)
 		local d = Vector3.new(lookDir.X * math.cos(a) - lookDir.Z * math.sin(a), 0, lookDir.X * math.sin(a) + lookDir.Z * math.cos(a))
 		local r = Vector3.new(-d.Z, 0, d.X)
 		local hit = Workspace:Raycast(hrp.Position + d * graveDistance + up * 20, Vector3.new(0, -60, 0), rayParams)
 		-- the floor under the character (not a unit, a drop or a wall top): a little below the character's root
 		if hit and hit.Normal.Y > 0.9 and hit.Position.Y < hrp.Position.Y - 1.5 and hit.Position.Y > hrp.Position.Y - 6 then
-			local g = hit.Position
-			local eye = g + up * 3
-			local ok = viewIsClear(eye, g - d * 16 + r * 6 + up * 7) and viewIsClear(eye, g - d * 20 + r * 6 + up * 5)
-				and viewIsClear(eye, g + up * 12) and viewIsClear(eye, g + d * 6 + up * 3)
-			-- graves the unit leaves (hops or walks out): the hero shot is taken further forward, check that view too
-			local sd = (hopOut or (isDoor and template:GetAttribute("WalkOut")) or 0) * graveScale
-			if ok and sd > 0 then
-				ok = viewIsClear(g - d * sd + up * 3, g - d * (sd + 15) + r * 6 + up * 4)
-			end
-			-- the camera spots: arriving, close, the hero shot and both ends of its sway
-			if ok then
-				local s0 = g - d * sd
-				for _, spot in ipairs({ g - d * 16 + r * 6 + up * 7, g - d * 10 + r * 3.5 + up * 4.5,
-					s0 - d * 14 + r * 6 + up * 4, s0 - d * 12 + r * 12.4 + up * 4, s0 - d * 12 - r * 2.2 + up * 4 }) do
-					if not spotIsFree(spot) then
-						ok = false
-						break
-					end
-				end
-			end
-			if ok and isSummon then
-				-- the summon also needs flat floor where the circle opens, a clear side and low view of it, and open sky
-				local c = g - d * 12
-				local cHit = Workspace:Raycast(c + up * 20, Vector3.new(0, -60, 0), rayParams)
-				ok = cHit ~= nil and math.abs(cHit.Position.Y - g.Y) < 1 and viewIsClear(eye, c + up * 3)
-					and viewIsClear(c + up * 2, c + r * 17 - d * 4 + up * 6)
-					and viewIsClear(c + up * 2, c - d * 15 + r * 6 + up * 2.2)
-					and viewIsClear(c + up * 3, c + up * 80)
-			end
-			if ok then
-				dir, right, G = d, r, g
-				break
+			if stageFits(hit.Position, d, r) then
+				dir, right, G = d, r, hit.Position
 			end
 		end
 	end
@@ -227,7 +292,9 @@ function GraveCinematic.play(results, opts)
 	end
 	local rest = model:GetPivot()
 	local _, graveSize = model:GetBoundingBox()
-	model:PivotTo(rest - up * (graveSize.Y + 0.5))
+	if not preRisen then
+		model:PivotTo(rest - up * (graveSize.Y + 0.5))
+	end
 	model.Parent = fxFolder
 	local grave = GraveOpening.attach(model, { scale = graveScale, world = true })
 	-- doors: the unit starts on the chamber floor at the Core and walks out to `stand`; `focus` is where it is now
@@ -680,10 +747,10 @@ function GraveCinematic.play(results, opts)
 		-- ── The grave ───────────────────────────────────────
 		if T < START_BUILD then
 			-- pushes up out of the ground with a rumble
-			local k = smooth(T / (T_ARRIVE * 0.85))
+			local k = preRisen and 1 or smooth(T / (T_ARRIVE * 0.85))
 			local rumble = (1 - k) * 0.12 * graveScale
 			model:PivotTo((rest - up * (graveSize.Y + 0.5) * (1 - k)) * CFrame.new((math.random() - 0.5) * rumble, 0, (math.random() - 0.5) * rumble))
-			if T - dt <= 0 then
+			if T - dt <= 0 and not preRisen then
 				puff("rbxasset://textures/particles/smoke_main.dds", 24, Color3.fromRGB(150, 130, 110), Color3.fromRGB(70, 62, 60), 2, 7, 2, 14)
 			end
 			shakeAmount, shakeStart = 0.12 * (1 - k), os.clock()

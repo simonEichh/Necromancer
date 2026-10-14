@@ -16,6 +16,7 @@ local Sync = require(script.Parent.Sync)
 local GachaReveal = require(script.Parent.GachaReveal)
 local StarSummon = require(script.Parent.StarSummon)
 local GraveCinematic = require(script.Parent.GraveCinematic)
+local GraveScene = require(script.Parent.GraveScene)
 local SignatureDescent = require(script.Parent.SignatureDescent)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
@@ -33,6 +34,8 @@ local openGrave -- forward declared: the reveal's "Open x10" button calls it
 -- Shows the reveal for the server's results (a list: one entry per grave opened)
 local function playRollAnimation(results)
 	local graveType = currentRollGraveType
+	-- opened from the graves in the world: end that view now; its grave is already standing for the grave cinematic
+	local stage = GraveScene.takeStage(graveType)
 	local function showOverlay(skipShow)
 		GachaReveal.play(results, {
 			graveType = graveType,
@@ -101,6 +104,7 @@ local function playRollAnimation(results)
 		-- graves without a 3D model, or when it cannot play, keep the overlay's short show. Auto Roll always uses the overlay.
 		local okCall, started = pcall(GraveCinematic.play, results, {
 			graveType = graveType,
+			stage = stage,
 			onDone = function()
 				showOverlay(true)
 			end,
@@ -116,13 +120,13 @@ end
 openGrave = function(graveType, count)
 	count = count or 1
 	if isRolling then
-		return
+		return false
 	end -- locked while animation is active
 	if ShopPanel.isGraveLocked(graveType) then
-		return
+		return false
 	end
 	if (State.ownedGraves[graveType] or 0) <= 0 then
-		return
+		return false
 	end
 
 	-- Check for inventory space
@@ -147,7 +151,7 @@ openGrave = function(graveType, count)
 		warn.BorderSizePixel = 0
 		Instance.new("UICorner", warn).CornerRadius = UDim.new(0, 8)
 		game:GetService("Debris"):AddItem(warn, 2)
-		return
+		return false, "full"
 	end
 
 	-- Lock and track grave type for auto-roll chain
@@ -161,6 +165,7 @@ openGrave = function(graveType, count)
 	if remote then
 		remote:FireServer(graveType, count)
 	end
+	return true
 end
 
 local rollResultEvt = ReplicatedStorage:WaitForChild("RollResult", 5)
@@ -177,6 +182,7 @@ if digRejectedEvt then
 		isRolling = false
 		autoRollActive = false
 		Sync.release()
+		GraveScene.cancel()
 	end)
 end
 
