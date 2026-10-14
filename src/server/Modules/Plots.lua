@@ -8,6 +8,7 @@ local Walls = require(script.Parent.Walls)
 local Collision = require(script.Parent.Collision)
 local PlotFrame = require(script.Parent.PlotFrame)
 local PlotRegistry = require(script.Parent.PlotRegistry)
+local Titans = require(script.Parent.Titans)
 
 local playerPlots = PlotRegistry.playerPlots
 local getPlot = PlotRegistry.getPlot
@@ -186,6 +187,7 @@ initPlotForPlayer = function(player)
 		groundExtensions = {},
 	}
 	initWallQueue(plotState)
+	Titans.spawn(plotState) -- the realm's titan behind the lane
 	-- 5 grave slots to start, +1 per ascension (max 10)
 	local profile = PlayerData.get(player)
 	local slotCount = math.min(10, 5 + (profile and profile.rebirthCount or 0))
@@ -261,6 +263,7 @@ local function releasePlot(player)
 		for _, ext in ipairs(plotState.groundExtensions) do
 			if ext and ext.Parent then ext:Destroy() end
 		end
+		Titans.remove(plotState)
 		for _, u in ipairs(plotState.activeUnits) do
 			if u.block and u.block.Parent then u.block:Destroy() end
 		end

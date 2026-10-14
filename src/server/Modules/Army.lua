@@ -851,6 +851,7 @@ end
 
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
 local function update(now, dt)
+	local serverNow = workspace:GetServerTimeNow()
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
 		if not plotState.wall or not plotState.wall.Parent then
@@ -885,6 +886,29 @@ local function update(now, dt)
 			if not u.phase then u.phase = math.random() * math.pi * 2 end
 
 			local pos = u.block.Position
+			-- stunned by the titan's tremor (plotState.stun, set by Walls when he slams the outer wall): from the moment
+			-- the tremor reaches the unit until the new wall stands it does nothing; the clients bind it (StunFx) and
+			-- freeze its animation (UnitAnimator) from the attributes StunFrom / StunUntil
+			local stun = plotState.stun
+			if stun and serverNow < stun.untilT then
+				local _, fwd = PlotFrame.toLocal(plotState, pos)
+				local from = stun.impact + math.max(0, stun.originFwd - fwd) / stun.speed
+				if serverNow >= from then
+					if u.stunId ~= stun.id then
+						u.stunId = stun.id
+						if u.model then
+							u.model:SetAttribute("StunFrom", from)
+							u.model:SetAttribute("StunUntil", stun.untilT)
+						end
+					end
+					if u.barrage and not u.barrage.endTime then stopBarrage(u) end
+					if u.beam and not u.beam.endTime then stopBeam(u) end
+					u.bv.Velocity = Vector3.new(0, 0, 0)
+					if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
+					u.lastAttack = now -- the attack timer starts again after the stun
+					continue
+				end
+			end
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
 			-- the unit's slot in the formation (falls back to the lane it was placed in until the first layout)
 			local lat = u.slotLat or u.lateral

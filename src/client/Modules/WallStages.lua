@@ -315,6 +315,12 @@ end
 local function rise(w, left, total)
 	local model = w.model
 	local final = w.pivot
+	if left > total then
+		-- the rise starts later (the titan slams the outer wall first): wait under the ground
+		task.wait(left - total)
+		if not model.Parent then return end
+		left = total
+	end
 	for i, seg in ipairs(w.segments) do
 		if i % 3 == 1 then
 			dust(seg:GetPivot().Position + Vector3.new(0, 1, 0) + w.front * 2, 18)

@@ -176,6 +176,7 @@ require(Modules.UnitAnimator)
 require(Modules.SpellEffects)
 require(Modules.HitEffects)
 require(Modules.WallStages) -- damage stages of the modelled walls (cracks, collapse)
+require(Modules.TitanAnimator) -- idle animation of the realm titans behind the outer wall
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)

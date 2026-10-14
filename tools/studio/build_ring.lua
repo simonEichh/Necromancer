@@ -143,9 +143,12 @@ for i = 1, 8 do
 end
 
 -- ── Round mid-towers between the gate towers ──────────────────
+-- Off since the realm titans (tools/studio/build_titan_gravekeeper.lua): a titan's arm lies along the battlements and
+-- would reach into the tower beside its lane.
+local MID_TOWERS = false
 local MID_H = 100
 local MID_TOP = floorTop + MID_H
-for i = 0, 7 do
+for i = 0, MID_TOWERS and 7 or -1 do
 	local deg = i * 45 + 22.5
 	local tower = Instance.new("Folder")
 	tower.Name = "MidTower" .. (i + 1)

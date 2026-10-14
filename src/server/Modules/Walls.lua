@@ -10,6 +10,7 @@ local PlotFrame = require(script.Parent.PlotFrame)
 local Quests = require(script.Parent.Quests)
 local PlayerData = require(script.Parent.PlayerData)
 local Drops = require(script.Parent.Drops)
+local Titans = require(script.Parent.Titans)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
@@ -199,11 +200,23 @@ local function setFront(plotState, layer)
 	plotState.wallTargetFwd = plotState.wallFwd - (WALL_THICKNESS / 2 + 3)
 	plotState.wallFaceFwd = plotState.wallFwd - WALL_THICKNESS / 2
 	plotState.wallTarget = PlotFrame.toWorld(plotState, 0, plotState.wallTargetFwd)
+	Titans.setFocus(plotState) -- the titan watches the wall being fought
 end
 
-local WALL_RISE_TIME = 2.5 -- seconds a new wall takes to rise out of the ground
+local WALL_RISE_TIME = 2.5 -- seconds a new wall takes to rise out of the ground (on its own)
+-- The titan's summon (keep in sync with the client Modules/TitanAnimator): he gathers himself, slams the outer wall at
+-- TITAN_IMPACT (a tremor runs down the lane and stuns the army it reaches), then raises his hand and weaves the next wall,
+-- which rises from TITAN_WEAVE_RISE for TITAN_RISE_TIME; the army stays stunned until it stands.
+local TITAN_IMPACT = 3.1
+local TITAN_WEAVE_RISE = 5.6
+local TITAN_RISE_TIME = 3.2
+local TITAN_SEQUENCE = 10.4 -- the whole SlamWeave, until he rests again
+local TITAN_GATE_SEQUENCE = 6 -- only the slam (the gate fell)
+local TREMOR_SPEED = 140 -- studs per second the tremor runs down the lane from the outer wall
 
-local function spawnWall(layer, plotState, rise)
+-- `rise`: the wall rises out of the ground, starting `riseDelay` seconds from now and taking `riseTime` (default
+-- WALL_RISE_TIME)
+local function spawnWall(layer, plotState, rise, riseDelay, riseTime)
 	local height = wallHeight(layer)
 	local gate = Economy.isGate(layer)
 	local wallPart = Instance.new("Part")
@@ -230,8 +243,8 @@ local function spawnWall(layer, plotState, rise)
 		CollectionService:AddTag(m, "StagedWall")
 		if rise then
 			-- the clients raise it out of the ground (Modules/WallStages); the invisible collider stands at once
-			m:SetAttribute("RiseStart", workspace:GetServerTimeNow())
-			m:SetAttribute("RiseTime", WALL_RISE_TIME)
+			m:SetAttribute("RiseStart", workspace:GetServerTimeNow() + (riseDelay or 0))
+			m:SetAttribute("RiseTime", riseTime or WALL_RISE_TIME)
 		end
 		m.Parent = wallPart
 		height += WALL_MODEL_GUI_LIFT
@@ -241,7 +254,7 @@ local function spawnWall(layer, plotState, rise)
 		-- a plain slab (the gate, for now) rises on the server
 		local up = wallPart.CFrame
 		wallPart.CFrame = up - Vector3.new(0, height, 0)
-		TweenService:Create(wallPart, TweenInfo.new(WALL_RISE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = up }):Play()
+		TweenService:Create(wallPart, TweenInfo.new(riseTime or WALL_RISE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, riseDelay or 0), { CFrame = up }):Play()
 	end
 
 	-- small "Wall N" tag above the wall (sized in studs, so it shrinks with distance); only the gate is visible from afar
@@ -394,12 +407,34 @@ local function breakWall(plotState)
 	plotState.wallLayer += 1
 	crumbleWall(plotState.wallQueue[brokenLayer], plotState)
 
-	if plotState.wallLayer <= NUM_WALLS then
+	-- the realm's titan slams the outer wall in anger (the tremor stuns the army), then weaves the next wall
+	-- (Modules/TitanAnimator on the clients, Army reads plotState.stun). Never twice at once: a wall broken while he is
+	-- still busy just rises on its own, without a stun.
+	local riseDelay, riseTime = 0, nil
+	local gateFell = plotState.wallLayer > NUM_WALLS
+	if plotState.titan and os.clock() >= (plotState.titanBusyUntil or 0) then
+		local at = workspace:GetServerTimeNow()
+		plotState.titan:SetAttribute("SummonKind", gateFell and "Slam" or "SlamWeave")
+		plotState.titan:SetAttribute("SummonAt", at)
+		plotState.titanBusyUntil = os.clock() + (gateFell and TITAN_GATE_SEQUENCE or TITAN_SEQUENCE)
+		if not gateFell then
+			riseDelay, riseTime = TITAN_WEAVE_RISE, TITAN_RISE_TIME
+			plotState.stun = {
+				id = at,
+				impact = at + TITAN_IMPACT, -- the tremor leaves the outer wall
+				speed = TREMOR_SPEED,
+				originFwd = LANE_END_FWD, -- and runs down the lane from there
+				untilT = at + TITAN_WEAVE_RISE + TITAN_RISE_TIME + 0.2, -- the new wall stands
+			}
+		end
+	end
+
+	if not gateFell then
 		-- the army marches on to the next wall
 		plotState.WALL_MAX_HP = Economy.wallHp(plotState.wallLayer, ownerRebirths(plotState))
 		plotState.wallHP = plotState.WALL_MAX_HP
 		plotState.wallRegen = plotState.wallLayer * 2
-		plotState.wallQueue[plotState.wallLayer] = spawnWall(plotState.wallLayer, plotState, true)
+		plotState.wallQueue[plotState.wallLayer] = spawnWall(plotState.wallLayer, plotState, true, riseDelay, riseTime)
 		activateWall(plotState, plotState.wallLayer)
 		updateWallGui(plotState)
 	else

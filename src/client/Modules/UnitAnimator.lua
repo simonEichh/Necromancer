@@ -395,12 +395,15 @@ for _, model in ipairs(CollectionService:GetTagged(TAG)) do
 	register(model)
 end
 
+local StunFx = require(script.Parent.StunFx)
+
 RunService.RenderStepped:Connect(function(dt)
 	local now = os.clock()
+	local serverNow = workspace:GetServerTimeNow()
 	for model, rig in pairs(rigs) do
 		if model.Parent == nil then
 			rigs[model] = nil
-		else
+		elseif not StunFx.isStunned(model, serverNow) then -- a unit bound by the titan's tremor holds its pose
 			animate(model, rig, dt, now)
 		end
 	end
