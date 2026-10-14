@@ -206,9 +206,40 @@ random, the Forge needs dust), the first pulls are bland, and walls go minutes w
   rarity colour; after Continue he absorbs the unit into a spectral grimoire. Graves stay the source of units.
 - **Codex / compendium (later, wanted):** a book listing every pullable unit (seen / owned, rarity, odds, art), ideally
   the same grimoire the necromancer absorbs units into. Doubles as the collection index from the content table.
-- **Items, later** (after spells and Souls): staff (shapes the spells), robe (small passive + looks), familiars (the Soul
-  Wisp becomes the first; others collect differently or carry a small buff). From the Souls shop / bosses / later
-  cosmetics for Robux; NOT a second gacha; small stats, big looks.
+- **Items / outfits (NEXT, agreed 2026-10-14; plan below).** Long term: staffs shape the spells, small passives, the Soul
+  Wisp as the first familiar; from the Codex, ascension milestones, the Gem Shop, later Souls; NOT a second gacha; small
+  stats, big looks.
+
+#### Items / outfits plan (agreed 2026-10-14, not started)
+
+Why now: the player's character is the lead in the pull cinematics and the Codex, so its look matters. Spells do not
+exist yet, so items start as **cosmetics (look only)**; effects come with the spells (step 2).
+
+- **Avatars:** players keep their own avatars; the game is set to **R15** (the user changed Game Settings > Avatar;
+  the IK poses of the ritual / Codex need R15). Scale ranges stay default unless something breaks. These settings cannot
+  be changed through the Studio MCP (locked properties).
+- **Three slots:**
+  1. **Hand / magic:** staffs, scythes, lanterns, a skull orb, a grimoire. Held in the right hand (or on the back when
+     idle); raised in the ritual.
+  2. **Head:** hoods, crowns, horns, a skull mask, a halo of soul flames.
+  3. **Back** (the flexible slot, chosen because the camera mostly sees the character's back and one attachment point,
+     `BodyBackAttachment`, fits almost every body): capes / torn mantles, bone or ghost wings, a gravestone strapped on
+     like the titan's, spectral chains, a floating ring of souls, a floating open grimoire.
+  - Later maybe a 4th slot: **aura** (particles round the character; robust on any avatar, good for rare items).
+  - Full robes were rejected for now (they break on very different body shapes; a mantle/cape is robust).
+- **How they are built:** from parts in the game's chunky block style (like the unit models), as models welded to the
+  R15 body (hand: RightGripAttachment / RightHand; head: HatAttachment / Head; back: BodyBackAttachment / UpperTorso),
+  scaled to the avatar's body size. Items live in ReplicatedStorage (client-visible) or ServerStorage (server attaches,
+  replicates).
+- **Start set** (dark gothic, Realm 1 colours: moss green, charcoal, bone, rusty iron, lantern gold, soul green):
+  e.g. Lantern Staff, Bone Staff, Gravedigger's Hood, a skull mask or crown, Tattered Cape, a strapped gravestone or bone
+  wings. Show the user the first 2-3 as models before building the rest (models are approved batch by batch).
+- **Wardrobe panel ("Outfits")**, opened by a HUD tile: the character turns to the camera and is shown in 3D (a short
+  camera move like the Codex, upright, no overhead swing); slots with owned items, equip / unequip.
+- **Server:** owned items + equipped per slot saved per player (PlayerData + Persistence), equipped items attached to
+  the character on spawn for everyone to see; sources: Codex page completion rewards, ascension milestones (e.g. the
+  realm portal), a few in the Gem Shop (cosmetics only for Robux later, no power).
+- **Step 2 (with the spells):** staffs get spell effects, head / back items small passives.
 
 ### Monetization
 

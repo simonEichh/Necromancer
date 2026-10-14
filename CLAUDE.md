@@ -219,7 +219,17 @@ weave, defeat at the gate, return after ascending); the portal behind the gate (
 through ascends at a realm's last ascension); coin bursts at every wall damage stage; gold kept through a realm; realm
 upgrades + the Upgrades panel (old UpgradePanel removed).
 
-**Next, in this order (agreed after the 2026-10-14 playtest: "not fun enough yet, the player only watches"):**
+**Also built later on 2026-10-14 (committed):** the necromancer's ritual in all pull cinematics (NecroRitual), the Codex
+(CodexPanel, discovered units saved), realm upgrades + Upgrades panel, the cemetery plot look with the new grave layout.
+
+**NEXT (the user's choice at the end of 2026-10-14): items / outfits as cosmetics**, full plan in Design.md "Items /
+outfits plan": three slots (hand/magic, head, back), part-built models welded to the R15 body (the user switched the
+game to R15 in Game Settings > Avatar; the MCP cannot change avatar settings), a start set, a wardrobe panel with a 3D
+view of the character, saved ownership + equipped slots, sources Codex rewards / ascension milestones / Gem Shop.
+**First step: build 2-3 item models (e.g. Lantern Staff, Gravedigger's Hood, Tattered Cape) and show them to the user
+before the system.**
+
+**Then, in this order (agreed after the 2026-10-14 playtest: "not fun enough yet, the player only watches"):**
 1. **Necromancer spells** (the next big feature, design it WITH the user first): 3-4 spells with cooldowns cast in the
    lane (ideas: Raise Dead, Curse, Soul Surge), upgraded permanently with gold on a growing cost curve. See Design.md
    "Making the player matter".
