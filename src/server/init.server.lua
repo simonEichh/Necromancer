@@ -28,6 +28,7 @@ require(Modules.GemShop)
 require(Modules.ShopNpcs)
 require(Modules.Digging)
 require(Modules.DevTools)
+require(Modules.Lava) -- the lava sea round the lanes sends players back to their plot
 
 local playerPlots = PlotRegistry.playerPlots
 

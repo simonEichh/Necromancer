@@ -51,7 +51,7 @@ Roblox idle/gacha game ("Necro Buddies"). Players buy and dig graves to roll und
 
 - Lighting is configured in `default.project.json` (Rojo is the source of truth): ShadowMap technology, dusk `ClockTime` 17.7, purple ambient, the `Graveyard Skybox` sky, one `Atmosphere`, `Bloom` and `ColorCorrection`. Edit the JSON, not the Studio properties, or Rojo will overwrite your change. There must be exactly one Sky and one Atmosphere under Lighting (the old place had 12 leftover Skies, now removed).
 - Rojo can create duplicate Lighting children when the project file changes while same-named ones already exist in Studio: if you see doubles, delete the extras.
-- Terrain water (`tools/studio/set_water.lua`) is stored in the place file only.
+- Terrain water (`tools/studio/set_water.lua`) is stored in the place file only. Inside the outer wall it was replaced by a **lava sea** (`tools/studio/build_lava.lua` -> `Workspace.Lava`: a CrackedLava `Surface` disc 0.9 below the floors, ragged neon pools with rivulets, embers; place file only). Server `Modules/Lava`: touching the `Surface` burns the player for a moment and sends them back to their plot's PlayerSpawn (2 s cooldown, a Notice).
 - Neon parts (lamps, runes, beacon, eyes) rely on Bloom (threshold 1.0) to glow; keep new light sources `PointLight.Shadows = false`.
 
 ## Plot geometry (never assume an axis)
