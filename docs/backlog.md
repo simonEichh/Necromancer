@@ -1,5 +1,7 @@
 # Backlog, state and open issues
 
+**Spin wheel (2026-10-14, made by ChatGPT/Codex, committed as is):** a shared `LuckyWheel` in the plaza (`tools/studio/build_wheel.lua`, place file), `WheelScene`, `WheelRewards`. TODO: rework the wheel MODEL (the user finds it weak); one spin at a time server-wide (others are rejected for 5 s: consider a queue); the prompt is only wired if the wheel exists at server start.
+
 **Keeper hands (2026-10-14):** the titan behind each lane is replaced by his hands from two rifts and his eyes in fog (docs/world.md). Open: the resting hands sit slightly inside the outer wall (fix with the outer wall rework: one realm-styled sector per plot, swapped by PlotLook, neutral buttresses at the sector seams, gate towers keep `GateTower<i>`/`GateDoor` for the portal), the shut rifts' scar smoke is faint, the effects duplicate TitanAnimator's, the Return was not watched on its own. Later: the full Gravekeeper as a world boss (phase 2: 16 hands).
 
 **On hold (2026-10-14, the user's idea, discussed):** raise the quality floor of the standard units with a reusable "attack kit" (4-5 attack styles + hit effects, one per unit, scaled by rarity: Common/Uncommon own attack motion + hit effect, Rare/Cursed visible ranged/area attack, Legendary+ a small in-world special, Signature cinematic specials + a second skill unlocked by awakening (Forge level 10 or Star Dust)). Keep the current Signatures as Signatures. Proposal per unit to be made and approved batch by batch when the user picks it up.
@@ -7,6 +9,8 @@
 Moved out of CLAUDE.md: what was built when, the agreed next steps, small known issues, the before-publishing checklist and discarded ideas.
 
 ## Next steps (backlog, in the order we discussed)
+
+**Lucky Wheel rework:** the old scrolling strip is replaced by a real seven-section wheel on the main plaza, with an E prompt and an in-world camera/controls view. Odds and rewards are unchanged. Actual spin, shared busy rejection, winning-section landing and view restoration checked in Studio. Save the place to keep `Workspace.LuckyWheel`; rebuild script `tools/studio/build_wheel.lua`. See `docs/features.md` and `docs/world.md`.
 
 ### State at the end of the 2026-10-14 session (read `Design.md` too: identity, realms, every idea rated)
 

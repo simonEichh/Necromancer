@@ -49,6 +49,8 @@ local EVENTS = {
 	"DustStockUpdate", -- (stock {dust = count}, seconds until the restock): the Forge's Buy Dust tab
 	"WallBreak",
 	"WheelResult",
+	"WheelRejected", -- reason: no spin was consumed
+	"OpenWheel", -- the plaza wheel's prompt opens its in-world view
 	"WheelSpinsUpdate",
 }
 

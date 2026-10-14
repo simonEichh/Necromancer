@@ -5,6 +5,9 @@ local PlayerData = require(script.Parent.PlayerData)
 local Rolling = require(script.Parent.Rolling)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local WHEEL_OUTCOMES = require(ReplicatedStorage.Shared.WheelRewards)
+local SPIN_TIME = 5
+local busyUntil = 0
 
 local rollUnit = Rolling.rollUnit
 local getBaseOneIn = Units.getBaseOneIn
@@ -24,15 +27,6 @@ local function getWheelData(player)
 end
 
 -- Wheel outcomes (7 segments matching the client display order)
-local WHEEL_OUTCOMES = {
-	{ id = "gold_1k",    weight = 50, label = "+1k Gold",          emoji = "" },
-	{ id = "luck_buff",  weight = 10, label = "2x Luck 5min",      emoji = "" },
-	{ id = "gems_50",    weight = 16, label = "+50 Gems",          emoji = "" },
-	{ id = "graves_5",   weight = 10, label = "+5 Ancient Graves", emoji = "", graveType = "Ancient", count = 5 },
-	{ id = "gems_100",   weight = 8,  label = "+100 Gems",         emoji = "" },
-	{ id = "grave_rare", weight = 5,  label = "+1 Shadow Grave",   emoji = "", graveType = "Shadow",  count = 1 },
-	{ id = "lucky_box",  weight = 1,  label = "Lucky Box!",        emoji = "" },
-}
 local WHEEL_TOTAL_WEIGHT = 0
 for _, o in ipairs(WHEEL_OUTCOMES) do
 	WHEEL_TOTAL_WEIGHT += o.weight
@@ -55,15 +49,36 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player)
 	local profile = PlayerData.get(player)
 	local wd = getWheelData(player)
 	if not profile or wd.spins <= 0 then
+		Remotes.WheelRejected:FireClient(player, "No spins available yet.")
 		return
 	end
+	local wheel = workspace:FindFirstChild("LuckyWheel")
+	if not wheel or not wheel:FindFirstChild("Rotor") then
+		Remotes.WheelRejected:FireClient(player, "The plaza wheel is not available.")
+		return
+	end
+	local at = workspace:GetServerTimeNow()
+	if at < busyUntil then
+		Remotes.WheelRejected:FireClient(player, "The wheel is spinning. Try again in a moment.")
+		return
+	end
+	busyUntil = at + SPIN_TIME
 	wd.spins -= 1
 
 	-- The server rolls the outcome; the client only animates toward the index we send.
 	local idx, outcome = rollWheelOutcome()
+	local from = wheel:GetAttribute("SpinTo") or 0
+	local landing = outcome.centerAngle
+	local to = from + 6 * 2 * math.pi + (landing - from % (2 * math.pi)) % (2 * math.pi)
+	wheel:SetAttribute("SpinFrom", from)
+	wheel:SetAttribute("SpinTo", to)
+	wheel:SetAttribute("SpinDuration", SPIN_TIME)
+	wheel:SetAttribute("SpinWinner", idx)
+	wheel:SetAttribute("SpinOwner", player.UserId)
+	wheel:SetAttribute("SpinAt", at) -- last: clients see one consistent animation snapshot
 
 	-- Award reward (stored in PlayerData; the client sees it via DataSync)
-	local rewardData = { outcomeIdx = idx, outcome = outcome }
+	local rewardData = { outcomeIdx = idx, outcome = outcome, spinAt = at, spinDuration = SPIN_TIME }
 	if outcome.id == "gold_1k" then
 		PlayerData.addGold(player, math.floor(1000 * Economy.sellGoldMultiplier(profile.upgrades.coinBoost)))
 	elseif outcome.id == "luck_buff" then
@@ -117,6 +132,18 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player)
 	Remotes.WheelSpinsUpdate:FireClient(player, wd.spins, secondsUntilNext)
 	print("🎡 " .. player.Name .. " spun wheel → " .. outcome.label)
 end)
+
+-- The model lives in the Studio place. The prompt and the HUD tile use the same wheel view.
+local wheel = workspace:FindFirstChild("LuckyWheel")
+local prompt = wheel and wheel:FindFirstChild("WheelPrompt", true)
+if prompt then
+	prompt.Triggered:Connect(function(player)
+		local wd = getWheelData(player)
+		local secondsUntilNext = math.max(0, math.floor(900 - (tick() - wd.lastGrantTime)))
+		Remotes.WheelSpinsUpdate:FireClient(player, wd.spins, secondsUntilNext)
+		Remotes.OpenWheel:FireClient(player)
+	end)
+end
 
 -- Sends the spin count once the player's character exists.
 local function onPlayerAdded(player)
