@@ -11,6 +11,7 @@ local Quests = require(script.Parent.Quests)
 local PlayerData = require(script.Parent.PlayerData)
 local Drops = require(script.Parent.Drops)
 local Titans = require(script.Parent.Titans)
+local Portal = require(script.Parent.Portal)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local incrementQuest = Quests.increment
@@ -460,6 +461,7 @@ local function breakWall(plotState)
 			Remotes.WallBreak:FireClient(p, goldReward, plotState.wallLayer - 1)
 			if Economy.isGate(brokenLayer) then
 				PlayerData.setGateCleared(p, true)
+				Portal.open(plotState, p) -- the gate tower's door bursts open: the portal to the next realm
 				Remotes.Notice:FireClient(p, "The gate has fallen! You can ascend now.")
 			end
 			incrementQuest(p, "breakWalls", 1)
@@ -472,8 +474,9 @@ end
 
 local function resetWall(plotState)
 	Drops.clearPlot(plotState)
-	-- the titan comes back over the wall for the new run
+	-- the titan comes back over the wall for the new run, the portal closes
 	plotState.stun = nil
+	Portal.close(plotState)
 	if plotState.titan then
 		plotState.titan:SetAttribute("SummonKind", "Return")
 		plotState.titan:SetAttribute("SummonAt", workspace:GetServerTimeNow())

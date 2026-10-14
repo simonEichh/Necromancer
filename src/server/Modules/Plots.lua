@@ -9,6 +9,7 @@ local Collision = require(script.Parent.Collision)
 local PlotFrame = require(script.Parent.PlotFrame)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local Titans = require(script.Parent.Titans)
+local Portal = require(script.Parent.Portal)
 
 local playerPlots = PlotRegistry.playerPlots
 local getPlot = PlotRegistry.getPlot
@@ -208,7 +209,8 @@ initPlotForPlayer = function(player)
 	print("✅ Assigned Plot" .. plotIndex .. " to " .. player.Name)
 end
 
-Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
+-- Ascends the player (the Ascend button, or walking through the open portal at a realm's last ascension)
+local function ascendPlayer(player)
 	local plotState = getPlot(player)
 	if not plotState then return end
 	if not PlayerData.ascend(player) then return end -- can't afford it
@@ -250,7 +252,9 @@ Remotes.PlayerAscend.OnServerEvent:Connect(function(player)
 		hrp.CFrame = CFrame.lookAt(hub, hub + Vector3.new(0, 0, -1))
 	end
 	print("⬆️ " .. player.Name .. " ascended — wall reset, graves: " .. #plotState.graveSlots)
-end)
+end
+Remotes.PlayerAscend.OnServerEvent:Connect(ascendPlayer)
+Portal.onPass = ascendPlayer
 
 -- Tears down a leaving player's plot objects and frees the plot.
 local function releasePlot(player)
@@ -264,6 +268,7 @@ local function releasePlot(player)
 			if ext and ext.Parent then ext:Destroy() end
 		end
 		Titans.remove(plotState)
+		Portal.close(plotState)
 		for _, u in ipairs(plotState.activeUnits) do
 			if u.block and u.block.Parent then u.block:Destroy() end
 		end

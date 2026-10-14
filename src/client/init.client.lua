@@ -177,6 +177,7 @@ require(Modules.SpellEffects)
 require(Modules.HitEffects)
 require(Modules.WallStages) -- damage stages of the modelled walls (cracks, collapse)
 require(Modules.TitanAnimator) -- idle animation of the realm titans behind the outer wall
+require(Modules.PortalFx) -- the portal behind the gate (door bursts open, rune progress, rejection)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)
