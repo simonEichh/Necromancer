@@ -4,8 +4,16 @@
 -- it replaces (the model's attribute Hides) are hidden meanwhile, and the Base is recoloured (FloorColor / FloorMaterial).
 -- It also places the Soul Altar beside the plot (tools/studio/build_altar.lua): LaneModels.AltarCore (the same in every
 -- realm: altar, braziers, floating runes, the bone bridge) and the realm's island (LaneModels.CemeteryAltarIsland).
+-- The altar (tag SoulAltar) carries the owner's realm upgrade levels as attributes Level_<key>, kept up to date after
+-- every data sync; the client module AltarFx sizes the braziers' flames from them.
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Collision = require(script.Parent.Collision)
+local PlayerData = require(script.Parent.PlayerData)
+local PlotRegistry = require(script.Parent.PlotRegistry)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 local PlotLook = {}
 
@@ -36,6 +44,27 @@ local function place(template, plotState, name)
 	model.Parent = workspace
 	return model
 end
+
+-- the owner's realm upgrade levels onto the altar (only the ones that changed)
+local function updateAltar(plotState, profile)
+	local altar = plotState.look and plotState.look.altar and plotState.look.altar[1]
+	if not altar or not profile then
+		return
+	end
+	for _, u in ipairs(Economy.REALM_UPGRADES) do
+		local level = profile.realmUpgrades[u.key] or 0
+		if altar:GetAttribute("Level_" .. u.key) ~= level then
+			altar:SetAttribute("Level_" .. u.key, level)
+		end
+	end
+end
+
+table.insert(PlayerData.onSync, function(player, profile)
+	local plotState = PlotRegistry.getPlot(player)
+	if plotState then
+		updateAltar(plotState, profile)
+	end
+end)
 
 function PlotLook.clear(plotState)
 	local look = plotState.look
@@ -104,7 +133,14 @@ function PlotLook.apply(plotState)
 			table.insert(look.altar, place(t, plotState, (i == 1 and "PlotAltar_" or "PlotAltarIsland_") .. plotState.plotIndex))
 		end
 	end
+	local core = look.altar[1]
+	if core and core.Name:find("^PlotAltar_") then
+		CollectionService:AddTag(core, "SoulAltar")
+		core:SetAttribute("OwnerId", plotState.ownerId)
+	end
 	plotState.look = look
+	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
+	updateAltar(plotState, owner and PlayerData.get(owner))
 end
 
 return PlotLook

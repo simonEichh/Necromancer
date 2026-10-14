@@ -268,10 +268,17 @@ function PlayerData.snapshot(profile)
 	}
 end
 
+-- functions(player, profile) called after every sync, for server modules that mirror player data into the world
+-- (PlotLook: the realm upgrade levels on the Soul Altar); they are registered by the modules themselves (no cycles)
+PlayerData.onSync = {}
+
 function PlayerData.sync(player)
 	local profile = profiles[player.UserId]
 	if profile and player.Parent then
 		Remotes.DataSync:FireClient(player, PlayerData.snapshot(profile))
+		for _, fn in ipairs(PlayerData.onSync) do
+			task.spawn(fn, player, profile)
+		end
 	end
 end
 
