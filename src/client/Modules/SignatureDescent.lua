@@ -37,6 +37,7 @@ local mainGui = require(script.Parent.Gui)
 local Theme = require(script.Parent.Theme)
 local SignatureName = require(script.Parent.SignatureName)
 local GraveOpening = require(script.Parent.GraveOpening)
+local NecroRitual = require(script.Parent.NecroRitual)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
 
@@ -128,6 +129,8 @@ function SignatureDescent.play(results, opts)
 	local START_LAND = START_DESCENT + T_FALL
 	local HOLD_AT = START_LAND + 1.6
 	local endTime = math.huge
+	local ABSORB_TIME = 1.9 -- after Continue: the necromancer draws the unit into the grimoire (Modules/NecroRitual)
+	local absorbStart
 
 	-- ── The place (like the grave cinematic, but the cone needs a clear sky above too) ──
 	local up = Vector3.yAxis
@@ -360,8 +363,25 @@ function SignatureDescent.play(results, opts)
 			end
 		end
 	end
-	hideCharacter(true)
 	local startCam = camera.CFrame
+	-- the necromancer works dark magic on the grave during the bait, then stops and looks up at the sky while the circles
+	-- open (not their doing); hidden from the portal on (the falling figure's cameras pass near them), shown for the absorb
+	-- (from the character itself: the grave's ground can be higher or lower than where the character stands)
+	local charHum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+	local charFeet = hrp.Position - Vector3.new(0, (charHum and charHum.HipHeight or 2) + hrp.Size.Y / 2, 0)
+	local savedAnchored = hrp.Anchored
+	hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(G.X, hrp.Position.Y, G.Z))
+	hrp.Anchored = true
+	local graveTarget = Instance.new("Part")
+	graveTarget.Anchored = true
+	graveTarget.CanCollide = false
+	graveTarget.CanQuery = false
+	graveTarget.CanTouch = false
+	graveTarget.Transparency = 1
+	graveTarget.Size = Vector3.one * 0.3
+	graveTarget.CFrame = CFrame.new(G + up * 2)
+	graveTarget.Parent = fxFolder
+	local ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = graveTarget, smokeAt = graveTarget, feet = charFeet, color = ACCENT })
 
 	local ui = Instance.new("ScreenGui")
 	ui.Name = "SignatureDescentUI"
@@ -461,6 +481,10 @@ function SignatureDescent.play(results, opts)
 			end
 		end
 		hideCharacter(false)
+		ritual.restore()
+		if hrp.Parent then
+			hrp.Anchored = savedAnchored
+		end
 		if controls then
 			pcall(function() controls:Enable() end)
 		end
@@ -472,7 +496,9 @@ function SignatureDescent.play(results, opts)
 	skipBtn.button.Activated:Connect(finish)
 	local function continue()
 		if endTime == math.huge and continueBtn.root.Visible then
-			endTime = T + 0.5
+			-- the necromancer absorbs the unit into the grimoire, then the cinematic ends
+			absorbStart = T
+			endTime = T + ABSORB_TIME + 0.5
 			continueBtn.root.Visible = false
 		end
 	end
@@ -570,6 +596,12 @@ function SignatureDescent.play(results, opts)
 	local camArrive = G - dir * 16 + right * 6 + up * 7
 	local camClose = G - dir * 10 + right * 3.5 + up * 4.5
 	local lookGrave = G + up * 1.6 * GRAVE_SCALE
+	local channelLook = charFeet:Lerp(G, 0.5) + up * 3
+	local camChannel = charFeet - dir * 3 + right * 11 + up * 4
+	if not viewIsClear(camChannel, channelLook) then
+		camChannel = charFeet - dir * 3 - right * 11 + up * 4
+	end
+	local lastCamPos, lastCamLook = camChannel, channelLook -- (where the absorb's camera move starts)
 	local camWide = G - dir * 215 + right * 65 + up * 60
 	local camPortal = top.center - up * (unitTall * 0.7) - dir * 88 + right * 26 -- (outside the cone, level with the figure: never below it)
 	local portalDist = (camPortal - (skyPivot.Position + up * bodyMid)).Magnitude
@@ -584,7 +616,20 @@ function SignatureDescent.play(results, opts)
 		end
 		local dt = realDt * speed
 		T += dt
-		hideCharacter(true)
+		hideCharacter(not (T < START_PORTAL or absorbStart))
+		if absorbStart then
+			if ritual.absorb((T - absorbStart) / ABSORB_TIME, unit) then
+				unit = nil
+				startFlash(0.4, 0.4)
+			end
+		else
+			-- the bait: the necromancer works on the grave like in a hand-opened grave; when it falls silent they lower
+			-- their hands and look up: what comes next is not their doing (divine intervention)
+			local weight = smooth((T - 0.9) / 0.6) * (1 - smooth((T - START_SILENCE) / 0.5))
+			local p = math.clamp((T - 1.1) / (START_SILENCE - 1.1), 0, 1)
+			ritual.update(weight, p * p * 0.6, "forward")
+			ritual.look(G + up * (TOP_HEIGHT * 0.6), smooth((T - START_SILENCE - 0.3) / 1.0))
+		end
 		if T >= endTime then
 			finish()
 			return
@@ -860,19 +905,26 @@ function SignatureDescent.play(results, opts)
 		-- ── Camera ──────────────────────────────────────────
 		local camPos, camLook, fov
 		local roll = 0
-		if T < START_CIRCLES then
-			-- the bait: exactly like a hand-opened grave
-			local k = smooth(T / START_CIRCLES)
+		if absorbStart then
+			-- the absorb: a side view of the necromancer and the unit flying into the grimoire
+			local mid = charFeet:Lerp(G, 0.45)
+			local k = smooth((T - absorbStart) / 0.7)
+			camPos = lastCamPos:Lerp(mid + right * 20 - dir * 3 + up * 6, k)
+			camLook = lastCamLook:Lerp(mid + up * 3, k)
+			fov = 60
+		elseif T < START_CIRCLES then
+			-- the bait: the grave arrives, then the necromancer works on it (a side view of them both), like a hand-opened grave
 			local fromStart = smooth(T / 0.8)
-			camPos = startCam.Position:Lerp(camArrive:Lerp(camClose, k), fromStart)
-			camLook = (startCam.Position + startCam.LookVector * 20):Lerp(lookGrave, fromStart)
-			fov = 62 - 10 * k
+			local k = smooth((T - 1.1) / 0.9)
+			camPos = startCam.Position:Lerp(camArrive, fromStart):Lerp(camChannel, k)
+			camLook = (startCam.Position + startCam.LookVector * 20):Lerp(lookGrave, fromStart):Lerp(channelLook, k)
+			fov = 62 - 4 * k
 		elseif T < START_LINES then
 			-- the rings build: the camera pulls back from the grave to the side view (arching up a little) so they are seen
 			-- opening from the side; the look climbs from the grave to the middle of the spire
 			local k = smooth((T - START_CIRCLES) / (START_LINES - START_CIRCLES))
-			camPos = camClose:Lerp(camWide, k) + up * math.sin(k * math.pi) * 18
-			camLook = lookGrave:Lerp(G + up * (TOP_HEIGHT * 0.5), smooth(math.min(1, k * 1.25)))
+			camPos = camChannel:Lerp(camWide, k) + up * math.sin(k * math.pi) * 18
+			camLook = channelLook:Lerp(G + up * (TOP_HEIGHT * 0.5), smooth(math.min(1, k * 1.25)))
 			fov = 52 + 8 * k
 		elseif T < START_PORTAL then
 			-- the whole spire, wide, drifting slowly round
@@ -916,8 +968,14 @@ function SignatureDescent.play(results, opts)
 			camLook = G + up * heroLookY
 			fov = 82 + (HERO_FOV - 82) * k
 		end
+		if not absorbStart then
+			lastCamPos, lastCamLook = camPos, camLook
+		end
 		local shake = shakeAmount * math.exp(-(os.clock() - shakeStart) * (landed and 3 or 6))
 		local jitter = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * shake
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable -- (something may have reset it; the default camera would take over)
+		end
 		camera.CFrame = CFrame.lookAt(camPos + jitter, camLook + jitter * 0.5) * CFrame.Angles(0, 0, roll)
 		camera.FieldOfView = fov
 	end)

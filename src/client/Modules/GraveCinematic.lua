@@ -6,11 +6,14 @@
 --              onDone     function(), called when the cinematic ends (also when it is skipped)
 --     returns false (and does nothing) when it cannot play: no model for that grave, no character, or a cinematic runs.
 --
--- What you see: the camera eases into a three-quarter view as the real grave pushes up out of the ground in front of you,
--- it shakes harder and harder while its soul-light cracks shift to the pull's rarity colour (big rarities flicker out
--- right before the burst), then it bursts open (GraveOpening with world effects: flying earth, a light column, a real light,
+-- What you see: the camera eases into a three-quarter view as the real grave pushes up out of the ground in front of you;
+-- then YOUR CHARACTER raises their hands and works dark magic on it (a necromantic circle under their feet, wavering ghostly
+-- threads from their hands into the grave, dark smoke round it: the ritual, T_CHANNEL), and the grave shakes harder and
+-- harder while its soul-light cracks and the threads shift to the pull's rarity colour (big rarities flicker out right
+-- before the burst), then it bursts open (GraveOpening with world effects: flying earth, a light column, a real light,
 -- dust, sparks, souls), the camera shakes, and the BEST unit of the pull rises out of the pit. A Continue button (or Space /
--- Enter / E) ends it; Skip ends it at once. The caller then shows the overlay straight at the result (the grid for x10).
+-- Enter / E) ends it: the necromancer absorbs the unit into a spectral grimoire (it shrinks into a stream of soul light,
+-- the book snaps shut); Skip ends it at once. The caller then shows the overlay straight at the result (the grid for x10).
 -- Everything scales with the best result's rarity rank (t = 0..1). Only the player who pulled sees it; camera, controls and
 -- the main UI are taken over and restored like the star summon (Modules/StarSummon, which this mirrors).
 local CollectionService = game:GetService("CollectionService")
@@ -26,6 +29,7 @@ local Theme = require(script.Parent.Theme)
 local SignatureName = require(script.Parent.SignatureName)
 local GraveOpening = require(script.Parent.GraveOpening)
 local MagicCircle = require(script.Parent.MagicCircle)
+local NecroRitual = require(script.Parent.NecroRitual)
 local Sfx = require(script.Parent.Sfx)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local Units = require(ReplicatedStorage.Shared.Units)
@@ -102,9 +106,11 @@ function GraveCinematic.play(results, opts)
 	end
 
 	local T_ARRIVE = 1.1 -- the grave pushes up out of the ground
+	local T_CHANNEL = 1.8 -- the necromancer works their dark magic on it (the ritual) before it starts to glow
 	local T_BUILD = 1.2 + 1.4 * t -- it shakes and glows
 	local T_RISE = isDoor and (2.6 + 0.6 * t) or (2.0 + 0.8 * t) -- the unit climbs (or walks) out
-	local START_BUILD = T_ARRIVE
+	local START_CHANNEL = T_ARRIVE
+	local START_BUILD = START_CHANNEL + T_CHANNEL
 	local START_BURST = START_BUILD + T_BUILD
 	local START_RISE = START_BURST + (isDoor and 0.7 or 0.45)
 	local START_HERO = START_BURST + 1.8 -- from here the camera only orbits slowly
@@ -126,6 +132,8 @@ function GraveCinematic.play(results, opts)
 		HOLD_AT = START_RISE + T_RISE
 	end
 	local endTime = math.huge
+	local ABSORB_TIME = 1.7 -- after Continue: the unit is drawn into the necromancer's grimoire
+	local absorbStart
 
 	-- ── The place: in front of the player, with a clear view ──
 	local up = Vector3.yAxis
@@ -273,6 +281,7 @@ function GraveCinematic.play(results, opts)
 
 	-- ── Take over camera, controls and the UI ────────────────
 	local saved = { cameraType = camera.CameraType, fov = camera.FieldOfView, guiEnabled = mainGui.Enabled }
+	local ritual -- (built below, once the grave's light holder exists; finish() restores the character's pose)
 	local controls
 	pcall(function()
 		controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
@@ -297,8 +306,14 @@ function GraveCinematic.play(results, opts)
 			end
 		end
 	end
-	hideCharacter(true)
 	local startCam = camera.CFrame
+	-- the necromancer turns to the grave and stands still for the ritual (restored at the end)
+	-- (from the character itself: the grave's ground can be higher or lower than where the character stands)
+	local charHum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+	local charFeet = hrp.Position - Vector3.new(0, (charHum and charHum.HipHeight or 2) + hrp.Size.Y / 2, 0)
+	local savedAnchored = hrp.Anchored
+	hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(G.X, hrp.Position.Y, G.Z))
+	hrp.Anchored = true
 
 	-- black bars, flash, name, rarity, Skip and Continue
 	local ui = Instance.new("ScreenGui")
@@ -360,6 +375,9 @@ function GraveCinematic.play(results, opts)
 	})
 	continueBtn.root.Visible = false
 
+	-- ── The ritual: the necromancer works dark magic on the grave, absorbs the unit at the end (Modules/NecroRitual) ──
+	ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = leakHolder, smokeAt = leakHolder, feet = charFeet, color = bestColor })
+
 	-- ── State ────────────────────────────────────────────────
 	local T = 0
 	local done = false
@@ -393,6 +411,10 @@ function GraveCinematic.play(results, opts)
 			end
 		end
 		hideCharacter(false)
+		ritual.restore()
+		if hrp.Parent then
+			hrp.Anchored = savedAnchored
+		end
 		if controls then
 			pcall(function() controls:Enable() end)
 		end
@@ -404,7 +426,9 @@ function GraveCinematic.play(results, opts)
 	skipBtn.button.Activated:Connect(finish)
 	local function continue()
 		if endTime == math.huge and continueBtn.root.Visible then
-			endTime = T + 0.5
+			-- the necromancer draws the unit into the grimoire, then the cinematic ends
+			absorbStart = T
+			endTime = T + ABSORB_TIME + 0.6
 			continueBtn.root.Visible = false
 		end
 	end
@@ -498,6 +522,17 @@ function GraveCinematic.play(results, opts)
 	local camHero = stand - dir * heroDist + right * 6 + up * heroCamY
 	local lookGrave = G + up * (isDoor and graveSize.Y * 0.35 or math.max(1.6 * graveScale, graveSize.Y * 0.35))
 	local grey = Color3.fromRGB(150, 150, 160)
+	-- the ritual and the absorb: a side view of the necromancer and the grave (or the unit) together
+	local channelLook = charFeet:Lerp(G, 0.5) + up * 3
+	local camChannel
+	for _, side in ipairs({ 1, -1 }) do
+		local spot = charFeet - dir * 3 + right * (11 * side) + up * 4
+		if spotIsFree(spot) and viewIsClear(spot, channelLook) then
+			camChannel = spot
+			break
+		end
+	end
+	camChannel = camChannel or (charFeet - dir * 9 + up * 7)
 
 	-- ── The summon (OpenStyle "Summon") ─────────────────────
 	local SKY_HEIGHT = 62
@@ -620,7 +655,8 @@ function GraveCinematic.play(results, opts)
 			return
 		end
 		T += dt
-		hideCharacter(true)
+		-- the necromancer is seen during the ritual and the absorb (hidden for the hero shots: they would block the camera)
+		hideCharacter(not (T < START_BURST + 0.2 or absorbStart))
 		if T >= endTime then
 			finish()
 			return
@@ -692,6 +728,17 @@ function GraveCinematic.play(results, opts)
 			updateSummon()
 		end
 
+		-- ── The ritual ──────────────────────────────────────
+		if not absorbStart then
+			local weight = smooth((T - START_CHANNEL) / 0.6) * (1 - smooth((T - START_BURST) / 0.35))
+			local shine = 0
+			if T >= START_BUILD and T < START_BURST then
+				local p = math.clamp((T - START_BUILD) / T_BUILD, 0, 1)
+				shine = (fake and p > 0.84) and 0 or math.clamp((p - 0.1) / 0.7, 0, 1)
+			end
+			ritual.update(weight, shine)
+		end
+
 		-- ── The unit ────────────────────────────────────────
 		if burst and not risen and T >= START_RISE then
 			risen = true
@@ -760,15 +807,40 @@ function GraveCinematic.play(results, opts)
 			rarityLbl.TextStrokeTransparency = 1 - k
 		end
 
+		-- ── The absorb: the unit is drawn into the grimoire as a stream of soul light, the book snaps shut ──
+		if absorbStart then
+			if ritual.absorb((T - absorbStart) / ABSORB_TIME, unit) then
+				unit = nil
+				flashStart = { at = os.clock(), length = 0.4 }
+				flash.BackgroundTransparency = 0.4
+			end
+		end
+
 		-- ── Camera ──────────────────────────────────────────
 		local camPos, camLook, fov
-		if not burst then
-			local k = smooth(T / START_BURST)
+		if absorbStart then
+			local k = smooth((T - absorbStart) / 0.6)
+			camPos = camera.CFrame.Position:Lerp(camChannel, k * 0.25)
+			camLook = (camera.CFrame.Position + camera.CFrame.LookVector * 20):Lerp(channelLook, k * 0.3)
+			fov = camera.FieldOfView + (56 - camera.FieldOfView) * 0.1
+		elseif not burst and T < START_CHANNEL then
+			-- the grave arrives
 			local fromStart = smooth(T / 0.8)
-			local path = camArrive:Lerp(camClose, k)
-			camPos = startCam.Position:Lerp(path, fromStart)
+			camPos = startCam.Position:Lerp(camArrive, fromStart)
 			camLook = (startCam.Position + startCam.LookVector * 20):Lerp(lookGrave, fromStart)
-			fov = 62 - 10 * k
+			fov = 62
+		elseif not burst and T < START_BUILD then
+			-- the ritual: swing to the side, the necromancer and the grave together
+			local k = smooth((T - START_CHANNEL) / 0.9)
+			camPos = camArrive:Lerp(camChannel, k)
+			camLook = lookGrave:Lerp(channelLook, k)
+			fov = 62 - 4 * k
+		elseif not burst then
+			-- the grave starts to shine: close in on it
+			local k = smooth((T - START_BUILD) / (T_BUILD * 0.85))
+			camPos = camChannel:Lerp(camClose, k)
+			camLook = channelLook:Lerp(lookGrave, k)
+			fov = 58 - 6 * k
 		elseif isSummon and T < START_HERO then
 			if T < SUMMON_SKY then
 				-- the cast: swing round to a side view of the grave and the opening circle
@@ -811,6 +883,9 @@ function GraveCinematic.play(results, opts)
 		end
 		local shake = shakeAmount * math.exp(-(os.clock() - shakeStart) * (burst and 3.5 or 12))
 		local jitter = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * shake
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable -- (something may have reset it; the default camera would take over)
+		end
 		camera.CFrame = CFrame.lookAt(camPos + jitter, camLook + jitter * 0.5)
 		camera.FieldOfView = fov
 	end)

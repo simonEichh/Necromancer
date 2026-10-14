@@ -201,6 +201,11 @@ random, the Forge needs dust), the first pulls are bland, and walls go minutes w
   for 20 s; Curse: the wall takes +50 % for 10 s; Soul Surge: faster attacks), upgraded **permanently with gold** on a
   growing cost curve: the main gold sink, visible and felt.
 - **A better start** (D): a guaranteed Rare (or the first Signature) in the first pulls.
+- **The necromancer raises the dead himself** (built 2026-10-14): the grave cinematic shows the player's character
+  working dark magic on the grave (raised arms, a necromantic circle, ghostly threads into it) before it shines in the
+  rarity colour; after Continue he absorbs the unit into a spectral grimoire. Graves stay the source of units.
+- **Codex / compendium (later, wanted):** a book listing every pullable unit (seen / owned, rarity, odds, art), ideally
+  the same grimoire the necromancer absorbs units into. Doubles as the collection index from the content table.
 - **Items, later** (after spells and Souls): staff (shapes the spells), robe (small passive + looks), familiars (the Soul
   Wisp becomes the first; others collect differently or carry a small buff). From the Souls shop / bosses / later
   cosmetics for Robux; NOT a second gacha; small stats, big looks.

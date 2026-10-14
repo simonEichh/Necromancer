@@ -25,6 +25,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local NecroRitual = require(script.Parent.NecroRitual)
 local GameData = require(script.Parent.GameData)
 local mainGui = require(script.Parent.Gui)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
@@ -186,13 +187,18 @@ function StarSummon.play(results, opts)
 	local bestColor = rarityColor(best.rarity)
 	local count = math.min(#results, 10)
 
+	-- the bait (when the grave has a model): it rises and shakes like a hand-opened grave while the necromancer works dark
+	-- magic on it, then it falls silent, the necromancer lowers their hands and looks up, and the stars light up
+	local hasBait = GraveOpening.template(opts.graveType) ~= nil
+	local T_BAIT_SILENCE = hasBait and 2.7 or 0
+	local T_BAIT = hasBait and 3.2 or 0
 	local T_INTRO = 1.5 -- the stars light up one by one
 	local T_BUILD = 2.2 + 1.6 * t -- the best star's aura swells
 	local T_FLARE = 0.9 -- it shines even bigger
 	local T_FALL = 1.5 + 0.9 * t -- the crash down
 	local T_SHAKE = 1.1 -- the impact rocks the camera
 	local T_RISE = 2.4 + 1.0 * t -- the unit climbs out
-	local START_BUILD = T_INTRO
+	local START_BUILD = T_BAIT + T_INTRO
 	local START_FLARE = START_BUILD + T_BUILD
 	local START_FALL = START_FLARE + T_FLARE
 	local START_IMPACT = START_FALL + T_FALL
@@ -202,6 +208,8 @@ function StarSummon.play(results, opts)
 	-- the camera keeps orbiting slowly meanwhile. endTime is set when they continue (the black bars slide out).
 	local HOLD_AT = START_RISE + T_RISE
 	local endTime = math.huge
+	local ABSORB_TIME = 2.0 -- after Continue: the necromancer draws the unit into the grimoire (Modules/NecroRitual)
+	local absorbStart
 
 	-- ── The place: a spot on the ground near the player with a clear view ──
 	-- The grave stands about 30 studs away from the player; the cinematic cameras sit behind it and above it, so the spot
@@ -285,7 +293,25 @@ function StarSummon.play(results, opts)
 			end
 		end
 	end
-	hideCharacter(true)
+	-- the necromancer turns to the spot and stands still: before the fall they raise their arms to the sky and pull the
+	-- star down with ghostly threads (hidden after the fall so they never block the camera; shown again for the absorb)
+	-- (from the character itself: the grave's ground can be higher or lower than where the character stands)
+	local charHum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+	local charFeet = hrp.Position - Vector3.new(0, (charHum and charHum.HipHeight or 2) + hrp.Size.Y / 2, 0)
+	local savedAnchored = hrp.Anchored
+	hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(G.X, hrp.Position.Y, G.Z))
+	hrp.Anchored = true
+	local ritual -- (built on the first frame)
+	local baitSilenced = false
+	local baitTarget = Instance.new("Part") -- where the threads of the bait end: in the grave
+	baitTarget.Anchored = true
+	baitTarget.CanCollide = false
+	baitTarget.CanQuery = false
+	baitTarget.CanTouch = false
+	baitTarget.Transparency = 1
+	baitTarget.Size = Vector3.one * 0.3
+	baitTarget.CFrame = CFrame.new(G + up * 2)
+	baitTarget.Parent = fxFolder
 
 	-- its own little UI: black bars, the white flash, the unit's name and the skip button
 	local ui = Instance.new("ScreenGui")
@@ -371,6 +397,7 @@ function StarSummon.play(results, opts)
 	local graveParts = { stoneBase, slab, top, crossV, crossH }
 	-- the opened grave's real model replaces the simple tombstone when it has one
 	local worldGrave
+	local baitModel, baitRest, baitDepth, baitScale -- (the bait: the real grave model rises, shakes, falls silent)
 	local graveTemplate = GraveOpening.template(opts.graveType)
 	-- OpenStyle "Door" (crypts): the unit WALKS out of the crypt instead of rising (like GraveCinematic); the crypt is
 	-- scaled up so the unit fits through the door; `focus` is where the unit stands now, `stand` where it stops
@@ -423,6 +450,12 @@ function StarSummon.play(results, opts)
 		end
 		gm.Parent = grave
 		worldGrave = GraveOpening.attach(gm, { scale = GRAVE_SCALE, world = true })
+		if hasBait then
+			baitModel, baitRest, baitScale = gm, gm:GetPivot(), GRAVE_SCALE
+			local _, size = gm:GetBoundingBox()
+			baitDepth = size.Y + 0.5
+			gm:PivotTo(baitRest - up * baitDepth)
+		end
 	end
 	local graveRest = {}
 	for _, p in ipairs(graveParts) do
@@ -501,6 +534,7 @@ function StarSummon.play(results, opts)
 	local unit -- the model that climbs out
 	local shakeAmount, shakeStart = 0, 0
 	local lastChasePos, lastChaseLook = camera.CFrame.Position, G
+	local lastAbsorbPos, lastAbsorbLook = camera.CFrame.Position, G -- (where the absorb's camera move starts)
 	local flashStart = nil
 
 	local function finish()
@@ -528,6 +562,12 @@ function StarSummon.play(results, opts)
 			end
 		end
 		hideCharacter(false)
+		if ritual then
+			ritual.restore()
+		end
+		if hrp.Parent then
+			hrp.Anchored = savedAnchored
+		end
 		if controls then
 			pcall(function()
 				controls:Enable()
@@ -548,7 +588,9 @@ function StarSummon.play(results, opts)
 	continueBtn.root.Visible = false
 	local function continue()
 		if endTime == math.huge and continueBtn.root.Visible then
-			endTime = T + 0.6
+			-- the necromancer absorbs the unit into the grimoire, then the cinematic ends
+			absorbStart = T
+			endTime = T + ABSORB_TIME + 0.6
 			continueBtn.root.Visible = false
 		end
 	end
@@ -738,7 +780,41 @@ function StarSummon.play(results, opts)
 		end
 		local dt = realDt * speed
 		T += dt
-		hideCharacter(true) -- (the default camera scripts may reset it)
+		-- (set every frame: the default camera scripts may reset it) the necromancer is seen while casting and absorbing
+		hideCharacter(not (T < START_FALL or absorbStart))
+		if not ritual then
+			ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = baitTarget, smokeAt = baitTarget, feet = charFeet, color = bestColor })
+		end
+		-- the bait: the grave rises and shakes (a hint of the rarity colour), then falls silent
+		local baitP = math.clamp((T - 1.1) / math.max(0.1, T_BAIT_SILENCE - 1.1), 0, 1)
+		if baitModel and T < T_BAIT_SILENCE then
+			if T < 1.1 then
+				local k = smooth(T / 0.95)
+				local rumble = (1 - k) * 0.12 * baitScale
+				baitModel:PivotTo((baitRest - up * baitDepth * (1 - k)) * CFrame.new((math.random() - 0.5) * rumble, 0, (math.random() - 0.5) * rumble))
+			else
+				local amp = (0.03 + 0.16 * baitP) * baitScale
+				baitModel:PivotTo(baitRest * CFrame.new((math.random() - 0.5) * amp, 0, (math.random() - 0.5) * amp))
+				worldGrave.setGlow(bestColor, baitP * baitP * 0.5)
+			end
+		elseif baitModel and not baitSilenced then
+			baitSilenced = true
+			baitModel:PivotTo(baitRest)
+			worldGrave.setGlow(bestColor, 0)
+		end
+		if ritual and not absorbStart then
+			-- the necromancer works on the grave during the bait; when it falls silent they lower their hands and look up at
+			-- the stars (what comes next is not their doing); hidden from the fall on
+			local weight = hasBait and smooth((T - 0.9) / 0.6) * (1 - smooth((T - T_BAIT_SILENCE) / 0.5)) or 0
+			ritual.update(weight, baitP * baitP * 0.5, "forward")
+			ritual.look(star and star.pos or (G + up * 60), smooth((T - T_BAIT_SILENCE - 0.2) / 1.0))
+		end
+		if ritual and absorbStart then
+			if ritual.absorb((T - absorbStart) / ABSORB_TIME, unit) then
+				unit = nil
+				startFlash(0.4)
+			end
+		end
 		if T >= endTime then
 			finish()
 			return
@@ -764,7 +840,7 @@ function StarSummon.play(results, opts)
 
 		-- the stars: they light up one by one, twinkle, and the best one grows its aura
 		for _, s in ipairs(stars) do
-			local appear = smooth((T - s.delay) / 0.5)
+			local appear = smooth((T - T_BAIT - s.delay) / 0.5)
 			local twinkle = 0.85 + 0.15 * math.sin(T * 5 + s.twinkle)
 			local scale = appear * twinkle
 			local dim = 1
@@ -798,13 +874,33 @@ function StarSummon.play(results, opts)
 
 		-- ── Camera ──────────────────────────────────────────
 		local camPos, camLook, fov
-		if T < START_FALL then
-			-- on the ground, looking up: a slow dolly forward, the look swings from the middle of the field to the best star
-			local dolly = T * 1.6
-			camPos = G - dir * 34 + up * 4.5 + dir * dolly
+		if absorbStart then
+			-- the absorb: a side view of the necromancer and the unit flying into the grimoire
+			local mid = charFeet:Lerp(stand, 0.45)
+			local k = smooth((T - absorbStart) / 0.7)
+			camPos = lastAbsorbPos:Lerp(mid + right * 26 - dir * 4 + up * 8, k)
+			camLook = lastAbsorbLook:Lerp(mid + up * 3, k)
+			fov = 60
+		elseif T < START_FALL then
+			-- low behind the necromancer's shoulder, looking up: they stand in the lower part of the frame, the stars above;
+			-- the look swings from the middle of the field to the best star
+			camPos = charFeet - dir * 11 + right * 3 + up * 3
 			local aim = smooth((T - START_BUILD * 0.6) / (T_BUILD + 0.4))
-			camLook = starCenter:Lerp(star.pos, aim)
-			fov = 72 - 20 * smooth((T - START_BUILD) / T_BUILD) - 16 * smooth((T - START_FLARE) / T_FLARE)
+			camLook = (charFeet + up * 6):Lerp(starCenter:Lerp(star.pos, aim), 0.15)
+			fov = 84 - 4 * smooth((T - START_BUILD) / T_BUILD) - 4 * smooth((T - START_FLARE) / T_FLARE)
+			if hasBait and T < T_BAIT + 1.4 then
+				-- the bait: from the start view to a side view of the necromancer and the grave; then over to the star shot
+				local mid = charFeet:Lerp(G, 0.5)
+				local baitPos = mid + right * 26 - dir * 6 + up * 7
+				local baitLook = mid + up * 3
+				local fromStart = smooth(T / 0.9)
+				baitPos = saved.cframe.Position:Lerp(baitPos, fromStart)
+				baitLook = (saved.cframe.Position + saved.cframe.LookVector * 20):Lerp(baitLook, fromStart)
+				local k = smooth((T - T_BAIT) / 1.4)
+				camPos = baitPos:Lerp(camPos, k)
+				camLook = baitLook:Lerp(camLook, k)
+				fov = 60 + (fov - 60) * k
+			end
 			if T > START_FLARE then
 				local k = smooth((T - START_FLARE) / T_FLARE)
 				shakeAmount, shakeStart = 0.25 * k, os.clock()
@@ -852,10 +948,17 @@ function StarSummon.play(results, opts)
 			fov = HERO_FOV + 4 - 4 * riseK
 		end
 
+		if not absorbStart then
+			lastAbsorbPos, lastAbsorbLook = camPos, camLook
+		end
+
 		-- camera shake
 		local shakeAge = os.clock() - shakeStart
 		local shake = shakeAmount * math.exp(-shakeAge * (impacted and 3.2 or 12))
 		local jitter = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * shake
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable -- (something may have reset it; the default camera would take over)
+		end
 		camera.CFrame = CFrame.lookAt(camPos + jitter, camLook + jitter * 0.5)
 		camera.FieldOfView = fov
 
