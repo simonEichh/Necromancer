@@ -290,8 +290,11 @@ local function initWallQueue(plotState)
 	initGround.Parent = workspace
 	table.insert(plotState.groundExtensions, initGround)
 
-	-- low stone walls along both sides of the lane (so nobody falls into the water), with a lighter cap
-	for _, side in ipairs({ -1, 1 }) do
+	-- the realm's lane look (ServerStorage.LaneModels, built by tools/studio/build_lane_cemetery.lua) has natural edges
+	-- (dirt shoulders sloping into the lava); without one the lane gets low stone walls along both sides
+	local laneModels = ServerStorage:FindFirstChild("LaneModels")
+	local laneTemplate = laneModels and laneModels:FindFirstChild("Cemetery")
+	for _, side in ipairs(laneTemplate and {} or { -1, 1 }) do
 		local centre = PlotFrame.toWorld(plotState, side * (WALL_WIDTH / 2 + 0.4), groundCentreFwd)
 		local rot = PlotFrame.rotation(plotState)
 		local sideWall = Instance.new("Part")
@@ -312,6 +315,25 @@ local function initWallQueue(plotState)
 		cap.Material = Enum.Material.Slate
 		cap.Parent = workspace
 		table.insert(plotState.groundExtensions, cap)
+	end
+
+	-- the realm's lane look: recolour the floor, then clone the decoration onto the lane
+	if laneTemplate then
+		initGround.Color = laneTemplate:GetAttribute("FloorColor") or initGround.Color
+		local mat = laneTemplate:GetAttribute("FloorMaterial")
+		if mat then
+			initGround.Material = Enum.Material[mat]
+		end
+		local lane = laneTemplate:Clone()
+		lane.Name = "LaneDecor_" .. plotState.plotIndex
+		lane:PivotTo(plotState.frame)
+		for _, d in ipairs(lane:GetDescendants()) do
+			if d:IsA("BasePart") and d.CanCollide then
+				d.CollisionGroup = Collision.DECOR -- the shoulders: players stand on them, units ignore them
+			end
+		end
+		lane.Parent = workspace
+		table.insert(plotState.groundExtensions, lane)
 	end
 
 	plotState.wallQueue = { spawnWall(1, plotState, false) }
