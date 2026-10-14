@@ -37,6 +37,8 @@ local State = {
 	coinBoostLevel = 0,
 	realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level (kept through a realm)
 	codex = {}, -- [unitType] = how many the player has ever pulled (the Codex)
+	items = {}, -- list of owned outfit item keys (shared/Items)
+	equipped = {}, -- [slot] = item key worn there
 
 	-- Wheel
 	wheelSpins = 0,

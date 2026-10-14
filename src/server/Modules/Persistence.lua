@@ -62,6 +62,8 @@ local function collect(player, profile)
 		upgrades = { luckBoost = profile.upgrades.luckBoost, coinBoost = profile.upgrades.coinBoost },
 		realmUpgrades = table.clone(profile.realmUpgrades),
 		codex = table.clone(profile.codex),
+		items = snapshot.items,
+		equipped = snapshot.equipped,
 		inventory = snapshot.inventory,
 		materials = snapshot.materials,
 		catalysts = snapshot.catalysts,

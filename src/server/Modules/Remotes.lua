@@ -25,6 +25,7 @@ local EVENTS = {
 	"BuyDust", -- (dust key, quantity): the Forge's Buy Dust tab, see UnitUpgrades
 	"BuyCatalyst", -- (catalyst key, quantity): gems for Forge catalysts, see UnitUpgrades
 	"BuyGemItem", -- (item "RemoteForge" | "WispSpeed"): the Gem Shop, see GemShop
+	"EquipItem", -- (slot, item key | nil): wear or take off an outfit item, see Outfits
 	"WheelSpin",
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync

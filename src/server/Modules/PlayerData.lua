@@ -6,6 +6,7 @@ local Remotes = require(script.Parent.Remotes)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Graves = require(ReplicatedStorage.Shared.Graves)
 local Units = require(ReplicatedStorage.Shared.Units)
+local Items = require(ReplicatedStorage.Shared.Items)
 
 local INVENTORY_MAX = Economy.INVENTORY_MAX
 local MAX_CURRENCY = 9e15 -- keep values exactly representable
@@ -45,6 +46,8 @@ function PlayerData.create(player, saved)
 		upgrades = { luckBoost = 0, coinBoost = 0 },
 		realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level; kept through a realm's ascensions, reset with the gold
 		codex = {}, -- [unitType] = how many the player has ever pulled (the Codex; discovered = in this table)
+		items = {}, -- [item key from Items.Defs] = true: outfit items the player owns
+		equipped = {}, -- [slot from Items.SLOTS] = item key worn there (see Modules/Outfits)
 		wallsBroken = 0, -- walls ever broken (the first objective: Drops.COLLECTOR_WALLS earns the Soul Wisp)
 		collector = false, -- has the Soul Wisp (collects the loot drops, see Drops)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
@@ -146,8 +149,59 @@ function PlayerData.create(player, saved)
 		end
 	end
 
+	-- outfit items: the start set plus whatever was saved; new players wear the start set
+	for _, key in ipairs(Items.START) do
+		profile.items[key] = true
+	end
+	if type(saved) == "table" and type(saved.items) == "table" then
+		for _, key in ipairs(saved.items) do
+			if Items.Defs[key] then
+				profile.items[key] = true
+			end
+		end
+	end
+	if type(saved) == "table" and type(saved.equipped) == "table" then
+		for _, slot in ipairs(Items.SLOTS) do
+			local key = saved.equipped[slot]
+			if profile.items[key] and Items.Defs[key].slot == slot then
+				profile.equipped[slot] = key
+			end
+		end
+	else
+		for _, key in ipairs(Items.START) do
+			profile.equipped[Items.Defs[key].slot] = key
+		end
+	end
+
 	profiles[player.UserId] = profile
 	return profile
+end
+
+-- Outfits: wear `key` in `slot` (nil takes the slot off). Returns true if it changed.
+function PlayerData.equipItem(player, slot, key)
+	local profile = profiles[player.UserId]
+	if not profile or not Items.SLOT_INFO[slot] then
+		return false
+	end
+	if key ~= nil and not (profile.items[key] and Items.Defs[key].slot == slot) then
+		return false
+	end
+	if profile.equipped[slot] == key then
+		return false
+	end
+	profile.equipped[slot] = key
+	PlayerData.changed(player)
+	return true
+end
+
+-- Outfits: list of owned item keys (for snapshots and saving)
+function PlayerData.ownedItems(profile)
+	local list = {}
+	for key in pairs(profile.items) do
+		table.insert(list, key)
+	end
+	table.sort(list)
+	return list
 end
 
 -- The Codex: one more of `unitType` pulled (Digging)
@@ -202,6 +256,8 @@ function PlayerData.snapshot(profile)
 		coinBoostLevel = profile.upgrades.coinBoost,
 		realmUpgrades = table.clone(profile.realmUpgrades),
 		codex = table.clone(profile.codex),
+		items = PlayerData.ownedItems(profile),
+		equipped = table.clone(profile.equipped),
 		inventory = inventory,
 		materials = materials,
 		wallsBroken = profile.wallsBroken,
