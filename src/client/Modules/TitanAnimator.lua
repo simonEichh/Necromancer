@@ -66,14 +66,16 @@ local TIMELINES = {
 		{ 4.4, "SLAM" }, { 5.3, "WEAVE" }, { 8.3, "WEAVE" }, { 9.8, "IDLE" },
 	},
 	Defeat = {
-		{ 0, "IDLE" }, { 0.7, "RECOIL" }, { 1.9, "RECOIL" }, { 3.0, "REACH" }, { 4.0, "REACH" }, { 5.0, "LIFT" }, { 5.5, "LIFT" },
-		{ 7.0, "SINK_HALF" }, { 8.8, "SUNK" },
+		{ 0, "IDLE" }, { 1.4, "RECOIL" }, { 3.2, "RECOIL" }, { 5.0, "REACH" }, { 6.8, "REACH" }, { 8.4, "LIFT" }, { 9.2, "LIFT" },
+		{ 11.8, "SINK_HALF", "in" }, { 14.0, "SUNK" },
 	},
 	-- (lowering the raised arms onto the wall is slow and heavy)
 	Return = { { 0, "SUNK" }, { 1.8, "RISE_REACH" }, { 3.8, "RISE_UP" }, { 6.6, "IDLE" }, { 7.4, "IDLE" } },
 }
 local HOLD_END = { Defeat = true } -- these keep their last pose after the timeline (he stays down)
-local LANTERN_DROP = 4.7 -- Defeat: the lantern slips from his hand into the arena as he lifts it off the wall
+local LANTERN_DROP = 4.6 -- Defeat: the lantern slips from his hand as he lowers his arms from the recoil (still high over the wall)
+local DEFEAT_LAG = 1.6 -- the beaten giant's arms trail his body even further (JOINT_LAG x this)
+local DEFEAT_EYES = { 5.2, 2 } -- Defeat: the eyes start to die at 5.2 s and are out 2 s later
 local LANTERN_LIFT = { 1.4, 3.2 } -- Return: it is pulled back up to his hand on its chain
 
 local function smooth(x)
@@ -133,7 +135,7 @@ local function makePoses(t)
 		WEAVE = WEAVE,
 		-- defeat: rears back with both hands torn off the wall; reaches over the lane; sinks behind the wall
 		RECOIL = { Waist = pitch(0.26), Neck = pitch(0.55), RShoulder = pitch(0.75), RElbow = pitch(0.45), LShoulder = pitch(0.25), LElbow = pitch(0.2), LWrist = pitch(0.3) },
-		REACH = with({ Waist = pitch(-0.1), Neck = pitch(-0.3), RShoulder = pitch(0.14), LShoulder = pitch(-0.22), LElbow = pitch(0.1), LWrist = pitch(-0.2) }),
+		REACH = with({ Waist = pitch(-0.1), Neck = pitch(-0.3), RShoulder = pitch(0.4), RElbow = pitch(0.2), LShoulder = pitch(-0.22), LElbow = pitch(0.1), LWrist = pitch(-0.2) }),
 		-- before sinking he lifts both hands off the wall and straightens up (sinking with them on it, they would be
 		-- dragged through the battlements)
 		LIFT = { Waist = pitch(0.15), Neck = pitch(-0.2), RShoulder = pitch(0.8), RElbow = pitch(0.45), LShoulder = pitch(0.3), LElbow = pitch(0.25), LWrist = pitch(0.3) },
@@ -228,7 +230,8 @@ CollectionService:GetInstanceRemovedSignal("RealmTitan"):Connect(function(m)
 end)
 
 local function set(j, cf)
-	if j then
+	-- (never write a NaN: one broken joint would send the whole rig to NaN)
+	if j and cf.X == cf.X and cf.LookVector.X == cf.LookVector.X and cf.UpVector.Y == cf.UpVector.Y then
 		j.Transform = cf
 	end
 end
@@ -376,6 +379,10 @@ lanternOnGround = function(t, kind, ta, swing)
 	end
 	if onGround <= 0 then
 		t.lanternGround = nil
+		if kind ~= "Defeat" and kind ~= "Return" then
+			-- remember where it hangs while he rests (in front of the wall): that is where it will land
+			t.lanternIdle = (joint.Part0.CFrame * joint.C0 * swing * joint.C1:Inverse()).Position
+		end
 		if light then
 			light.Brightness = t.lanternBright or light.Brightness
 		end
@@ -387,15 +394,28 @@ lanternOnGround = function(t, kind, ta, swing)
 	local hangFrame = joint.Part0.CFrame * joint.C0 -- where the lantern hangs from (the hand)
 	local hanging = hangFrame * swing * joint.C1:Inverse()
 	if not t.lanternGround then
-		-- where it lands: straight below where it hung when he still stood (the floor at the foot of the wall)
-		local ref = (kind == "Defeat") and hanging.Position or (t.lanternRest or hanging.Position)
-		t.lanternRest = ref
+		-- where it lands: below where it hung while he rested, pushed a little further into the arena (in front of the
+		-- wall; where it hangs at the moment it falls he is already pulling back, that spot is in the wall)
+		local ref = t.lanternIdle or hanging.Position
+		local look = t.model:GetPivot().LookVector
+		ref += Vector3.new(look.X, 0, look.Z).Unit * 8
 		local floorY = t.model:GetPivot().Position.Y + (t.model:GetAttribute("WallTop") or 102) - 70 + 1.2
 		t.lanternGround = CFrame.new(Vector3.new(ref.X, floorY, ref.Z)) * CFrame.Angles(0, math.random() * 6, math.rad(80))
 	end
-	local target = hanging:Lerp(t.lanternGround, onGround)
+	-- blend hanging -> lying: position linearly, rotation by axis-angle (CFrame:Lerp can return NaN when the two
+	-- rotations are nearly opposite, and a NaN in one joint wrecks the whole rig)
+	local ground = t.lanternGround
+	local rel = hanging.Rotation:Inverse() * ground.Rotation
+	local axis, angle = rel:ToAxisAngle()
+	local rot = hanging.Rotation
+	if angle > 1e-4 and axis.Magnitude > 0.5 then
+		rot = rot * CFrame.fromAxisAngle(axis.Unit, angle * onGround)
+	end
+	-- (a slight arc, so it clears the battlements)
+	local arc = Vector3.new(0, math.sin(onGround * math.pi) * 14, 0)
+	local target = CFrame.new(hanging.Position:Lerp(ground.Position, onGround) + arc) * rot
 	-- Part1 = Part0 * C0 * Transform * C1^-1  ->  Transform = (Part0 * C0)^-1 * target * C1
-	joint.Transform = hangFrame:Inverse() * target * joint.C1
+	set(joint, hangFrame:Inverse() * target * joint.C1)
 	local lit = (kind == "Return") and (1 - onGround) or (1 - math.clamp((ta - LANTERN_DROP - LANTERN_FALL) / 1.2, 0, 1))
 	if light then
 		light.Brightness = (t.lanternBright or 2.5) * lit
@@ -538,7 +558,8 @@ RunService.RenderStepped:Connect(function(dt)
 
 		local function p(name)
 			if acting then
-				return sampleJoint(poses, timeline, tl - (JOINT_LAG[name] or 0), name) or poses.IDLE[name] or ID
+				local lag = (JOINT_LAG[name] or 0) * (kind == "Defeat" and DEFEAT_LAG or 1)
+				return sampleJoint(poses, timeline, tl - lag, name) or poses.IDLE[name] or ID
 			end
 			return poses.IDLE[name] or ID
 		end
@@ -547,7 +568,13 @@ RunService.RenderStepped:Connect(function(dt)
 		-- body: slow breathing (heavier right after the slam), a very slow sway
 		local breath = math.sin(c * 0.3)
 		local hardBreath = math.sin(c * 1.4) * heave
-		set(j.Waist, CFrame.new(t.sinkDir * (t.sinkDepth * sink)) * p("Waist") * CFrame.Angles(math.rad(breath * 1.4 * calm + hardBreath * 2.5), math.rad(math.sin(c * 0.12) * 2) * calm, math.rad(math.sin(c * 0.17) * 1) * calm))
+		-- beaten, he staggers: a slow heavy sway from the reach until he is gone
+		local stagger = 0
+		if kind == "Defeat" and acting then
+			stagger = math.clamp((tl - 4.2) / 1.5, 0, 1) * (1 - math.clamp((tl - 12.5) / 1.5, 0, 1))
+		end
+		local sway = CFrame.Angles(0, math.rad(math.sin(tl * 0.55) * 2.5) * stagger, math.rad(math.sin(tl * 0.42 + 1) * 6) * stagger)
+		set(j.Waist, CFrame.new(t.sinkDir * (t.sinkDepth * sink)) * p("Waist") * sway * CFrame.Angles(math.rad(breath * 1.4 * calm + hardBreath * 2.5), math.rad(math.sin(c * 0.12) * 2) * calm, math.rad(math.sin(c * 0.17) * 1) * calm))
 		local look = aimHead(t, dt)
 		if kind == "Defeat" or kind == "Return" then
 			look = ID -- (he does not watch the army while he is beaten or climbing back)
@@ -586,8 +613,8 @@ RunService.RenderStepped:Connect(function(dt)
 		if kind == "SlamWeave" and acting then
 			anger = math.clamp(math.min((ta - 0.3) / 1.2, (IMPACT_HIT + 2.8 - ta) / 1.2), 0, 1)
 		elseif kind == "Defeat" and acting then
-			anger = math.clamp(ta / 0.5, 0, 1)
-			local fade = math.clamp((ta - 2.4) / 1.4, 0, 1)
+			anger = math.clamp(ta / 1.2, 0, 1)
+			local fade = math.clamp((ta - DEFEAT_EYES[1]) / DEFEAT_EYES[2], 0, 1)
 			-- a flicker before they die
 			dark = (fade > 0 and fade < 1) and ((math.sin(ta * 40) > 0.2) and fade or fade * 0.3) or fade
 		elseif kind == "Return" and acting then
