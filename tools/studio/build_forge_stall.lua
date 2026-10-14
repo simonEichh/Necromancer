@@ -306,7 +306,7 @@ end
 ghost("ArmL", Vector3.new(1.7, 0.5, 0.5), at(SX - 0.8, TOP + 2.9, 1.3) * CFrame.Angles(0, 0, math.rad(-20)))
 ghost("ArmR", Vector3.new(0.5, 1.7, 0.5), at(SX - 0.3, TOP + 4.0, -1.35) * CFrame.Angles(math.rad(-10), 0, math.rad(25)))
 part(m, "RaisedHammerHandle", Vector3.new(0.2, 2.0, 0.2), at(SX - 0.9, TOP + 5.0, -1.45) * CFrame.Angles(0, 0, math.rad(55)), WOOD_DARK, Enum.Material.Wood)
-part(m, "RaisedHammerHead", Vector3.new(0.5, 0.5, 1.0), at(SX - 1.7, TOP + 5.6, -1.45) * CFrame.Angles(0, 0, math.rad(55)), IRON_LIGHT, Enum.Material.Metal)
+part(m, "RaisedHammerHead", Vector3.new(1.0, 0.5, 0.5), at(SX - 1.7, TOP + 5.6, -1.45) * CFrame.Angles(0, 0, math.rad(55)), IRON_LIGHT, Enum.Material.Metal)
 local wisps = Instance.new("ParticleEmitter")
 wisps.Name = "Wisps"
 wisps.Color = ColorSequence.new(SPIRIT)

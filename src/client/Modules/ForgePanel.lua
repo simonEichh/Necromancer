@@ -8,6 +8,10 @@
 -- Two tabs in the header: Upgrade (the above) and Buy Dust (gold for dust: Economy.dustPrice, a limited stock that refills
 -- with the grave shop every 5 minutes, each dust unlocked at Economy.dustShopUnlock ascensions; the server checks
 -- everything in UnitUpgrades, BuyDust). The dust row at the bottom stays visible on both tabs.
+-- At the Forge stall the panel opens IN THE WORLD (WorldView + ForgeScene): the camera stands beside the anvil, the
+-- selected unit stands on it, the panel moves to the right, and every upgrade / dismantle is played out on the anvil
+-- (the DataSync is held until the animation shows the result; Skip button, Quick toggle). Opened anywhere else (Remote
+-- Forge) it is the plain panel.
 -- Builds its UI when required (no init call).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -20,7 +24,8 @@ local GameData = require(script.Parent.GameData)
 local UnitPortrait = require(script.Parent.UnitPortrait)
 local SignatureName = require(script.Parent.SignatureName)
 local Format = require(script.Parent.Format)
-local screenGui = require(script.Parent.Gui)
+local WorldView = require(script.Parent.WorldView)
+local ForgeScene = require(script.Parent.ForgeScene)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 
@@ -36,6 +41,7 @@ local buyDustRemote = ReplicatedStorage:WaitForChild("BuyDust", 5)
 local dustStockRemote = ReplicatedStorage:WaitForChild("DustStockUpdate", 5)
 
 local selected = nil -- { kind = "inv" | "grave", index = number }
+local startUpgradeAnim, startDismantleAnim -- (the in-world animations, defined with the wiring below)
 local confirmDismantle = false -- the Dismantle button was pressed once and waits for a second press
 local useCatalyst = { Fortune = false, Warding = false } -- switched on for the next upgrade attempt
 local rowFrames = {} -- row frames by "kind:index", for the selection highlight
@@ -43,7 +49,14 @@ local rowFrames = {} -- row frames by "kind:index", for the selection highlight
 -- ============================================================
 -- Frame
 -- ============================================================
-local themed = Theme.panel(screenGui, { title = "Forge", size = UDim2.fromOffset(800, 540), zIndex = Z })
+-- (its own ScreenGui: the in-world view switches every other one off)
+local forgeGui = Instance.new("ScreenGui")
+forgeGui.Name = "ForgeUI"
+forgeGui.ResetOnSpawn = false
+forgeGui.DisplayOrder = 5
+forgeGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local PANEL_W, PANEL_H = 800, 540
+local themed = Theme.panel(forgeGui, { title = "Forge", size = UDim2.fromOffset(PANEL_W, PANEL_H), zIndex = Z })
 local panel = themed.frame
 panel.Name = "ForgePanel"
 panel.Visible = false
@@ -107,8 +120,9 @@ local upgradeBtn = Theme.stoneButton(detail, {
 	text = "Upgrade", color = "green", size = UDim2.fromOffset(150, 46),
 	position = UDim2.new(0.5, -158, 0, 306), zIndex = Z + 3,
 	onClick = function()
-		if selected and upgradeRemote then
+		if selected and upgradeRemote and not ForgeScene.busy() then
 			confirmDismantle = false
+			startUpgradeAnim()
 			upgradeRemote:FireServer(selected.kind, selected.index, useCatalyst.Fortune, useCatalyst.Warding)
 		end
 	end,
@@ -135,6 +149,10 @@ dismantleBtn = Theme.stoneButton(detail, {
 		end
 		confirmDismantle = false
 		dismantleBtn.label.Text = "Dismantle"
+		if ForgeScene.busy() then
+			return
+		end
+		startDismantleAnim()
 		dismantleRemote:FireServer(selected.index)
 	end,
 })
@@ -521,6 +539,9 @@ local function paintMaterials(entry)
 end
 
 local function select(kind, index)
+	if ForgeScene.busy() then
+		return
+	end
 	selected = { kind = kind, index = index }
 	confirmDismantle = false
 	ForgePanel.refresh()
@@ -581,6 +602,9 @@ function ForgePanel.refresh()
 	end
 	showDetails(entry)
 	paintMaterials(entry)
+	if ForgeScene.active() and not ForgeScene.busy() then
+		ForgeScene.showUnit(entry and entry.unitType, entry and entry.level or 0)
+	end
 end
 
 function ForgePanel.toggle()
@@ -626,6 +650,160 @@ task.spawn(function()
 	end
 end)
 
+-- ============================================================
+-- In the world (at the Forge stall)
+-- ============================================================
+local view -- the WorldView session while the Forge is open at the stall
+local quick = false -- the Quick toggle: shorter animations
+local pendingAnim -- the in-world upgrade waiting for the server's answer
+local showResult -- (defined with the result handler below)
+
+-- the panel stands on the right while the anvil fills the left of the screen
+local panelScale = panel:FindFirstChildOfClass("UIScale")
+local function layoutInWorld()
+	if not view then
+		return
+	end
+	local screen = forgeGui.AbsoluteSize
+	panel.AnchorPoint = Vector2.new(1, 0.5)
+	panel.Position = UDim2.new(1, -40, 0.5, 0)
+	if panelScale and screen.X > 0 then
+		panelScale.Scale = math.clamp(math.min(screen.X * 0.56 / (PANEL_W + 56), (screen.Y - 60) / (PANEL_H + 56)), 0.4, 1)
+	end
+end
+forgeGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	task.defer(layoutInWorld) -- (after Theme's own fit)
+end)
+
+local skipBtn = Theme.stoneButton(forgeGui, {
+	text = "Skip", color = "stone", size = UDim2.fromOffset(110, 40),
+	anchor = Vector2.new(0, 1), position = UDim2.new(0, 40, 1, -40), zIndex = Z + 4,
+	onClick = function()
+		ForgeScene.skip()
+	end,
+})
+skipBtn.root.Visible = false
+local quickBtn
+local function paintQuick()
+	quickBtn.label.Text = quick and "Quick: On" or "Quick: Off"
+end
+quickBtn = Theme.stoneButton(detail, {
+	text = "Quick: Off", color = "stone", size = UDim2.fromOffset(120, 30),
+	position = UDim2.new(1, -124, 0, 0), zIndex = Z + 4,
+	onClick = function()
+		quick = not quick
+		paintQuick()
+	end,
+})
+quickBtn.root.Visible = false
+
+local function setBusy(busy)
+	skipBtn.root.Visible = busy
+	if busy then
+		upgradeBtn.root:SetAttribute("Disabled", true)
+		dismantleBtn.root:SetAttribute("Disabled", true)
+	else
+		dismantleBtn.root:SetAttribute("Disabled", false)
+	end
+end
+
+local function selectedEntry()
+	return selected and findEntry(collectEntries())
+end
+
+startUpgradeAnim = function()
+	local entry = selectedEntry()
+	if not (ForgeScene.active() and entry) then
+		return
+	end
+	Sync.hold()
+	setBusy(true)
+	pendingAnim = ForgeScene.playUpgrade({
+		dust = Economy.dustOf(rarityOf(entry.unitType)),
+		fortune = useCatalyst.Fortune,
+		warding = useCatalyst.Warding,
+		quick = quick,
+		onDone = function()
+			local anim = pendingAnim
+			pendingAnim = nil
+			setBusy(false)
+			Sync.release()
+			if anim and anim.text then
+				showResult(table.unpack(anim.text))
+			end
+			ForgePanel.refresh()
+		end,
+	})
+end
+
+startDismantleAnim = function()
+	local entry = selectedEntry()
+	if not (ForgeScene.active() and entry) then
+		return
+	end
+	Sync.hold()
+	setBusy(true)
+	ForgeScene.playDismantle({
+		dust = Economy.dustOf(rarityOf(entry.unitType)),
+		quick = quick,
+		onDone = function()
+			setBusy(false)
+			Sync.release()
+			ForgePanel.refresh()
+		end,
+	})
+end
+
+local function openInWorld()
+	if view or not ForgeScene.available() or not ForgeScene.start() then
+		return
+	end
+	view = WorldView.open({
+		keep = { forgeGui },
+		openTime = 0.9,
+		fov = 50,
+		goal = function()
+			return ForgeScene.cameraCFrame()
+		end,
+		onStep = function(v, _, k)
+			ForgeScene.hideCharacter(v.char, k > 0.4) -- (the character stands between the camera and the anvil)
+			ForgeScene.setBlend(k) -- (the Forge's magic circle floats down onto the anvil with the glide)
+		end,
+		onFinish = function(v)
+			ForgeScene.hideCharacter(v.char, false)
+			if view == v then
+				view = nil
+			end
+			ForgeScene.stop()
+			pendingAnim = nil
+			setBusy(false)
+			Sync.release()
+			quickBtn.root.Visible = false
+			panel.Visible = false
+			-- back to the plain centred panel: nudging the size makes Theme's fit place and scale it again
+			panel.AnchorPoint = Vector2.new(0.5, 0.5)
+			panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H + 1)
+			panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
+		end,
+	})
+	if not view then
+		ForgeScene.stop()
+		return
+	end
+	quickBtn.root.Visible = true
+	paintQuick()
+	layoutInWorld()
+	ForgePanel.refresh()
+end
+
+panel:GetPropertyChangedSignal("Visible"):Connect(function()
+	if panel.Visible then
+		openInWorld()
+	elseif view then
+		view:close()
+	end
+end)
+
 -- new data from the server: redraw (also keeps the numbers right after an upgrade)
 Sync.onApplied(function()
 	ForgePanel.refresh()
@@ -637,6 +815,18 @@ end)
 -- the result of an upgrade attempt
 if resultRemote then
 	resultRemote.OnClientEvent:Connect(function(success, unitType, level, chance)
+		if pendingAnim then
+			-- the anvil shows it first; the text follows when the animation ends
+			pendingAnim.resolve(success, level)
+			pendingAnim.text = { success, unitType, level, chance }
+			return
+		end
+		showResult(success, unitType, level, chance)
+	end)
+end
+
+function showResult(success, unitType, level, chance)
+	do
 		resultLbl.TextTransparency = 0
 		if success then
 			resultLbl.Text = "SUCCESS!  " .. unitType .. " is now level " .. level
@@ -646,7 +836,7 @@ if resultRemote then
 			resultLbl.TextColor3 = C.Blood
 		end
 		TweenService:Create(resultLbl, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 2), { TextTransparency = 1 }):Play()
-	end)
+	end
 end
 
 return ForgePanel

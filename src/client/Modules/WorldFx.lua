@@ -2,12 +2,15 @@
 -- Models tagged "SpinFx" (with a PrimaryPart and the attribute SpinSpeed in rad/s) turn forever around their PrimaryPart's
 -- up axis, e.g. the two magic circle layers above the Forge anvil (tools/studio/build_forge_stall.lua). Such models must
 -- use ModelStreamingMode Atomic, otherwise a part streamed in later would keep its unrotated server position.
+-- WorldFx.pause(model, true) hands a spinner over to another script (the Forge view moves the Forge's circles itself);
+-- WorldFx.baseOf(model) is its resting pivot.
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
 local MAX_DISTANCE = 220 -- do not animate spinners farther away than this from the camera
 
-local spinners = {} -- [model] = { base = CFrame, speed = number }
+local WorldFx = {}
+local spinners = {} -- [model] = { base = CFrame, speed = number, paused = bool }
 
 local function add(model)
 	if not model:IsA("Model") then
@@ -42,10 +45,24 @@ RunService.RenderStepped:Connect(function()
 	for model, s in pairs(spinners) do
 		if not model.Parent then
 			spinners[model] = nil
+		elseif s.paused then
+			continue
 		elseif not camPos or (s.base.Position - camPos).Magnitude < MAX_DISTANCE then
 			model:PivotTo(s.base * CFrame.Angles(0, (t * s.speed) % (2 * math.pi), 0))
 		end
 	end
 end)
 
-return {}
+function WorldFx.pause(model, paused)
+	local s = spinners[model]
+	if s then
+		s.paused = paused
+	end
+end
+
+function WorldFx.baseOf(model)
+	local s = spinners[model]
+	return s and s.base
+end
+
+return WorldFx
