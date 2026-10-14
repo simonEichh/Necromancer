@@ -171,7 +171,7 @@ local UNITS = {
 		hitDelay = 0.55,
 		-- The Procession: one toll, pallbearers carry a chained coffin to the wall, a black-red claw rakes through it
 		-- (client KnellFx; the hits: the toll, the rake, the tear imploding)
-		special = { kind = "Procession", cooldown = 75, share = 0.35, duration = 11.0,
+		special = { kind = "Procession", cooldown = 150, share = 0.6, duration = 11.0,
 			hits = { { at = 0.35, share = 0.08 }, { at = 7.2, share = 0.72 }, { at = 10.5, share = 0.2 } } },
 	},
 	-- ── Abyssal ─────────────────────────────────────────────────────────
@@ -243,7 +243,7 @@ local UNITS = {
 		-- special attack (Army.startSpecial, client SpecialFx): rips a rift into reality, chains swarm out and bite into the
 		-- wall (hit 1), then explode (hit 2). `share` of the unit's damage comes from the special, the rest from basic
 		-- attacks, so its DPS is unchanged. In Studio the cooldown is SPECIAL_TEST_COOLDOWN (Army) for testing.
-		special = { kind = "RiftChains", cooldown = 90, share = 0.35, duration = 8.8, hits = { { at = 6.95, share = 0.4 }, { at = 7.6, share = 0.6 } } },
+		special = { kind = "RiftChains", cooldown = 180, share = 0.6, duration = 8.8, hits = { { at = 6.95, share = 0.4 }, { at = 7.6, share = 0.6 } } },
 	},
 	DeathIncarnate = {
 		color = BrickColor.new("Really black"),
@@ -286,7 +286,7 @@ local UNITS = {
 		infiniteRange = true, -- it stays at a fixed post far behind the front and shoots the wall wherever it is
 		-- The Verdict: it writes a five-word sentence of rune circles over the wall, slots its stars into them, then
 		-- speaks it: every word bursts into fire and fires a hypersonic bolt of judgement (client Modules/VerdictFx)
-		special = { kind = "Verdict", cooldown = 90, share = 0.35, duration = 13.0,
+		special = { kind = "Verdict", cooldown = 180, share = 0.6, duration = 13.0,
 			hits = { { at = 9.36, share = 0.12 }, { at = 9.96, share = 0.12 }, { at = 10.41, share = 0.12 },
 				{ at = 10.76, share = 0.12 }, { at = 11.36, share = 0.52 } } },
 	},
