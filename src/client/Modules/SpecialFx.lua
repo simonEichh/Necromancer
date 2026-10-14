@@ -94,7 +94,7 @@ local function updateMeters(now, camPos)
 			local start = model:GetAttribute("SpecialStart") or now
 			local cd = model:GetAttribute("SpecialCD") or 1
 			local at = model:GetAttribute("SpecialAt")
-			local firing = at and now - at >= 0 and now - at < SPECIAL_DURATION
+			local firing = at and now - at >= 0 and now - at < (model:GetAttribute("SpecialDuration") or SPECIAL_DURATION)
 			local f = math.clamp((now - start) / cd, 0, 1)
 			if firing then
 				f = 1 - math.clamp((now - at) / 0.5, 0, 1) -- empties as the special fires

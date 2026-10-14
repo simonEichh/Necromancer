@@ -10,6 +10,8 @@ Moved out of CLAUDE.md: what was built when, the agreed next steps, small known 
 
 ## Next steps (backlog, in the order we discussed)
 
+**Knell and the Sigilwright's specials (2026-10-15, built with the user):** Knell reworked (red and black, its own belfry, a Kamehameha throw, the Procession special) and the Sigilwright got THE VERDICT (docs/features.md "Signature specials"). Open: Sigilwright's pool weight is still 1 (the Signature rule says very low; ask the user), the claw / bolt sizes were tuned by eye in few test runs, no sounds.
+
 **Lucky Wheel rework:** the old scrolling strip is replaced by a real seven-section wheel on the main plaza, with an E prompt and an in-world camera/controls view. Odds and rewards are unchanged. Actual spin, shared busy rejection, winning-section landing and view restoration checked in Studio. Save the place to keep `Workspace.LuckyWheel`; rebuild script `tools/studio/build_wheel.lua`. See `docs/features.md` and `docs/world.md`.
 
 ### State at the end of the 2026-10-14 session (read `Design.md` too: identity, realms, every idea rated)

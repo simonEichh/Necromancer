@@ -193,6 +193,7 @@ model:SetAttribute("Float", 0.22)
 model:SetAttribute("AttackStyle", "SigilCast")
 model:SetAttribute("CastColor", GOLD)
 model:SetAttribute("CastPart", "SigilPoint")
+model:SetAttribute("SpecialDuration", 13) -- (the Verdict, read by the special charge meter)
 model.Parent = models
 
 local count = 0

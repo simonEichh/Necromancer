@@ -174,6 +174,7 @@ end
 require(Modules.Effects)
 require(Modules.UnitAnimator)
 require(Modules.SpellEffects)
+require(Modules.VerdictFx) -- the Sigilwright's special: the sentence of rune circles, burning words, hypersonic bolts
 require(Modules.HitEffects)
 require(Modules.WallStages) -- damage stages of the modelled walls (cracks, collapse)
 require(Modules.TitanAnimator) -- idle animation of the realm titans behind the outer wall
@@ -192,6 +193,7 @@ require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 / 1
 require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
 require(Modules.FingerBeam) -- the finger-beam attack (Hush): magic circle at the fingertip, beam to the wall
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
+require(Modules.KnellFx) -- Knell's soul tolls and the colossal spectral bell
 require(Modules.UpgradesPanel) -- realm upgrades + permanent luck / coin (the Upgrades tile, the upgrade stall)
 WheelPanel = require(Modules.WheelPanel)
 require(Modules.DevPanel) -- Studio only, drawn on top

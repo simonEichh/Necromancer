@@ -1280,4 +1280,8 @@ for _, model in ipairs(CollectionService:GetTagged(TAG)) do
 	track(model)
 end
 
-return {}
+-- the rune circles, shared with the Sigilwright's special (Modules/VerdictFx)
+return {
+	newSigilCircle = newSigilCircle, -- (color, diameter, scale) -> { part, layers, light, ... }; the part's Size sets its size
+	updateSigilCircle = updateSigilCircle, -- (circle, visibility 0..1, elapsed) spins and fades it
+}

@@ -676,7 +676,8 @@ local function startBarrage(u, plotState, lat)
 		start = start,
 		rate = rate,
 		flight = flight,
-		shotDamage = (u.def.damage / u.def.attackCD) / rate,
+		-- (a unit with a special deals only the rest of its damage with its barrage)
+		shotDamage = (u.def.damage / u.def.attackCD) / rate * (u.def.special and (1 - u.def.special.share) or 1),
 		landed = 0, -- shots whose damage has been applied
 		endTime = nil, -- set when the barrage stops (shots already fired still land)
 	}
@@ -779,6 +780,7 @@ end
 
 local function startSpecial(u, plotState, lat, now)
 	local sp = u.def.special
+	local targetWall = plotState.wall
 	local cd = specialCooldown(u.def)
 	local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
 	if u.model then
@@ -794,6 +796,7 @@ local function startSpecial(u, plotState, lat, now)
 	for _, h in ipairs(sp.hits) do
 		task.delay(h.at, function()
 			if not plotState.wall or not u.block or not u.block.Parent then return end
+			if plotState.wall ~= targetWall then return end -- the remaining spectacle belongs to the old wall
 			local dmg = total * h.share
 			plotState.wallHP = math.max(0, plotState.wallHP - dmg)
 			earnHitGold(plotState, u, dmg)
@@ -956,8 +959,15 @@ local function update(now, dt)
 					initSpecial(u, now)
 				end
 				if attackStyle == "StaffCast" or attackStyle == "SigilCast" then
-					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage)
-					if not u.barrage or u.barrage.endTime then
+					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage);
+					-- a caster with a special (the Sigilwright's Verdict) stops the barrage while it plays
+					if u.def.special and plotState.wall and now >= u.specialReady then
+						if u.barrage and not u.barrage.endTime then stopBarrage(u) end
+						startSpecial(u, plotState, lat, now)
+						u.specialUntil = now + u.def.special.duration
+					elseif now < (u.specialUntil or 0) then
+						-- the special is playing: no barrage
+					elseif not u.barrage or u.barrage.endTime then
 						startBarrage(u, plotState, lat)
 					elseif u.model then
 						-- the front wall moves on when a wall breaks: keep the barrage aimed at the wall being fought

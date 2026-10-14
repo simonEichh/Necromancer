@@ -203,6 +203,44 @@ local function animate(model, rig, dt, now)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
 
+	-- the Sigilwright's Verdict (VerdictFx, 13 s): it rises and holds its hand up, writing in the air (1.5..7), and
+	-- on every spoken word (bolts at 9.3, 9.9, 10.35, 10.7, 11.3) jerks the hand forward at the wall; before the last
+	-- word it pulls the hand far back, then thrusts it; every jerk flows back into the raised pose (no snap)
+	local verdictLift = 0
+	if style == "SigilCast" and model:GetAttribute("SpecialKind") == "Verdict" then
+		local spAt = model:GetAttribute("SpecialAt")
+		local st = spAt and workspace:GetServerTimeNow() - spAt or -1
+		if st >= 0 and st < 13 then
+			local function sm(x)
+				x = clamp01(x)
+				return x * x * (3 - 2 * x)
+			end
+			local vw = sm(st / 0.8) * (1 - sm((st - 12.2) / 0.8))
+			local rs, re, ls, le, lean = 2.6, 0.2, 0.55, 0.6, -0.12
+			if st > 1.5 and st < 7 then
+				rs += math.sin(st * 7) * 0.18 + math.sin(st * 11.3) * 0.08 -- writing
+				re += math.sin(st * 9) * 0.12
+			end
+			for i, b in ipairs({ 9.3, 9.9, 10.35, 10.7, 11.3 }) do
+				local d = st - (b - 0.08)
+				if d >= 0 and d < 0.7 then
+					local thrust = d < 0.08 and (d / 0.08) ^ 2 or (1 - sm((d - 0.08) / 0.6))
+					local big = (i == 5) and 1.4 or 1
+					rs -= 1.1 * thrust * big
+					re -= 0.15 * thrust
+					lean += 0.12 * thrust * big
+				end
+			end
+			rs += 0.6 * sm((st - 10.75) / 0.45) * (st < 11.22 and 1 or 0) -- the wind-up before the last word
+			rShoulder = rShoulder + (rs - rShoulder) * vw
+			rElbow = rElbow + (re - rElbow) * vw
+			lShoulder = lShoulder + (ls - lShoulder) * vw
+			lElbow = lElbow + (le - lElbow) * vw
+			waistPitch = waistPitch + (lean - waistPitch) * vw
+			verdictLift = 1.6 * vw
+		end
+	end
+
 	set(rig, "LShoulder", ANGLES(lShoulder, 0, 0))
 	set(rig, "LElbow", ANGLES(lElbow, 0, 0))
 	set(rig, "RShoulder", ANGLES(rShoulder, 0, 0))
@@ -210,6 +248,231 @@ local function animate(model, rig, dt, now)
 	set(rig, "RStaff", ANGLES(staffRot, 0, 0))
 	set(rig, "Waist", ANGLES(waistPitch, 0, waistRoll))
 	set(rig, "Neck", ANGLES(-0.04 * w, math.sin(t * 0.8) * 0.12 * (1 - w), 0))
+	if verdictLift > 0 then
+		set(rig, "Root", CFrame.new(shake, bob + float + rise + verdictLift * scale, shake * 0.7))
+	end
+
+	-- Knell (Pose "Bellbearer"): it carries its own belfry; the right hand holds the bell rope. Built on the classic
+	-- principles (roblox-animation skill + anticipation / follow-through / overlap): every layer (idle procession,
+	-- walk lean, rope pull, Last Toll) adds into one pose, so nothing snaps; the bell and the veil hang on damped springs
+	-- and trail the body (secondary motion).
+	--   pull (a = seconds since it started): anticipation 0..0.18 (leans back, both hands climb the rope, looks up),
+	--   the yank 0.18..0.28 (eased in: the body snaps forward and dips), the bell rings at 0.26 (KnellFx's clang),
+	--   follow-through to 0.9 with a slight overshoot (used for the Last Toll's first two tolls).
+	--   Basic attack = a Kamehameha-style THROW in one continuous cycle (no reset to rest): from the charged pose (both
+	--   hands at the right hip, the body coiled) the arms are flung forward, palms together (0.22 s: the shockwave leaves
+	--   the hands, KnellFx), momentum carries them on, they fall, swing down and back past the hips and gather at the
+	--   hip again (1.8 s), charging until the next attack (attackCD 2 s) launches straight out of it. Keyframes are
+	--   joined by a Catmull-Rom spline (velocity carries through each key) and a fast spring absorbs timing jitter;
+	--   the cycle eases out into the idle when the attacks stop.
+	--   The Procession (SpecialAt, 11 s): one hard pull at 0.35 s, it rises and conducts with the left hand, arches back
+	--   with the claw's wind-up (6.1..7.1) and dives forward on the rake (7.2).
+	if model:GetAttribute("Pose") == "Bellbearer" then
+		local function smooth01(x)
+			x = clamp01(x)
+			return x * x * (3 - 2 * x)
+		end
+		local function damped(x, amp, freq, decay)
+			return x > 0 and amp * math.sin(x * freq) * math.exp(-x * decay) or 0
+		end
+		local k = rig.knell
+		if not k then
+			k = { bell = 0, bellV = 0, veil = 0, veilV = 0, roll = 0, rollV = 0 }
+			rig.knell = k
+		end
+		local function spring(x, v, target, stiffness, damping)
+			v = v + ((target - x) * stiffness - v * damping) * math.min(dt, 0.05)
+			return x + v * math.min(dt, 0.05), v
+		end
+
+		-- idle procession + walking lean
+		local rS, rE = 0.25 + math.max(0, math.sin(t * 1.6)) ^ 8 * 0.25, 0.45
+		local lS, lE, lRoll = 0.12 + math.sin(t * 0.9 + 1) * 0.05, 0.25, 0
+		local waist = -0.05 + math.sin(t * 1.8) * 0.02 + 0.18 * w
+		local waistRoll = math.sin(t * 0.9) * 0.06
+		local neck = 0.06 - 0.06 * w
+		local neckYaw = math.sin(t * 0.5) * 0.12
+		local lift = 0 -- extra height of the root (design units)
+		local bellKick, clap = 0, math.sin(t * 1.7) * 0.05
+		rS -= 0.15 * w
+		lS -= 0.15 * w
+
+		-- the throw cycle: { t, rS, rE, rY, lS, lE, lY, waist pitch, waist yaw, lift }
+		-- { t, rS, rE, rY, lS, lE, lY, waist pitch, waist yaw, lift, rZ, lZ (shoulder rolls, + = the hand inwards) }
+		-- the charge pose is the Kamehameha form (user's reference): both forearms held forward at the right hip, the
+		-- wrists together, the hands cupped round the orb (the right one a little lower)
+		local CHARGE = { 0.05, 1.4, 0.0, -0.15, 1.45, 0.0, -0.06, -0.5, 0.05, 0.45, 1.05 }
+		local THROW = {
+			{ 0.00, table.unpack(CHARGE) },
+			{ 0.22, 1.3, 0.1, 0.25, 1.3, 0.1, -0.25, 0.18, 0.1, -0.2, 0.15, 0.15 }, -- the thrust: straight at the wall, palms together
+			{ 0.55, 1.36, 0.05, 0.25, 1.36, 0.05, -0.25, 0.22, 0.12, -0.25, 0.15, 0.15 }, -- held: the push carries on a little
+			{ 0.95, 0.75, 1.0, 0.1, 0.7, 1.05, -0.1, 0.1, -0.15, -0.1, 0.25, 0.45 }, -- drawn back: the elbows bend first
+			{ 1.35, 0.15, 1.4, 0.0, 0.0, 1.45, 0.0, -0.02, -0.4, 0.0, 0.4, 0.9 }, -- the hands sweep back to the hip
+			{ 1.80, table.unpack(CHARGE) }, -- the Kamehameha form again: the charge
+		}
+		local function sampleThrow(a, c)
+			local n = #THROW
+			if a <= THROW[1][1] then
+				return THROW[1][c]
+			end
+			if a >= THROW[n][1] then
+				return THROW[n][c]
+			end
+			for i = 1, n - 1 do
+				local k1, k2 = THROW[i], THROW[i + 1]
+				if a <= k2[1] then
+					local f = (a - k1[1]) / (k2[1] - k1[1])
+					local p0 = (THROW[i - 1] or k1)[c]
+					local p1, p2 = k1[c], k2[c]
+					local p3 = (THROW[i + 2] or k2)[c]
+					-- Catmull-Rom: the curve keeps its speed through every key (momentum, not ease-to-a-stop)
+					return 0.5 * ((2 * p1) + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f)
+				end
+			end
+			return THROW[n][c]
+		end
+
+		-- one pull on the rope; p = power
+		local function pull(a, p)
+			if a < 0 or a > 0.9 then
+				return
+			end
+			local up = smooth01(a / 0.18) -- anticipation
+			local yank = clamp01((a - 0.18) / 0.1) ^ 2 -- the action, eased in
+			local back = smooth01((a - 0.28) / 0.62) -- follow-through
+			local hold = (1 - yank) * up
+			local hit = yank * (1 - back)
+			local over = math.sin(clamp01((a - 0.28) / 0.62) * math.pi) * 0.12 * p
+			rS += hold * 2.4 + hit * -0.6 - over
+			rE += hold * -0.2 + hit * 1.0
+			lS += hold * 2.0 + hit * -0.3
+			lE += hit * 1.1
+			lRoll += hold * -0.35
+			waist += hold * -0.22 * p + hit * 0.42 * p - over
+			neck += hold * -0.3 + hit * 0.15
+			lift += hold * 0.25 - hit * 0.5 * p
+			bellKick += damped(a - 0.26, -0.75 * p, 6.5, 2.2)
+			clap += damped(a - 0.27, 1.0 * p, 11, 3.2)
+		end
+		local specialAt = model:GetAttribute("SpecialAt")
+		local st = specialAt and workspace:GetServerTimeNow() - specialAt or -1
+		local inSpecial = st >= 0 and st < 11.0
+
+		-- the throw: blended in while it fights (eases out ~2.4 s after the last attack, off while walking / the special)
+		local rY, lY, waistYaw, rZ, lZ = 0, 0, 0, 0, 0
+		-- (DebugThrowT: freezes the throw at that time, for looking at the poses; set it on the client only)
+		local debugT = model:GetAttribute("DebugThrowT")
+		if (rig.lastShot or debugT) and not inSpecial then
+			local a = debugT or (now - rig.lastShot)
+			local wA = (a < 2.4 and 1 or 1 - smooth01((a - 2.4) / 0.8)) * (1 - w)
+			if wA > 0 then
+				local ta = math.min(a, 1.8)
+				local tremble = a > 1.5 and math.sin(now * 38) * 0.03 * clamp01((a - 1.5) / 0.3) or 0 -- the charge trembles
+				local function mix(base, c)
+					return base + (sampleThrow(ta, c) - base) * wA
+				end
+				rS = mix(rS, 2) + tremble
+				rE = mix(rE, 3)
+				rY = mix(0, 4)
+				lS = mix(lS, 5) - tremble
+				lE = mix(lE, 6)
+				lY = mix(0, 7)
+				rZ = mix(0, 11)
+				lZ = mix(0, 12)
+				waist = mix(waist, 8)
+				waistYaw = mix(0, 9)
+				lift = mix(lift, 10)
+				bellKick += (damped(a - 0.22, -0.7, 6.5, 2.2)) * wA
+				clap += damped(a - 0.23, 1.0, 11, 3.2) * wA
+			end
+		end
+		-- a fast spring on the arm and body channels: absorbs the jump when an attack comes a little early or late
+		k.sm = k.sm or {}
+		local function smoothed(name, target)
+			local e = k.sm[name]
+			if not e then
+				e = { x = target, v = 0 }
+				k.sm[name] = e
+			end
+			e.x, e.v = spring(e.x, e.v, target, 260, 30)
+			return e.x
+		end
+		if inSpecial then
+			-- the Procession (KnellFx): one hard toll, then it rises and conducts the pallbearers with the raised left
+			-- hand; as the claw winds up it arches back with it, and dives forward on the rake (7.0 s)
+			local conduct = math.min(clamp01((st - 0.6) / 0.8), clamp01((11.0 - st) / 0.7))
+			lift += conduct * 1.6
+			lS += conduct * 1.3
+			lRoll += conduct * 0.35
+			neck -= conduct * 0.15
+			pull(st - 0.09, 1.6)
+			-- the right arm swings WITH the claw, on the same curves: it winds up far back, high and out to the right
+			-- (6.1..7.1, still drifting back at the end), rakes diagonally down across the body (7.1..7.22, accelerating)
+			-- and its momentum carries it on across (to 8.1, decelerating), then it eases back to conducting
+			local function lerp(a0, b0, f)
+				return a0 + (b0 - a0) * f
+			end
+			local COCKED = { rS = 3.0, rE = 0.35, rY = 0.5, rZ = -0.7, waist = -0.35, waistYaw = -0.6, lS = 0.4, lift = 0.6 }
+			local THROUGH = { rS = 0.25, rE = 0.15, rY = -0.45, rZ = 0.75, waist = 0.45, waistYaw = 0.55, lS = -0.1, lift = -0.6 }
+			local AFTER = { rS = -0.35, rE = 0.5, rY = -0.6, rZ = 0.95, waist = 0.5, waistYaw = 0.7, lS = 0.1, lift = -0.8 }
+			local target, wgt
+			if st >= 6.1 and st < 7.1 then
+				local u = (st - 6.1) / 1.0
+				target = table.clone(COCKED)
+				target.rS += 0.25 * math.max(0, u - 0.7) / 0.3 -- (the coil keeps tightening: no stop before the blow)
+				wgt = smooth01(u)
+			elseif st >= 7.1 and st < 7.22 then
+				local s = ((st - 7.1) / 0.12) ^ 1.6
+				target = {}
+				for key, v in pairs(COCKED) do
+					target[key] = lerp(v + (key == "rS" and 0.25 or 0), THROUGH[key], s)
+				end
+				wgt = 1
+			elseif st >= 7.22 and st < 8.9 then
+				local f = math.min(1, (st - 7.22) / 0.88)
+				local e = 1 - (1 - f) ^ 3
+				target = {}
+				for key, v in pairs(THROUGH) do
+					target[key] = lerp(v, AFTER[key], e)
+				end
+				wgt = 1 - smooth01((st - 8.1) / 0.8)
+			end
+			if target then
+				rS = lerp(rS, target.rS, wgt)
+				rE = lerp(rE, target.rE, wgt)
+				rY = lerp(rY, target.rY, wgt)
+				rZ = lerp(rZ, target.rZ, wgt)
+				waist = lerp(waist, target.waist, wgt)
+				waistYaw = lerp(waistYaw, target.waistYaw, wgt)
+				lS = lerp(lS, target.lS, wgt)
+				lift = lerp(lift, target.lift, wgt)
+			end
+			bellKick += damped(st - 7.2, 0.6, 6, 1.8)
+			clap += damped(st - 7.2, 1.2, 11, 3)
+		end
+
+		-- secondary motion: the bell swings behind the body (it hangs still in the world while the body leans), the
+		-- veil trails backwards when it moves and lags behind every lean
+		k.bell, k.bellV = spring(k.bell, k.bellV, -waist * 0.8, 38, 5)
+		k.roll, k.rollV = spring(k.roll, k.rollV, -waistRoll * 1.2, 30, 4)
+		k.veil, k.veilV = spring(k.veil, k.veilV, -(waist + neck) - 0.12 - 0.35 * w - 0.25 * clamp01(math.abs(lift) / 2), 22, 3.5)
+
+		rS, rE, rY = smoothed("rS", rS), smoothed("rE", rE), smoothed("rY", rY)
+		rZ, lZ = smoothed("rZ", rZ), smoothed("lZ", lZ)
+		lS, lE, lY = smoothed("lS", lS), smoothed("lE", lE), smoothed("lY", lY)
+		waist, waistYaw, lift = smoothed("waist", waist), smoothed("waistYaw", waistYaw), smoothed("lift", lift)
+		set(rig, "Root", CFrame.new(0, float + rise + lift * scale, 0))
+		set(rig, "Waist", ANGLES(waist, waistYaw, waistRoll))
+		-- (the head counters the twist: it keeps looking at the target)
+		set(rig, "Neck", ANGLES(neck, neckYaw - waistYaw * 0.6, 0))
+		set(rig, "RShoulder", ANGLES(rS, rY, -rZ))
+		set(rig, "RElbow", ANGLES(rE, 0, 0))
+		set(rig, "LShoulder", ANGLES(lS, lY + 0.1 * lRoll, -lRoll + lZ))
+		set(rig, "LElbow", ANGLES(lE, 0, 0))
+		set(rig, "BellSwing", ANGLES(k.bell + bellKick, 0, k.roll))
+		set(rig, "BellClapper", ANGLES(clap - k.bell * 0.5, 0, 0))
+		set(rig, "Veil", ANGLES(k.veil, 0, -waistRoll * 0.8))
+	end
 
 	-- "Crucified" pose (model attribute Pose, e.g. Hush): the rig is BUILT in a T pose; it hangs in the air as if nailed
 	-- to an invisible cross: arms sag a little, the empty sleeves hang from the elbows and swing, the head hangs to one

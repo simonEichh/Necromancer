@@ -160,6 +160,20 @@ local UNITS = {
 		attackCD = 0.5,
 		transparent = true,
 	},
+	-- Knell, the Mourning Bell: a rare Legendary Signature with a three-toll spectacle.
+	Knell = {
+		color = BrickColor.new("Sand green"),
+		size = Vector3.new(2.8, 4, 2.8),
+		damage = 3300, -- 1,650 nominal DPS: top of Legendary, below Abyssal
+		speed = 9,
+		attackRange = 20,
+		attackCD = 2,
+		hitDelay = 0.55,
+		-- The Procession: one toll, pallbearers carry a chained coffin to the wall, a black-red claw rakes through it
+		-- (client KnellFx; the hits: the toll, the rake, the tear imploding)
+		special = { kind = "Procession", cooldown = 75, share = 0.35, duration = 11.0,
+			hits = { { at = 0.35, share = 0.08 }, { at = 7.2, share = 0.72 }, { at = 10.5, share = 0.2 } } },
+	},
 	-- ── Abyssal ─────────────────────────────────────────────────────────
 	SoulEater = {
 		color = BrickColor.new("Bright orange"),
@@ -270,6 +284,11 @@ local UNITS = {
 		shotsPerSecond = 8,
 		shotFlight = 0.45,
 		infiniteRange = true, -- it stays at a fixed post far behind the front and shoots the wall wherever it is
+		-- The Verdict: it writes a five-word sentence of rune circles over the wall, slots its stars into them, then
+		-- speaks it: every word bursts into fire and fires a hypersonic bolt of judgement (client Modules/VerdictFx)
+		special = { kind = "Verdict", cooldown = 90, share = 0.35, duration = 13.0,
+			hits = { { at = 9.36, share = 0.12 }, { at = 9.96, share = 0.12 }, { at = 10.41, share = 0.12 },
+				{ at = 10.76, share = 0.12 }, { at = 11.36, share = 0.52 } } },
 	},
 }
 
@@ -303,6 +322,7 @@ local RARITY_UNITS = {
 		{ unit = "LichLord", weight = 3 },
 		{ unit = "DeathReaper", weight = 2 },
 		{ unit = "VoidWalker", weight = 1 },
+		{ unit = "Knell", weight = 0.15 }, -- Signature: rare within its tier
 	},
 	Abyssal = {
 		{ unit = "SoulEater", weight = 3 },
@@ -356,6 +376,7 @@ local UNIT_EMOJIS = {
 	LichLord = "",
 	DeathReaper = "",
 	VoidWalker = "",
+	Knell = "",
 	-- Abyssal
 	SoulEater = "",
 	AbyssalTitan = "",
