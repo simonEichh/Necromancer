@@ -2,6 +2,9 @@ local QuestsPanel = {}
 
 local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Theme = require(script.Parent.Theme)
+local C = Theme.Color
+local Z = 30
 
 -- ── Quest definitions (mirrors server) ───────────────────────
 local DAILY_QUESTS = {
@@ -47,8 +50,8 @@ local function switchTab(name)
 	activeTab = name
 	for t, btn in pairs(tabButtons) do
 		local on = (t == name)
-		btn.BackgroundColor3 = on and Color3.fromRGB(90, 60, 20) or Color3.fromRGB(50, 30, 10)
-		btn.TextColor3 = on and Color3.fromRGB(255, 220, 120) or Color3.fromRGB(180, 140, 80)
+		btn.on.root.Visible = on
+		btn.off.root.Visible = not on
 		tabContents[t].Visible = on
 	end
 	resetLabel.Text = (name == "Daily")
@@ -69,76 +72,75 @@ end
 -- ── Build a quest row ─────────────────────────────────────────
 local function makeQuestRow(parent, order, q)
 	local row = Instance.new("Frame", parent)
-	row.Size = UDim2.new(1, -8, 0, 110)
-	row.BackgroundColor3 = Color3.fromRGB(20, 15, 10)
+	row.Name = q.id
+	row.Size = UDim2.new(1, -8, 0, 116)
+	row.BackgroundColor3 = C.StoneRaised
 	row.BorderSizePixel = 0
 	row.LayoutOrder = order
-	row.ZIndex = 32
-	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+	row.ZIndex = Z + 2
+	Theme.corner(row, Theme.Radius.Medium)
+	Theme.stroke(row, C.Border, Theme.Stroke.Thin)
 
-	local title = Instance.new("TextLabel", row)
-	title.Size = UDim2.new(1, -160, 0, 34)
-	title.Position = UDim2.new(0, 12, 0, 8)
-	title.BackgroundTransparency = 1
-	title.Text = q.label
-	title.TextColor3 = Color3.fromRGB(255, 245, 220)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextScaled = true
-	title.Font = Enum.Font.GothamBold
-	title.ZIndex = 33
+	local title = Theme.label(row, {
+		text = q.label, font = "Strong", color = C.Bone,
+		frameSize = UDim2.new(1, -176, 0, 28),
+	})
+	title.Position = UDim2.fromOffset(14, 12)
+	title.ZIndex = Z + 3
 
-	local progressLbl = Instance.new("TextLabel", row)
-	progressLbl.Size = UDim2.new(1, -160, 0, 22)
-	progressLbl.Position = UDim2.new(0, 12, 0, 42)
-	progressLbl.BackgroundTransparency = 1
-	progressLbl.Text = "0 / " .. fmtNum(q.target)
-	progressLbl.TextColor3 = Color3.fromRGB(120, 220, 120)
-	progressLbl.TextXAlignment = Enum.TextXAlignment.Left
-	progressLbl.TextScaled = true
-	progressLbl.Font = Enum.Font.Gotham
-	progressLbl.ZIndex = 33
+	local progressLbl = Theme.label(row, {
+		text = "0 / " .. fmtNum(q.target), color = C.Soul,
+		frameSize = UDim2.new(1, -176, 0, 22),
+	})
+	progressLbl.Name = "Progress"
+	progressLbl.Position = UDim2.fromOffset(14, 47)
+	progressLbl.ZIndex = Z + 3
 
 	local barBg = Instance.new("Frame", row)
-	barBg.Size = UDim2.new(1, -160, 0, 22)
-	barBg.Position = UDim2.new(0, 12, 0, 68)
-	barBg.BackgroundColor3 = Color3.fromRGB(20, 50, 20)
+	barBg.Name = "ProgressTrack"
+	barBg.Size = UDim2.new(1, -176, 0, 10)
+	barBg.Position = UDim2.fromOffset(14, 83)
+	barBg.BackgroundColor3 = C.Void
 	barBg.BorderSizePixel = 0
-	barBg.ZIndex = 33
-	Instance.new("UICorner", barBg).CornerRadius = UDim.new(0, 6)
+	barBg.ZIndex = Z + 3
+	Theme.corner(barBg, Theme.Radius.Small)
+	Theme.stroke(barBg, C.Border, Theme.Stroke.Thin)
 
 	local barFill = Instance.new("Frame", barBg)
 	barFill.Size = UDim2.new(0, 0, 1, 0)
-	barFill.BackgroundColor3 = Color3.fromRGB(80, 220, 80)
+	barFill.Name = "ProgressFill"
+	barFill.BackgroundColor3 = C.Soul
 	barFill.BorderSizePixel = 0
-	barFill.ZIndex = 34
-	Instance.new("UICorner", barFill).CornerRadius = UDim.new(0, 6)
+	barFill.ZIndex = Z + 4
+	Theme.corner(barFill, Theme.Radius.Small)
+
+	local reward = Theme.label(row, {
+		text = q.reward .. " Gems", font = "Strong", color = C.Gold,
+		align = Enum.TextXAlignment.Center, frameSize = UDim2.fromOffset(132, 26),
+	})
+	reward.Name = "Reward"
+	reward.Position = UDim2.new(1, -146, 0, 14)
+	reward.ZIndex = Z + 3
 
 	-- Claim button
-	local claimBtn = Instance.new("TextButton", row)
-	claimBtn.Size = UDim2.new(0, 130, 0, 70)
-	claimBtn.Position = UDim2.new(1, -142, 0, 20)
-	claimBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
-	claimBtn.Text = "Claim\n" .. q.reward .. " Gems"
-	claimBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
-	claimBtn.TextScaled = true
-	claimBtn.Font = Enum.Font.GothamBold
-	claimBtn.BorderSizePixel = 0
+	local claim = Theme.stoneButton(row, {
+		text = "Claim", color = "gold", size = UDim2.fromOffset(132, 36),
+		position = UDim2.new(1, -146, 0, 56), zIndex = Z + 3, disabled = true,
+	})
+	claim.root.Name = "ClaimButton"
+	local claimBtn = claim.button
 	claimBtn.Visible = false
-	claimBtn.ZIndex = 33
-	Instance.new("UICorner", claimBtn).CornerRadius = UDim.new(0, 10)
 
-	local claimedLbl = Instance.new("TextLabel", row)
-	claimedLbl.Size = UDim2.new(0, 130, 0, 70)
-	claimedLbl.Position = UDim2.new(1, -142, 0, 20)
-	claimedLbl.BackgroundTransparency = 1
-	claimedLbl.Text = "Claimed"
-	claimedLbl.TextColor3 = Color3.fromRGB(100, 150, 100)
-	claimedLbl.TextScaled = true
-	claimedLbl.Font = Enum.Font.GothamBold
+	local claimedLbl = Theme.label(row, {
+		text = "Claimed", color = C.BoneDim,
+		align = Enum.TextXAlignment.Center, frameSize = UDim2.fromOffset(132, 36),
+	})
+	claimedLbl.Position = UDim2.new(1, -146, 0, 56)
 	claimedLbl.Visible = false
-	claimedLbl.ZIndex = 33
+	claimedLbl.ZIndex = Z + 3
 
-	return { row = row, progressLbl = progressLbl, barFill = barFill, claimBtn = claimBtn, claimedLbl = claimedLbl }
+	return { row = row, progressLbl = progressLbl, barFill = barFill, claimBtn = claimBtn,
+		claimRoot = claim.root, claimedLbl = claimedLbl }
 end
 
 -- ── Update display ────────────────────────────────────────────
@@ -152,7 +154,8 @@ local function refreshQuests(dailyProg, dailyClaimed, weeklyProg, weeklyClaimed)
 		local pct     = math.clamp(prog / q.target, 0, 1)
 		r.progressLbl.Text = fmtNum(prog) .. " / " .. fmtNum(q.target)
 		r.barFill.Size = UDim2.new(pct, 0, 1, 0)
-		r.barFill.BackgroundColor3 = pct >= 1 and Color3.fromRGB(80, 220, 80) or Color3.fromRGB(60, 180, 60)
+		r.barFill.BackgroundColor3 = pct >= 1 and C.Soul or C.Verdigris
+		r.claimRoot:SetAttribute("Disabled", claimed == true or pct < 1)
 		r.claimBtn.Visible    = not claimed and pct >= 1
 		r.claimedLbl.Visible  = claimed
 	end
@@ -165,7 +168,8 @@ local function refreshQuests(dailyProg, dailyClaimed, weeklyProg, weeklyClaimed)
 		local pct     = math.clamp(prog / q.target, 0, 1)
 		r.progressLbl.Text = fmtNum(prog) .. " / " .. fmtNum(q.target)
 		r.barFill.Size = UDim2.new(pct, 0, 1, 0)
-		r.barFill.BackgroundColor3 = pct >= 1 and Color3.fromRGB(80, 220, 80) or Color3.fromRGB(60, 180, 60)
+		r.barFill.BackgroundColor3 = pct >= 1 and C.Soul or C.Verdigris
+		r.claimRoot:SetAttribute("Disabled", claimed == true or pct < 1)
 		r.claimBtn.Visible    = not claimed and pct >= 1
 		r.claimedLbl.Visible  = claimed
 	end
@@ -184,106 +188,72 @@ function QuestsPanel.init(screenGui, deps)
 	onGemsAdded      = deps.onGemsAdded
 
 	-- ── Main panel ───────────────────────────────────────────
-	panel = Instance.new("Frame")
-	panel.Name = "QuestsPanel"
-	panel.Size = UDim2.new(0, 620, 0, 520)
-	panel.Position = UDim2.new(0.5, -310, 0.5, -260)
-	panel.BackgroundColor3 = Color3.fromRGB(18, 12, 6)
-	panel.BackgroundTransparency = 0.05
-	panel.BorderSizePixel = 0
-	panel.Visible = false
+	local themed = Theme.panel(screenGui, { title = "Quests", size = UDim2.fromOffset(620, 520), zIndex = Z })
+	panel = themed.frame
 	require(script.Parent.Windows).register(panel) -- only one window open at a time
-	panel.ZIndex = 30
-	panel.Parent = screenGui
-	Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
-	Instance.new("UIStroke", panel).Color = Color3.fromRGB(150, 100, 30)
+	panel.Name = "QuestsPanel"
+	panel.Visible = false
+	local body = themed.body
 
 	do
-		local title = Instance.new("TextLabel", panel)
-		title.Size = UDim2.new(0, 160, 0, 40)
-		title.Position = UDim2.new(0, 12, 0, 8)
-		title.BackgroundTransparency = 1
-		title.Text = "Quests"
-		title.TextColor3 = Color3.fromRGB(255, 220, 100)
-		title.TextXAlignment = Enum.TextXAlignment.Left
-		title.TextScaled = true
-		title.Font = Enum.Font.GothamBold
-		title.ZIndex = 31
+		resetLabel = Theme.label(body, {
+			text = "Daily resets in: 00:00:00", size = "Small", color = C.BoneDim,
+			align = Enum.TextXAlignment.Right, frameSize = UDim2.new(1, -306, 0, 36),
+		})
+		resetLabel.Position = UDim2.fromOffset(306, 0)
+		resetLabel.ZIndex = Z + 3
 
-		resetLabel = Instance.new("TextLabel", panel)
-		resetLabel.Size = UDim2.new(1, -220, 0, 40)
-		resetLabel.Position = UDim2.new(0, 180, 0, 8)
-		resetLabel.BackgroundTransparency = 1
-		resetLabel.Text = "Daily resets in: 00:00:00"
-		resetLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
-		resetLabel.TextXAlignment = Enum.TextXAlignment.Left
-		resetLabel.TextScaled = true
-		resetLabel.Font = Enum.Font.Gotham
-		resetLabel.ZIndex = 31
-
-		local closeBtn = Instance.new("TextButton", panel)
-		closeBtn.Size = UDim2.new(0, 36, 0, 36)
-		closeBtn.Position = UDim2.new(1, -44, 0, 8)
-		closeBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-		closeBtn.Text = "X"
-		closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		closeBtn.TextScaled = true
-		closeBtn.Font = Enum.Font.GothamBold
-		closeBtn.BorderSizePixel = 0
-		closeBtn.ZIndex = 31
-		Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
-		closeBtn.MouseButton1Click:Connect(function()
-			panel.Visible = false
-		end)
+		Theme.stoneButton(panel, {
+			text = "X", color = "red", size = UDim2.fromOffset(44, 28),
+			position = UDim2.new(1, -62, 0, 6), zIndex = Z + 2,
+			onClick = function() panel.Visible = false end,
+		})
 	end
 
 	-- ── Tabs ────────────────────────────────────────────────
 	do
-		local tabBar = Instance.new("Frame", panel)
-		tabBar.Size = UDim2.new(1, -20, 0, 42)
-		tabBar.Position = UDim2.new(0, 10, 0, 54)
+		local tabBar = Instance.new("Frame", body)
+		tabBar.Size = UDim2.fromOffset(292, 36)
+		tabBar.Position = UDim2.fromOffset(0, 0)
 		tabBar.BackgroundTransparency = 1
-		tabBar.ZIndex = 31
+		tabBar.ZIndex = Z + 2
 
 		for i, name in ipairs({ "Daily", "Weekly" }) do
-			local btn = Instance.new("TextButton", tabBar)
-			btn.Size = UDim2.new(0, 140, 1, 0)
-			btn.Position = UDim2.new(0, (i-1) * 148, 0, 0)
-			btn.BackgroundColor3 = Color3.fromRGB(50, 30, 10)
-			btn.Text = name
-			btn.TextColor3 = Color3.fromRGB(180, 140, 80)
-			btn.TextScaled = true
-			btn.Font = Enum.Font.GothamBold
-			btn.BorderSizePixel = 0
-			btn.ZIndex = 32
-			Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-			tabButtons[name] = btn
+			local buttons = {}
+			for _, state in ipairs({ "on", "off" }) do
+				buttons[state] = Theme.stoneButton(tabBar, {
+					text = name, color = state == "on" and "green" or "stone",
+					size = UDim2.fromOffset(140, 36), position = UDim2.fromOffset((i - 1) * 148, 0),
+					zIndex = Z + 3, onClick = function() switchTab(name) end,
+				})
+			end
+			tabButtons[name] = buttons
 
 			-- Badge
-			local badge = Instance.new("TextLabel", btn)
-			badge.Size = UDim2.new(0, 22, 0, 22)
-			badge.Position = UDim2.new(1, -8, 0, -8)
-			badge.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
-			badge.Text = "0"
-			badge.TextColor3 = Color3.fromRGB(255, 255, 255)
-			badge.TextScaled = true
-			badge.Font = Enum.Font.GothamBold
-			badge.ZIndex = 34
+			local badge = Theme.label(tabBar, {
+				text = "0", font = "Strong", size = "Small", color = C.Bone,
+				align = Enum.TextXAlignment.Center, frameSize = UDim2.fromOffset(22, 22),
+			})
+			badge.Position = UDim2.fromOffset((i - 1) * 148 + 126, -5)
+			badge.BackgroundTransparency = 0
+			badge.BackgroundColor3 = C.BloodDeep
+			badge.ZIndex = Z + 6
 			badge.Visible = false
 			badge.BorderSizePixel = 0
-			Instance.new("UICorner", badge).CornerRadius = UDim.new(0.5, 0)
+			Theme.corner(badge, Theme.Radius.Small)
+			Theme.stroke(badge, C.Border, Theme.Stroke.Thin)
 			if name == "Daily" then dailyBadge = badge else weeklyBadge = badge end
 
-			local content = Instance.new("ScrollingFrame", panel)
-			content.Size = UDim2.new(1, -20, 1, -106)
-			content.Position = UDim2.new(0, 10, 0, 102)
+			local content = Instance.new("ScrollingFrame", body)
+			content.Name = name .. "Quests"
+			content.Size = UDim2.new(1, 0, 1, -50)
+			content.Position = UDim2.fromOffset(0, 50)
 			content.BackgroundTransparency = 1
 			content.BorderSizePixel = 0
 			content.ScrollBarThickness = 4
-			content.ScrollBarImageColor3 = Color3.fromRGB(150, 100, 30)
+			content.ScrollBarImageColor3 = C.Border
 			content.Visible = (name == "Daily")
-			content.ZIndex = 31
-			content.Parent = panel
+			content.ZIndex = Z + 1
 			tabContents[name] = content
 
 			local layout = Instance.new("UIListLayout", content)
@@ -293,7 +263,6 @@ function QuestsPanel.init(screenGui, deps)
 				content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
 			end)
 
-			btn.MouseButton1Click:Connect(function() switchTab(name) end)
 		end
 		switchTab("Daily")
 	end
