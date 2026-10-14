@@ -42,7 +42,7 @@ local ascendWarning = Instance.new("TextLabel", ascendPanel)
 ascendWarning.Size = UDim2.new(1, -20, 0, 36)
 ascendWarning.Position = UDim2.new(0, 10, 0, 62)
 ascendWarning.BackgroundTransparency = 1
-ascendWarning.Text = "You will lose all your Gold!"
+ascendWarning.Text = "Your Gold is kept until you enter a new realm"
 ascendWarning.TextColor3 = Color3.fromRGB(255, 120, 80)
 ascendWarning.TextScaled = true
 ascendWarning.Font = Enum.Font.GothamBold
@@ -89,7 +89,7 @@ updateAscendPanel = function()
 	local ready = State.gateCleared
 	local head = ready and "The gate has fallen!" or ("Break wall " .. Economy.WALLS_PER_RUN .. " (the gate) to ascend")
 	ascendInfoLbl.Text = head .. "\n" .. unlockText .. "\nUnit damage after ascending: "
-		.. string.format("%.1fx", newMult) .. "\nThe wall and your gold reset"
+		.. string.format("%.1fx", newMult) .. "\nThe walls start over (your Gold stays)"
 	local canAfford = ready
 	ascendConfirmBtn.BackgroundColor3 = canAfford and Color3.fromRGB(140, 60, 10) or Color3.fromRGB(50, 25, 10)
 	ascendConfirmBtn.TextColor3 = canAfford and Color3.fromRGB(255, 230, 150) or Color3.fromRGB(130, 100, 60)

@@ -95,13 +95,19 @@ local function setWallStage(wallPart, stage)
 	end
 end
 
+-- A wall pays Economy.STAGE_GOLD_SHARE of its gold at each damage stage it reaches (a burst of coins on the lane);
+-- the rest when it breaks (breakWall pays the stages it skipped first). plotState.lootStage = the stages paid so far.
+local payStageLoot -- (defined below)
+
 local function updateWallGui(plotState)
 	if not plotState.wall then return end -- the gate has fallen: no wall left
 	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
 	plotState.hpFill.Size = UDim2.new(pct, 0, 1, 0)
 	plotState.hpFill.BackgroundColor3 = FILL_LOW:Lerp(FILL_FULL, pct)
 	plotState.hpText.Text = compact(plotState.wallHP) .. " / " .. compact(plotState.WALL_MAX_HP)
-	setWallStage(plotState.wall, pct <= 0.25 and 3 or pct <= 0.5 and 2 or pct <= 0.75 and 1 or 0)
+	local stage = pct <= 0.25 and 3 or pct <= 0.5 and 2 or pct <= 0.75 and 1 or 0
+	setWallStage(plotState.wall, stage)
+	payStageLoot(plotState, stage)
 	if plotState.layerLbl then
 		plotState.layerLbl.Text = layerText(plotState.wallLayer)
 	end
@@ -276,6 +282,25 @@ local function spawnWall(layer, plotState, rise, riseDelay, riseTime)
 	return wallPart
 end
 
+payStageLoot = function(plotState, upTo)
+	local paid = plotState.lootStage or 0
+	if upTo <= paid then return end
+	plotState.lootStage = upTo
+	for _, p in ipairs(Players:GetPlayers()) do
+		if tostring(p.UserId) == plotState.ownerId then
+			local profile = PlayerData.get(p)
+			if profile then
+				local gold = Economy.wallGold(plotState.wallLayer, profile.rebirthCount)
+					* Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost) * Economy.STAGE_GOLD_SHARE * (upTo - paid)
+				if gold >= 1 then
+					Drops.spawnWallDrops(p, plotState, math.floor(gold), {}, plotState.wallFaceFwd)
+				end
+			end
+			break
+		end
+	end
+end
+
 -- Makes the wall of `layer` the one being fought (HP bar on it, the army's front moves to it)
 local function activateWall(plotState, layer)
 	local wallPart = plotState.wallQueue[layer]
@@ -284,6 +309,7 @@ local function activateWall(plotState, layer)
 	if previewGui then previewGui:Destroy() end
 	buildWallGui(wallPart, plotState)
 	plotState.wall = wallPart
+	plotState.lootStage = 0
 	setFront(plotState, layer)
 end
 
@@ -405,6 +431,7 @@ local function breakWall(plotState)
 	if plotState.wallLayer > NUM_WALLS then return end -- the gate already fell (late arrows, last barrage hits)
 	local brokenLayer = plotState.wallLayer
 	local brokenFaceFwd = plotState.wallFaceFwd -- where the loot bursts out
+	payStageLoot(plotState, 3) -- the stages it went through too fast to pay
 	plotState.wallLayer += 1
 	crumbleWall(plotState.wallQueue[brokenLayer], plotState)
 
@@ -447,7 +474,8 @@ local function breakWall(plotState)
 		plotState.wallHP = 0
 	end
 
-	local goldReward = Economy.wallGold(brokenLayer, ownerRebirths(plotState))
+	-- (the stages already paid 3 x STAGE_GOLD_SHARE of it)
+	local goldReward = Economy.wallGold(brokenLayer, ownerRebirths(plotState)) * (1 - 3 * Economy.STAGE_GOLD_SHARE)
 	for _, p in ipairs(Players:GetPlayers()) do
 		if tostring(p.UserId) == plotState.ownerId then
 			local profile = PlayerData.get(p)

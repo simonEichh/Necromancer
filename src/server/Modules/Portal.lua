@@ -9,10 +9,11 @@ local RunService = game:GetService("RunService")
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local Portal = {}
 
-Portal.REALM_SIZE = 5 -- ascensions per realm (realm 1 = ascensions 0-4, see Design.md "Realms")
+Portal.REALM_SIZE = Economy.ASCENSIONS_PER_REALM -- ascensions per realm (realm 1 = ascensions 0-4)
 Portal.MAX_ASCENSIONS = 9 -- (the game has 9 ascensions so far: no realm after the last one)
 Portal.onPass = nil -- function(player): ascends through the portal (set by Plots)
 

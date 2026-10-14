@@ -186,6 +186,25 @@ spectral choir (the Hollow Choir), the abyss.
 Build order (proposal): wall 1 test model (intact stage) -> its damage stages -> gate wall -> lane look + lava +
 veil -> the Gravekeeper titan -> summoning animation.
 
+### Making the player matter (agreed 2026-10-14, after a playtest)
+
+Playtest verdict: not fun enough yet. The player has nothing to do but watch, gold has no visible impact (graves are
+random, the Forge needs dust), the first pulls are bland, and walls go minutes without any reward. Decisions:
+
+- **Loot at every damage stage** (B): a wall bursts out coins (sometimes dust) at 75 / 50 / 25 %, not only when it
+  breaks.
+- **Gold is kept through the ascensions of a realm** and only reset at the realm change (sim: practically no change in
+  pacing; no friction when ascending; the realm change becomes the big cut). Later the leftover gold is converted into
+  **Souls** at the realm change (a permanent currency).
+- **No run upgrades** (C is dropped): players would not spend gold on something temporary.
+- **Necromancer spells** (A, next big feature): 3-4 spells with cooldowns cast in the lane (Raise Dead: skeletons fight
+  for 20 s; Curse: the wall takes +50 % for 10 s; Soul Surge: faster attacks), upgraded **permanently with gold** on a
+  growing cost curve: the main gold sink, visible and felt.
+- **A better start** (D): a guaranteed Rare (or the first Signature) in the first pulls.
+- **Items, later** (after spells and Souls): staff (shapes the spells), robe (small passive + looks), familiars (the Soul
+  Wisp becomes the first; others collect differently or carry a small buff). From the Souls shop / bosses / later
+  cosmetics for Robux; NOT a second gacha; small stats, big looks.
+
 ### Monetization
 
 | Idea | Fit | Impact | Effort | Risk | Score | Notes |

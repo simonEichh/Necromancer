@@ -172,7 +172,7 @@ PRESETS["income"] = dict(
 
 # "four" preset: like "income", but a run is 4 walls (the 4th is the gate); each stands for 8 of the old 32 layers
 # (their HP, gold and dust added up). In game every wall shows 4 damage stages.
-PRESETS["four"] = dict(PRESETS["income"], gate=dict(walls=4, hp_mult=1.5, group=8))
+PRESETS["four"] = dict(PRESETS["income"], gate=dict(walls=4, hp_mult=1.5, group=8), realm_size=5)
 
 # Pace targets in ACTIVE minutes per stage (my proposal; the user agreed): ascension k takes this long after the previous one.
 TARGETS = {1: (10, 15), 2: (20, 40), 3: (20, 40), 4: (20, 40), 5: (60, 180), 6: (60, 180), 7: (60, 180), 8: (180, 1440), 9: (180, 1440)}
@@ -247,7 +247,9 @@ class Player:
                 self.drop_materials(sub + 1)
 
     def do_ascend(self):
-        self.gold = 0
+        keep = self.R.get("realm_size")  # gold is kept through the ascensions of a realm (reset when a new realm starts)
+        if not keep or (self.r + 1) % keep == 0:
+            self.gold = 0
         self.stage_from.append(dict(self.gold_from))
         self.gold_from = {k: 0.0 for k in self.gold_from}
         self.r += 1

@@ -25,6 +25,12 @@ Economy.WALLS_PER_RUN = 4 -- the 4th wall of a run is the gate: breaking it unlo
 -- Each wall stands for LAYERS_PER_WALL of the old 32 thin walls ("sub-layers"): its HP, gold and dust are theirs added
 -- up, so the pacing of the old design is kept (sim preset "four"). Every wall shows 4 damage stages in game.
 Economy.LAYERS_PER_WALL = 8
+-- A wall pays part of its gold at each damage stage (75 / 50 / 25 % HP: 3 stages), the rest when it breaks; the total
+-- is unchanged (Walls.payStageLoot)
+Economy.STAGE_GOLD_SHARE = 0.15
+-- Ascensions are grouped into realms (Design.md "Realms"): gold is kept through the ascensions of a realm and only
+-- reset when a new realm starts (PlayerData.ascend); the portal behind the gate counts them (server Portal)
+Economy.ASCENSIONS_PER_REALM = 5
 local GATE_HP_MULT = 1.5
 
 function Economy.isGate(layer)

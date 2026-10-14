@@ -447,8 +447,11 @@ function PlayerData.ascend(player)
 		return nil -- ascending needs the gate (the last wall of the run) to be broken
 	end
 	profile.gateCleared = false
-	profile.gold = 0
 	profile.rebirthCount += 1
+	-- gold is kept through the ascensions of a realm; a new realm starts from zero
+	if profile.rebirthCount % Economy.ASCENSIONS_PER_REALM == 0 then
+		profile.gold = 0
+	end
 	PlayerData.changed(player)
 	return profile.rebirthCount
 end
