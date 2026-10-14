@@ -72,10 +72,6 @@ Remotes.BuyCatalyst.OnServerEvent:Connect(function(player, key, qty)
 	if not info then
 		return
 	end
-	if not ShopNpcs.nearForge(player) then
-		Remotes.Notice:FireClient(player, "Visit the Forge to buy catalysts.")
-		return
-	end
 	local amount = math.min(math.floor(qty), 10, math.floor(profile.gems / info.price))
 	if amount <= 0 then
 		Remotes.Notice:FireClient(player, "Not enough Gems (" .. info.price .. " needed).")

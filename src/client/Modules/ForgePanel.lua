@@ -619,7 +619,7 @@ task.spawn(function()
 			local anchor = shops and shops:FindFirstChild("ForgeKeeper")
 			local character = Players.LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if anchor and root and (root.Position - anchor.Position).Magnitude > FORGE_RANGE then
+			if anchor and root and not State.remoteForge and (root.Position - anchor.Position).Magnitude > FORGE_RANGE then
 				panel.Visible = false
 			end
 		end

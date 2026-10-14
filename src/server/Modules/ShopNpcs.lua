@@ -1,12 +1,17 @@
 -- Shopkeeper prompts (Buy / Sell / Upgrade). The anchor parts in Workspace.Shops are invisible and sit on the
 -- stall counters built by tools/studio/build_hub.lua (the stalls carry their own signs).
 local Remotes = require(script.Parent.Remotes)
+local PlayerData = require(script.Parent.PlayerData)
 
 local ShopNpcs = {}
 local FORGE_RANGE = 25 -- studs from the Forge anvil within which the Forge works
 
--- True when the player stands at the Forge stall (upgrading and buying dust only work there).
+-- True when the player stands at the Forge stall (upgrading and buying dust only work there), or owns the Remote Forge.
 function ShopNpcs.nearForge(player)
+	local profile = PlayerData.get(player)
+	if profile and profile.remoteForge then
+		return true -- bought the Remote Forge (Gem Shop)
+	end
 	local shops = workspace:FindFirstChild("Shops")
 	local anchor = shops and shops:FindFirstChild("ForgeKeeper")
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")

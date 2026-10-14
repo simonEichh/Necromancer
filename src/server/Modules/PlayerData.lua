@@ -45,6 +45,8 @@ function PlayerData.create(player, saved)
 		upgrades = { luckBoost = 0, coinBoost = 0 },
 		wallsBroken = 0, -- walls ever broken (the first objective: Drops.COLLECTOR_WALLS earns the Soul Wisp)
 		collector = false, -- has the Soul Wisp (collects the loot drops, see Drops)
+		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
+		remoteForge = false, -- bought the Remote Forge (Gem Shop): the Forge works anywhere
 		saved = saved, -- raw saved data, for modules that restore their own state
 		syncQueued = false,
 		dirty = false,
@@ -57,6 +59,8 @@ function PlayerData.create(player, saved)
 		profile.rebirthCount = math.floor(clampNumber(saved.rebirthCount, 0, 0))
 		profile.wallsBroken = math.floor(clampNumber(saved.wallsBroken, 0, 0))
 		profile.collector = saved.collector == true
+		profile.wispLevel = math.floor(clampNumber(saved.wispLevel, 0, 0))
+		profile.remoteForge = saved.remoteForge == true
 
 		if type(saved.ownedGraves) == "table" then
 			for key in pairs(profile.ownedGraves) do
@@ -164,6 +168,8 @@ function PlayerData.snapshot(profile)
 		materials = materials,
 		wallsBroken = profile.wallsBroken,
 		collector = profile.collector,
+		wispLevel = profile.wispLevel,
+		remoteForge = profile.remoteForge,
 		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}
 end

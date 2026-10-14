@@ -65,6 +65,8 @@ local function collect(player, profile)
 		catalysts = snapshot.catalysts,
 		wallsBroken = profile.wallsBroken,
 		collector = profile.collector,
+		wispLevel = profile.wispLevel,
+		remoteForge = profile.remoteForge,
 		placed = placed,
 		pity = Rolling.exportPity(player),
 		wheelSpins = Wheel.getWheelData(player).spins,

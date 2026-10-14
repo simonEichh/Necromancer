@@ -163,6 +163,20 @@ Economy.CATALYST_INFO = {
 }
 Economy.FORTUNE_BONUS = 0.25
 
+-- The Gem Shop (HUD Shop tile, usable anywhere; server GemShop): catalysts (above), Remote Forge (the Forge opens
+-- anywhere, one-time) and Soul Wisp speed levels.
+Economy.REMOTE_FORGE_PRICE = 250
+Economy.WISP_MAX_LEVEL = 5
+function Economy.wispLevelPrice(level) -- gems to go from `level` to level + 1: 40, 80, 160, 320, 640
+	return 40 * 2 ^ level
+end
+function Economy.wispSpeed(level) -- studs per second: 14 at level 0, +30 % per level (35 at level 5)
+	return 14 * (1 + 0.3 * level)
+end
+function Economy.wispPause(level) -- seconds the wisp lingers after each pick-up
+	return 0.5 * (1 - 0.12 * level)
+end
+
 -- The dust shop (Buy Dust tab at the Forge, stock rotates with the grave shop every 5 minutes; sim preset "dust").
 -- A dust is on sale from the ascension at which walls start dropping it (dust index d: 1 = Stone ... 5 = Star).
 Economy.DUST_SHOP_STOCK = 10 -- of each dust per restock

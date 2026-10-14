@@ -16,6 +16,7 @@ local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotFrame = require(script.Parent.PlotFrame)
 local PlotRegistry = require(script.Parent.PlotRegistry)
+local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local Drops = {}
 
@@ -229,14 +230,14 @@ local function updateWisp(player, s, dt)
 	local goal = s.wispTarget and (s.wispTarget.pos + Vector3.new(0, 0.5, 0)) or rest
 	local pos = s.wisp.Position
 	local delta = goal - pos
-	local step = WISP_SPEED * dt
+	local step = Economy.wispSpeed(profile.wispLevel or 0) * dt -- (Gem Shop levels; WISP_SPEED is level 0)
 	if delta.Magnitude <= step then
 		pos = goal
 		if s.wispTarget then
 			for i, drop in ipairs(s.list) do
 				if drop == s.wispTarget then
 					collect(player, s, i, "wisp")
-					s.pauseUntil = os.clock() + WISP_PAUSE
+					s.pauseUntil = os.clock() + Economy.wispPause(profile.wispLevel or 0)
 					break
 				end
 			end

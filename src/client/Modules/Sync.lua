@@ -33,6 +33,8 @@ local function apply(snap)
 	State.gateCleared = snap.gateCleared == true
 	State.wallsBroken = snap.wallsBroken or 0
 	State.collector = snap.collector == true
+	State.wispLevel = snap.wispLevel or 0
+	State.remoteForge = snap.remoteForge == true
 	State.goldMultiplier = snap.goldMultiplier
 	State.luckBoostLevel = snap.luckBoostLevel
 	State.coinBoostLevel = snap.coinBoostLevel
