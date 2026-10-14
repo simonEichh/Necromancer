@@ -124,7 +124,54 @@ entity conjures the next one ahead of the army. This also removes the stacked-sl
    Default orange-red for now; later the lava colour may change per ascension. Touching it sends the player back to
    their plot with a short burn effect (no death).
 
+**Wall shape** (agreed): the wall must envelop the road, not stand on it like a slab. A crescent bending towards the
+army, about 70-80 studs wide against the 40-stud lane, tallest in the middle where the army fights; the wings curve
+forward on both sides and step down at the ends into pillars / rubble / spikes that run out into the hazard. Damage
+stages crack from the middle outwards, the wings break last.
+
 Next step when we start: one wall type with its damage stages as a test model, the user judges the look first.
+
+### Realms (agreed 2026-10-14)
+
+Ascensions are grouped into **realms**: realm 1 = ascensions 0-4, realm 2 = 5-9, and so on, open-ended (many more
+ascensions later without a new theme for every one). Each realm transforms the player's lane: its own entity, wall
+style, lane look and hazard. Inside a realm each ascension varies the details (more wear, ornaments, lava colour).
+Everyone in the server sees how far each player has come.
+
+**Several realms in one lobby:** every plot owns a wedge of the arena (its lane plus the land halfway to the
+neighbouring lanes); the realm only changes that wedge. A **realm veil** (tall shimmering curtain of ghostly mist with
+drifting runes) stands on the line exactly between two lanes, from the plaza edge to the outer wall; hazards stop at
+the veil. Walking through a veil into another player's realm slightly changes your own screen tint (client only).
+
+**The entity is a titan behind the outer wall** (the user's idea, like the Colossal Titan): behind every occupied
+lane the realm's entity stands outside the outer ring, ~150-200 studs tall, upper body over the wall (~70 high),
+leaning on it and looking down into the lane. Its hands move slowly (resting on the battlements, pointing, weaving);
+when a new wall is needed it summons it: threads of light from its fingers down into the lane, the wall grows out of
+the ground. When the gate falls it reels back / roars; after ascending into a new realm the next titan takes its
+place. Low-poly (~300-400 parts), client-animated like the units, must stay loaded from afar (streaming persistent).
+Several titans around the coliseum = a strong image for clips.
+
+#### Realm 1: The Forgotten Cemetery (approved draft)
+
+- **Entity: the Gravekeeper.** A colossal hooded sexton as the titan: stooped, pale bony hands, a huge lantern hanging
+  from one hand above the lane (green-gold light), the other hand weaving the walls.
+- **Walls 1-3: cemetery walls in a crescent.** Mossy fieldstone with a spiked iron fence on top (~20 high in the
+  middle); the wings carry crooked tombstones, dead trees, roots through the stone, and end in buttress pillars with
+  hanging lanterns, then rubble into the lava. Damage stages: 1 fence bends, tombstones topple; 2 cracks with green
+  soul light; 3 the middle caves in, lanterns fall; 4 collapse to rubble, wings last.
+- **Wall 4, the realm's gate:** a mausoleum wall with a heavy iron double gate, chains and a stone angel on top;
+  bigger and taller.
+- **Lane look:** dirt path with broken cobblestones, low ground fog, crooked lamp posts, a few graves at the edges,
+  dead trees on the wings.
+- **Hazard:** orange-red lava next to the lane (colour may shift per ascension or realm later).
+- **Colours:** moss green, grey fieldstone, rusty iron, warm lantern gold, green soul light (matches the plots and the
+  Mossy grave).
+
+Later realms escalate, e.g. the cathedral (the Last Saint), the golden threshold of the living (the Warden), the
+spectral choir (the Hollow Choir), the abyss.
+
+Build order (proposal): wall 1 test model (intact stage) -> its damage stages -> gate wall -> lane look + lava +
+veil -> the Gravekeeper titan -> summoning animation.
 
 ### Monetization
 

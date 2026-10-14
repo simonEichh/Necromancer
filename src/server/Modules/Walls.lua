@@ -2,6 +2,8 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local CollectionService = game:GetService("CollectionService")
+local ServerStorage = game:GetService("ServerStorage")
 local Remotes = require(script.Parent.Remotes)
 local Collision = require(script.Parent.Collision)
 local PlotFrame = require(script.Parent.PlotFrame)
@@ -72,12 +74,32 @@ local function layerText(layer)
 	return "LAYER " .. layer
 end
 
+-- The realm's wall model (ServerStorage.WallModels, built by tools/studio/build_wall_cemetery.lua). The wall part stays
+-- as the invisible collider and the model is cloned into it as "WallModel". The gate keeps the plain slab until its own
+-- model exists.
+local WALL_MODEL_GUI_LIFT = 8 -- the model is taller than the slab (fence, cross): lift the HP bar and the tag
+local function wallModelFor(layer)
+	local models = ServerStorage:FindFirstChild("WallModels")
+	if Economy.isGate(layer) or not models then return nil end
+	return models:FindFirstChild("Cemetery")
+end
+
+-- Damage stage of a modelled wall from its HP (0 intact, 1 at 75 %, 2 at 50 %, 3 at 25 %; 4 = collapse when it breaks).
+-- Only ever goes up (the wall regenerates a little, the cracks stay). The client animates it (Modules/WallStages).
+local function setWallStage(wallPart, stage)
+	local m = wallPart and wallPart:FindFirstChild("WallModel")
+	if m and stage > (m:GetAttribute("Stage") or 0) then
+		m:SetAttribute("Stage", stage)
+	end
+end
+
 local function updateWallGui(plotState)
 	if not plotState.wall then return end -- the gate has fallen: no wall left
 	local pct = math.clamp(plotState.wallHP / plotState.WALL_MAX_HP, 0, 1)
 	plotState.hpFill.Size = UDim2.new(pct, 0, 1, 0)
 	plotState.hpFill.BackgroundColor3 = FILL_LOW:Lerp(FILL_FULL, pct)
 	plotState.hpText.Text = compact(plotState.wallHP) .. " / " .. compact(plotState.WALL_MAX_HP)
+	setWallStage(plotState.wall, pct <= 0.25 and 3 or pct <= 0.5 and 2 or pct <= 0.75 and 1 or 0)
 	if plotState.layerLbl then
 		plotState.layerLbl.Text = layerText(plotState.wallLayer)
 	end
@@ -93,7 +115,7 @@ local BAR_BONE = Color3.fromRGB(222, 214, 190)
 local function buildWallGui(wallPart, plotState)
 	local gui = Instance.new("BillboardGui", wallPart)
 	gui.Size = UDim2.new(0, 320, 0, 74)
-	gui.StudsOffset = Vector3.new(0, 14, 0)
+	gui.StudsOffset = Vector3.new(0, wallPart:FindFirstChild("WallModel") and 14 + WALL_MODEL_GUI_LIFT or 14, 0)
 	gui.AlwaysOnTop = true
 
 	local layerLbl = Instance.new("TextLabel", gui)
@@ -189,13 +211,30 @@ local function spawnWall(layer, plotState)
 	wallPart.Anchored = true
 	wallPart.Color = gate and GATE_COLOR or LAYER_COLORS[((layer - 1) % #LAYER_COLORS) + 1]
 	wallPart.Material = gate and Enum.Material.Brick or WALL_MATERIALS[(layer % #WALL_MATERIALS) + 1]
+	local template = wallModelFor(layer)
+	if template then
+		wallPart.Transparency = 1
+		local m = template:Clone()
+		m.Name = "WallModel"
+		m:SetAttribute("Stage", 0)
+		-- the model's front (-Z) faces back up the lane, towards the army
+		m:PivotTo(CFrame.new(PlotFrame.toWorld(plotState, 0, wallFwdOf(layer))) * PlotFrame.rotation(plotState) * CFrame.Angles(0, math.pi, 0))
+		for _, d in ipairs(m:GetDescendants()) do
+			if d:IsA("BasePart") and d.CanCollide then
+				d.CollisionGroup = Collision.DECOR -- the earth bank: players stand on it, units ignore its ledge
+			end
+		end
+		CollectionService:AddTag(m, "StagedWall")
+		m.Parent = wallPart
+		height += WALL_MODEL_GUI_LIFT
+	end
 	wallPart.Parent = workspace
 
 	-- small "Wall N" tag above the wall (sized in studs, so it shrinks with distance); only the gate is visible from afar
 	local gui = Instance.new("BillboardGui", wallPart)
 	gui.Name = "PreviewGui"
 	gui.Size = UDim2.new(12, 0, 3, 0)
-	gui.StudsOffset = Vector3.new(0, height / 2 + 3, 0)
+	gui.StudsOffset = Vector3.new(0, (template and height - WALL_MODEL_GUI_LIFT or height) / 2 + 3 + (template and WALL_MODEL_GUI_LIFT or 0), 0)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = gate and 400 or 60
 	local lbl = Instance.new("TextLabel", gui)
@@ -272,6 +311,16 @@ end
 -- A broken wall flashes, fades out and throws a few chunks of itself away from the units
 local function crumbleWall(wall, plotState)
 	local frame = plotState.frame
+	local m = wall:FindFirstChild("WallModel")
+	if m then
+		-- the clients bring it down (Modules/WallStages, stage 4); the collider stops blocking right away
+		m:SetAttribute("Stage", 4)
+		wall.CanCollide = false
+		local gui = wall:FindFirstChildOfClass("BillboardGui")
+		if gui then gui:Destroy() end
+		Debris:AddItem(wall, 3)
+		return
+	end
 	for _ = 1, 10 do
 		local size = math.random(10, 30) / 10
 		local chunk = Instance.new("Part")
