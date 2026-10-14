@@ -57,6 +57,7 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 		local unitType = rollUnit(rarity)
 		local oneIn = getBaseOneIn(unitType)
 		PlayerData.addUnit(player, unitType, oneIn)
+		PlayerData.recordPull(player, unitType) -- (the Codex)
 
 		table.insert(results, { unitType = unitType, rarity = rarity, pity = getPity(player, graveType), oneIn = oneIn })
 		print("🪦 " .. player.Name .. " dug up: " .. unitType .. " (" .. rarity .. ")")

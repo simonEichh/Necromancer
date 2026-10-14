@@ -10,6 +10,8 @@
 --   ritual.absorb(a, unit)              every frame of the absorb, a = 0..1: the grimoire opens at the left hand, the unit
 --                                       shrinks into a stream of soul light flying into it, the book snaps shut.
 --                                       Returns true on the frame the unit vanished (the caller can flash).
+--   ritual.placeBook(open, shown, at?)  just the grimoire (the Codex holds it up to read at `at`); returns the point above
+--                                       the pages and the spine's CFrame
 --   ritual.restore()                    removes everything put into the character (call when the cinematic ends)
 --
 -- The arms are posed with IKControls (R15 only; the joints of current avatars cannot be changed directly), so R6
@@ -238,10 +240,11 @@ function NecroRitual.new(opts)
 		return tome
 	end
 	-- places the grimoire in front of the left hand (open 0..1: covers from shut to flat; shown 0..1); returns the point
-	-- above its pages
-	local function placeBook(open, shown)
+	-- above its pages and the spine's CFrame (pages face its UpVector, the top of the spread is its LookVector)
+	local function placeBook(open, shown, at)
 		local tome = book()
-		local hinge = hrp.CFrame * CFrame.new(-0.9, 0.6, -2.4) * CFrame.Angles(math.rad(-30), 0, 0) -- (tilted to the camera)
+		-- (default: in front of the left hand, tilted to the camera; `at` places it elsewhere, e.g. held up to read)
+		local hinge = at or (hrp.CFrame * CFrame.new(-0.9, 0.6, -2.4) * CFrame.Angles(math.rad(-30), 0, 0))
 		local angle = math.rad(85) * (1 - open)
 		tome.spine.CFrame = hinge
 		tome.left.CFrame = hinge * CFrame.Angles(0, 0, angle) * CFrame.new(-0.7, 0, 0)
@@ -253,8 +256,9 @@ function NecroRitual.new(opts)
 		end
 		tome.light.Brightness = 4 * open
 		MagicCircle.place(tome.circle, hinge * CFrame.new(0, -0.6, 0) * CFrame.Angles(0, os.clock() * 1.5, 0), 0.6 + 0.4 * shown, 1 - 0.8 * shown * open)
-		return hinge.Position + hinge.UpVector * 0.4
+		return hinge.Position + hinge.UpVector * 0.4, hinge
 	end
+	r.placeBook = placeBook -- (the Codex reads in the same grimoire)
 
 	function r.absorb(a, unit)
 		r.update(0, 0)

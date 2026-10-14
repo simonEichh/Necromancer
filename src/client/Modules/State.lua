@@ -36,6 +36,7 @@ local State = {
 	luckBoostLevel = 0,
 	coinBoostLevel = 0,
 	realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level (kept through a realm)
+	codex = {}, -- [unitType] = how many the player has ever pulled (the Codex)
 
 	-- Wheel
 	wheelSpins = 0,

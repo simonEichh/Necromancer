@@ -44,6 +44,7 @@ function PlayerData.create(player, saved)
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
 		realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level; kept through a realm's ascensions, reset with the gold
+		codex = {}, -- [unitType] = how many the player has ever pulled (the Codex; discovered = in this table)
 		wallsBroken = 0, -- walls ever broken (the first objective: Drops.COLLECTOR_WALLS earns the Soul Wisp)
 		collector = false, -- has the Soul Wisp (collects the loot drops, see Drops)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
@@ -126,8 +127,35 @@ function PlayerData.create(player, saved)
 		end
 	end
 
+	-- the Codex: saved counts, plus everything the player owns now (older saves had no codex)
+	if type(saved) == "table" and type(saved.codex) == "table" then
+		for unitType, n in pairs(saved.codex) do
+			if Units.Stats[unitType] then
+				profile.codex[unitType] = math.floor(clampNumber(n, 1, 1))
+			end
+		end
+	end
+	for _, unit in pairs(profile.inventory) do
+		profile.codex[unit.unitType] = math.max(profile.codex[unit.unitType] or 0, 1)
+	end
+	if type(saved) == "table" and type(saved.placed) == "table" then
+		for _, p in ipairs(saved.placed) do
+			if type(p) == "table" and Units.Stats[p.unitType] then
+				profile.codex[p.unitType] = math.max(profile.codex[p.unitType] or 0, 1)
+			end
+		end
+	end
+
 	profiles[player.UserId] = profile
 	return profile
+end
+
+-- The Codex: one more of `unitType` pulled (Digging)
+function PlayerData.recordPull(player, unitType)
+	local profile = profiles[player.UserId]
+	if profile and Units.Stats[unitType] then
+		profile.codex[unitType] = (profile.codex[unitType] or 0) + 1
+	end
 end
 
 function PlayerData.get(player)
@@ -173,6 +201,7 @@ function PlayerData.snapshot(profile)
 		luckBoostLevel = profile.upgrades.luckBoost,
 		coinBoostLevel = profile.upgrades.coinBoost,
 		realmUpgrades = table.clone(profile.realmUpgrades),
+		codex = table.clone(profile.codex),
 		inventory = inventory,
 		materials = materials,
 		wallsBroken = profile.wallsBroken,

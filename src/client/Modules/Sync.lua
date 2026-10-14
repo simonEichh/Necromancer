@@ -39,6 +39,7 @@ local function apply(snap)
 	State.luckBoostLevel = snap.luckBoostLevel
 	State.coinBoostLevel = snap.coinBoostLevel
 	State.realmUpgrades = snap.realmUpgrades or {}
+	State.codex = snap.codex or {}
 
 	-- Other modules hold references to these tables, so update them in place
 	for graveType in pairs(State.ownedGraves) do
