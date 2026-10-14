@@ -340,7 +340,7 @@ local RARITY_UNITS = {
 	},
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
-		{ unit = "Sigilwright", weight = 1 },
+		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
 	},
 }
 
