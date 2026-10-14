@@ -27,6 +27,7 @@ Roblox idle/gacha game ("Necro Buddies"). Players buy and dig graves to roll und
 - `Workspace.OuterWall`: the fortress ring around the whole arena (inner radius 392, 12 thick, ~70 high; 8 gate towers on the lane axes with a glowing emblem and plot number, 8 round mid-towers with braziers, sconces). Built by `tools/studio/build_ring.lua` (safe to re-run, ~900 parts). **The lane floor in `Walls.lua` runs from `LANE_START_FWD` 24 (edge of the plot Base) to `LANE_END_FWD` 308 and is tied to this radius**: lanes end exactly at the gate towers (plot centre at radius 84 + 308 = 392). If you move the ring update `LANE_END_FWD` and `GATE_FWD` (the last wall must stand just in front of the gate tower).
 - **Realm titan (the Gravekeeper)**: `tools/studio/build_titan_gravekeeper.lua` -> `ServerStorage.TitanModels.Gravekeeper` (place file only; from `Images/Entity/...png`; built at 1/12 in design units and scaled; ~175 parts; anchored invisible `HumanoidRootPart` at the hips, bone parts on Motor6Ds Waist/Neck/R+LShoulder/Elbow/Wrist/every finger (`R/LFinger<n>a/b`, thumbs)/Lantern with the pose baked into C0/C1 (the baked pose has the LEFT hand raised = the weave pose); pivot = his feet via `root.PivotOffset` (WorldPivot is ignored with a PrimaryPart); attributes `WallTop`/`WallBack`). Server `Modules/Titans` places one behind every claimed plot's lane (`Titan_<plotIndex>`, sunk in the sea beside the gate tower at `LATERAL` -66, turned 12 degrees to the lane; tag `RealmTitan`; attributes `OwnerId`, `Focus` (the front wall, updated by `Walls.setFront`), `LaneEnd`/`LaneBack`/`LaneLength`); removed when the player leaves. The 8 round mid-towers of the outer ring were removed for his arm (`build_ring.lua` `MID_TOWERS = false`). Client `Modules/TitanAnimator` animates through Motor6D.Transform, slow and heavy (`JOINT_LAG`: torso leads, arms trail; the joints of one arm share a lag): idle = both hands on the battlements (the left arm pose is computed once by `makePoses` from `L_ELBOW_REST`/`L_WRIST_REST`), head follows `Focus`. **Summon**: `Walls.breakWall` sets `SummonAt`/`SummonKind` ("SlamWeave", or "Slam" when the gate fell) unless he is still busy (`titanBusyUntil`, then the wall just rises): he gathers himself (eyes turn red), slams both hands on the wall at `TITAN_IMPACT` 3.1 s (chunks, dust, camera shake for the owner only), a tremor crack runs down the lane (`TREMOR_SPEED` 140) and stuns the army (`plotState.stun`; `Army` stops units the tremor reached and sets `StunFrom`/`StunUntil` on their models; client `Modules/StunFx` draws rune rings sized to the bounding box, `UnitAnimator` freezes them) until the next wall stands; he weaves it with glowing green threads while it rises (`TITAN_WEAVE_RISE` 5.6 s, `TITAN_RISE_TIME` 3.2 s; `spawnWall(..., riseDelay, riseTime)`). When the GATE falls it is his **defeat** (`SummonKind` "Defeat", always played, he stays down: `HOLD_END`): he rears back, reaches over the lane while his eyes go out, lifts his hands off the wall and sinks down and back behind it (the `Sink` pose value: a translation in the Waist Transform, `sinkDir`), the lantern falls into the arena and goes out (`lanternOnGround` sets the Lantern joint's Transform to a world spot). `Walls.resetWall` (ascending) plays "Return" (`TITAN_RETURN` 7.6 s): the raised hands come over the wall first, then the head, the lantern is pulled back up, the hands are lowered slowly onto the battlements. Known: the resting right hand's fingers still dip slightly into the wall (to fix with the outer wall rework). Timing constants live in both Walls.lua and TitanAnimator.lua: keep them in sync. The model got a detail pass (274 parts: gravestone over the right shoulder, tiered cloak, hood glow + smoke, knuckles, ornate lantern).
 - **The portal behind the gate**: server `Modules/Portal`: when the gate falls (`Walls.breakWall`) the lane's gate tower (`OuterWall...GateTower<plotIndex>`) gets attributes `PortalOpen`, `OpenAt`, `OwnerId`, `RealmSize` (`Portal.REALM_SIZE` 5 ascensions per realm), `RealmDone`, `Remaining`, `Ready`; anyone who steps in front of it (12 studs) is thrown back (`RejectAt`, Notice) unless it is the owner and `Ready` (the realm's last ascension, below `MAX_ASCENSIONS` 9): then walking through ascends (`Portal.onPass` = `Plots.ascendPlayer`, which the Ascend button also uses). Closed on ascension (`Walls.resetWall`) and when the player leaves. Client `Modules/PortalFx`: the tower's `GateDoor` bursts outwards and falls flat, a 20 x 30 arched portal (in front of the tower's plinth) with a swirl, five rune stones (lit = done in this realm, the next pulses, all gold when Ready), the text "THE WAY OPENS IN N ASCENSIONS" / "THE WAY IS OPEN", a red flare and shockwave on rejection. Only realm 1 exists: passing the portal is a normal ascension for now.
+- **Grave layout and plot look**: `GraveSpot1..10` stand in two rows of 5 along the plot's sides (lateral +-13, forward 14 / 6 / -2 / -10 / -18; `tools/studio/layout_graves.lua`, place file), slots fill closest to the lane first alternating left/right, the tombstones face the free middle path (`Plots.addGraveSlot`). A claimed plot gets its realm's look (server `Modules/PlotLook`, `ServerStorage.LaneModels.CemeteryPlot` from `tools/studio/build_plot_cemetery.lua`, ~286 parts: dirt Base, grass under the graves, a flagstone path that runs on into the lane, fieldstone side walls with an iron fence (Decor group: players kept on the plot), a cemetery gate with lanterns and the plot number at the plaza entrance); the neutral Style parts it replaces (attribute `Hides`) are hidden meanwhile and restored when the player leaves. Empty plots stay neutral grey stone, so the cut to the realm sits at the plot's gate.
 - **Lane look (Realm 1)**: `tools/studio/build_lane_cemetery.lua` -> `ServerStorage.LaneModels.Cemetery` (~400 parts, place file only): broken flagstones without collision, ragged dirt shoulders (players stand on them, `Decor` group) sloping into the lava, crooked lamp posts, graves, dead trees, low white fog; decor keeps clear of the wall spots. `Walls.initWallQueue` clones it onto every lane (`LaneDecor_<plotIndex>`, pivoted to the plot frame), recolours the lane floor (attributes `FloorColor`/`FloorMaterial`) and leaves out the low side walls (only lanes without a lane model get them).
 - Plot styling: `tools/studio/style_plots.lua` (safe to re-run) adds a `Style` folder to each Plot model (side walls, grass/mud under the graves, glowing spawn rune, entrance arch with the plot number) and recolours the Base. The lane floor, the lane side walls and the wall tints/materials are created at runtime in `Walls.lua` (constants `LANE_*`, `LAYER_COLORS`). Palette: dark stone (58,60,72)/(88,91,106)/(122,126,142), moss green, glow green (120,255,190), warm lamp (255,190,110).
 - `Workspace.HubDecor`: plaza inlays, central monument + beacon, 8 gate paths, rim wall, lamp posts (also on every plot's corners) and the three shop stalls (facing the monument). Workspace attribute `HubSpawn` is where the travel tile's Shops teleports players.
@@ -201,24 +202,43 @@ The user dropped the unicorn idea (2026-10-13). Its build script `tools/studio/b
 
 ## Next steps (backlog, in the order we discussed)
 
-### Open items from the 2026-10-13 session (do these first)
+### State at the end of the 2026-10-14 session (read `Design.md` too: identity, realms, every idea rated)
 
-- **Not yet tested in game:** buying the Remote Forge (the test save had only 90 gems: earn gems or add a DEV "give gems"
-  button), the faster Soul Wisp actually flying, clicking the Forge catalyst chips (the toggles were only sent to the server),
-  a failed upgrade with a Warding Catalyst, the star summon and the Graves-panel cards with the new graves (tiers 3-10),
-  tall units walking / hopping out of graves, the narrowed Void-summon sky circle, the sold-out "Buy 10" label.
-- **Postponed by the user** (do not start unprompted): StarSummon / SignatureDescent support for the new opening styles
-  (the Descent has no hop-out or walk-out, neither has the Void beam summon), more opening effects for higher tiers,
-  the sound pass (only `rumble` is wired; slots in `sounds/README.md`).
-- **Sounds:** the user drops originals in `sounds/_source/` (or a folder); prepare with `tools/audio/prep_sound.py`, upload
-  with `tools/audio/upload_sound.py` (Open Cloud key in `tools/audio/.roblox_api_key`, git-ignored; the key was pasted
-  in chat once: remind the user to revoke it and make a new one when the sound work is done). Waiting:
-  `sounds/impacts/burst_earth_small.wav` (not prepared yet).
-- **Icons to paint:** Shop (Gem Shop tile, uses the Gems icon now), Forge (Remote Forge tile, uses the Gold Dust icon now).
-- **Before publishing:** save the place, delete `Workspace.GravePreview`, run `publish_unit_models.lua` if unit models changed.
-- **Watch:** the grave stall has ~2400 parts since the shelf minis (trim the minis if phones lag).
-- **User's own uncommitted files:** `Unit ideas.txt`, a changed `Images/Graves/celestial.png` (leave them alone).
+Built this session (all committed): hit income with coin drops per unit and the HUD "+X/s" (measured `GoldRate`);
+4 walls per run; Realm 1 "The Forgotten Cemetery": cemetery walls + mausoleum gate with damage stages, walls rise one at a
+time, lava sea, cemetery lane, cemetery plot look with the new grave layout; the Gravekeeper titan (slam + tremor stun +
+weave, defeat at the gate, return after ascending); the portal behind the gate (realm progress runes, rejection, walking
+through ascends at a realm's last ascension); coin bursts at every wall damage stage; gold kept through a realm; realm
+upgrades + the Upgrades panel (old UpgradePanel removed).
 
+**Next, in this order (agreed after the 2026-10-14 playtest: "not fun enough yet, the player only watches"):**
+1. **Necromancer spells** (the next big feature, design it WITH the user first): 3-4 spells with cooldowns cast in the
+   lane (ideas: Raise Dead, Curse, Soul Surge), upgraded permanently with gold on a growing cost curve. See Design.md
+   "Making the player matter".
+2. **A better start:** a guaranteed Rare (or the planned first early Signature unit) in the first pulls.
+3. A real playtest of the new pacing with a normal army (the sim does not model the ~9 s titan stun per wall).
+4. Later: Souls (leftover gold converted at the realm change), items (staff / robe / familiars, from Souls, not a
+   gacha), the realm veil (only when realm 2 exists), realm 2 "the Cathedral", the social layer from Design.md
+   (rare-pull broadcast, server luck, world boss = the Shroud Weaver).
+
+**Known issues / small things:**
+- The titan's resting right hand: its fingers dip slightly into the outer wall (fix with an outer wall rework).
+- Icons are placeholders: the Upgrades tile and its cards, Shop (Gems icon), Forge (Gold Dust icon).
+- The victory moment when the gate falls is on hold (user's call).
+- Not tested in game from earlier: buying the Remote Forge, the Forge catalyst chips, a Warding Catalyst on a failed
+  upgrade, tall units leaving graves, the narrowed Void-summon circle.
+- **Postponed by the user** (do not start unprompted): StarSummon / SignatureDescent support for the new grave opening
+  styles, more opening effects for higher tiers, the sound pass (only `rumble` is wired; slots in `sounds/README.md`).
+- **Sounds:** originals go to `sounds/_source/`; `tools/audio/prep_sound.py` + `upload_sound.py` (Open Cloud key in
+  `tools/audio/.roblox_api_key`, git-ignored; it was pasted in chat once: remind the user to revoke it when the sound
+  work is done). Waiting: `sounds/impacts/burst_earth_small.wav`.
+- **Before publishing:** save the place (walls, gate, lane, plot look, titan, lava, grave layout all live in it), delete
+  `Workspace.GravePreview`, run `publish_unit_models.lua` if unit models changed.
+- **Watch:** part counts per occupied lane (cemetery walls ~350, gate ~354, lane ~400, plot look ~286, titan ~274) and the
+  grave stall (~2400).
+- **User's own uncommitted files:** `Unit ideas.txt`, `sounds/impacts/` (leave them alone).
+
+### Older backlog
 
 1. ~~Buy Dust tab at the Forge~~ (done).
 1b. ~~Catalysts, Gem Shop, Remote Forge, Soul Wisp speed~~ (done). Later: Robux gem packs (Developer Products, with the odds-disclosure check), more gem items.

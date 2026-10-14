@@ -10,6 +10,7 @@ local PlotFrame = require(script.Parent.PlotFrame)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local Titans = require(script.Parent.Titans)
 local Portal = require(script.Parent.Portal)
+local PlotLook = require(script.Parent.PlotLook)
 
 local playerPlots = PlotRegistry.playerPlots
 local getPlot = PlotRegistry.getPlot
@@ -60,8 +61,10 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 			end
 		end
 		graveModel.Parent = workspace
-		-- the tombstone model faces +X; turn it to face away from the lane (towards the plaza)
-		graveModel:PivotTo(CFrame.new(basePos) * PlotFrame.rotation(plotState) * CFrame.Angles(0, -math.pi / 2, 0))
+		-- the tombstone model faces +X; the graves stand in two rows along the plot's sides (tools/studio/layout_graves.lua)
+		-- and face the free path down the middle
+		local lateral = PlotFrame.toLocal(plotState, basePos)
+		graveModel:PivotTo(CFrame.new(basePos) * PlotFrame.rotation(plotState) * CFrame.Angles(0, lateral > 0 and math.pi or 0, 0))
 		slab = graveModel.PrimaryPart or graveModel:FindFirstChildWhichIsA("BasePart")
 	else
 		-- Fallback: plain parts
@@ -189,6 +192,7 @@ initPlotForPlayer = function(player)
 	}
 	initWallQueue(plotState)
 	Titans.spawn(plotState) -- the realm's titan behind the lane
+	PlotLook.apply(plotState) -- the plot becomes part of the realm (cemetery ground, walls, gate)
 	-- 5 grave slots to start, +1 per ascension (max 10)
 	local profile = PlayerData.get(player)
 	local slotCount = math.min(10, 5 + (profile and profile.rebirthCount or 0))
@@ -269,6 +273,7 @@ local function releasePlot(player)
 		end
 		Titans.remove(plotState)
 		Portal.close(plotState)
+		PlotLook.clear(plotState)
 		for _, u in ipairs(plotState.activeUnits) do
 			if u.block and u.block.Parent then u.block:Destroy() end
 		end
