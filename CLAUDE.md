@@ -45,9 +45,9 @@ Roblox idle/gacha game ("Necro Buddies"). Players buy and dig graves to roll und
 
 The world (plots, shops, walls, lane, titan, lava, the altar islands, every model) lives only in the place file, built by scripts in `tools/studio/` (safe to re-run) and saved by the user. A circular plaza (`Workspace.HubFloor`) with 8 plots round it; a run is 4 walls down the plot's lane, the last is THE GATE (unlocks ascending); the realm keeper (only his hands from two rifts and his eyes in black fog) waits behind each lane's end; the hazard sea is lava. Claimed plots get the realm look (`PlotLook`: plot, lane decor, Soul Altar). Models: `ServerStorage.Models` (units, copied to `ReplicatedStorage.UnitModels` by `publish_unit_models.lua`), `ReplicatedStorage.GraveModels`, `ReplicatedStorage.ItemModels`, `ServerStorage.LaneModels`, `ServerStorage.WallModels`, `ServerStorage.TitanModels`.
 
-## Next (details in `docs/backlog.md`)
+## Next (details in `docs/backlog.md`, which starts with the latest session's state)
 
-More in-world panels (the user loves them), then necromancer spells (design WITH the user; the necromancer's own basic attack must always damage the wall, the fix for the no-units softlock), a better start (guaranteed Rare / early Signature), a pacing playtest.
+Necromancer spells (design WITH the user; the necromancer's own basic attack must always damage the wall, the fix for the no-units softlock), the outer wall rework (one realm-styled sector per plot), the standard units' attack kit, a better start, a pacing playtest. **Animation rule:** smooth, momentum-driven motion that never snaps back to rest (Knell's block in `UnitAnimator` is the reference); use the `roblox-animation` / `roblox-vfx` skills.
 
 ## Plot geometry (never assume an axis)
 

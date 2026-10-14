@@ -1,5 +1,51 @@
 # Backlog, state and open issues
 
+## State at the end of the 2026-10-14 / 15 session (read this first)
+
+**Built and committed (in order):**
+- **Graves in the world** (`GraveScene`): owned grave tiers rise in an arc in front of the player; Open hands the grave
+  straight to the grave cinematic (`GraveCinematic.fits` shared stage checks). Falls back to the plain panel.
+- **The Soul Altar** (realm upgrades in the world): a bone-bridge island beside every claimed plot (`build_altar.lua`,
+  `PlotLook`), braziers burn with the realm upgrade levels (`AltarFx`), the Upgrades panel opens at the altar
+  (`AltarScene`), permanent upgrades are "written into the tome" (a rite).
+- **Batch dismantle** (Forge "Dismantle" tab, list of the units it takes) and a **50 % dust refund** for upgraded units.
+- **CLAUDE.md shortened**: details moved to `docs/` (world, models, economy, features, backlog). `AGENTS.md` points Codex
+  (which also has the Studio MCP) to the same docs.
+- **The realm keeper as hands**: the titan is hidden; two torn rifts behind each lane's end with his forearms and hands,
+  his eyes in black fog (`build_titan_hands.lua`, `HandsAnimator`), idle + every behaviour. The full Gravekeeper model
+  is kept for a future world boss.
+- **Knell reworked** (red and black, own belfry, a Kamehameha throw with a manga-style blast, special **The Procession**:
+  pallbearers, chained coffin, a black-red claw raking the wall, a lingering void tear) and the **Sigilwright's special
+  The Verdict** (a sentence of huge rune circles, stars slotted in, words burst into fire and fire hypersonic bolts).
+  Details: docs/features.md "Signature specials".
+- **Specials balance**: 90 s charge (10 s in Studio unless the DEV panel's "Specials: REAL" is on), 60 % of the unit's
+  damage (was 35 %), total DPS unchanged. Sigilwright pool weight 0.2 (it is a Signature now).
+- From Codex (committed as is): cape sway, the Quests panel restyle, the shared Lucky Wheel in the plaza (its model
+  needs a rework).
+
+**The user's preferences learned this session (important for every future feature):**
+- **Animation:** smooth, momentum-driven; actions flow into each other, nothing snaps back to a rest pose (spline
+  keyframes + a spring, anticipation, follow-through, secondary motion). Knell's block in `UnitAnimator` is the model.
+- **Specials** must feel worth waiting for: big, readable, and they hit much harder than basic attacks.
+- In-world panels are loved (Codex, Outfits, Forge, Graves, Altar). Proposals get discussed first, often with a concept
+  image; the user tests in their own Studio and asks to be left to test ("stop testing").
+- Skills installed with `npx skills add ...` land in `.agents/skills/` (Codex) and are linked into `.claude/skills/`:
+  `roblox-animation`, `roblox-vfx` (use them for animation / VFX work).
+
+**Next (in this order unless the user says otherwise):**
+1. **Necromancer spells** (design WITH the user): the player's own basic attack always damages the wall (also the
+   softlock fix), 3-4 spells with cooldowns. Still the biggest gap ("the player only watches").
+2. **Outer wall rework**: one realm-styled sector per plot (swapped by PlotLook, neutral buttresses at the seams, gate
+   towers keep `GateTower<i>` / `GateDoor`); fixes the keeper's hands sitting inside the wall.
+3. **Attack kit** for the standard units (on hold, see below) and a **Signature DPS check**: the Sigilwright's 85k DPS is
+   below Last Lantern's ~110k (the rule says Signatures sit at the TOP of their rarity) - ask the user.
+4. Smaller: the Lucky Wheel model, a better start (guaranteed Rare / early Signature), a pacing playtest, the hovering
+   unit over its grave (user's idea file), Signature pulls are extremely rare (~1 in 10,000 pulls for a Descent).
+
+**Before publishing:** save the place (altar, keeper hands, Knell model, wheel, special durations on the stored unit
+models live only in it), delete preview folders, run `publish_unit_models.lua` after unit model changes.
+
+
 **Spin wheel (2026-10-14, made by ChatGPT/Codex, committed as is):** a shared `LuckyWheel` in the plaza (`tools/studio/build_wheel.lua`, place file), `WheelScene`, `WheelRewards`. TODO: rework the wheel MODEL (the user finds it weak); one spin at a time server-wide (others are rejected for 5 s: consider a queue); the prompt is only wired if the wheel exists at server start.
 
 **Keeper hands (2026-10-14):** the titan behind each lane is replaced by his hands from two rifts and his eyes in fog (docs/world.md). Open: the resting hands sit slightly inside the outer wall (fix with the outer wall rework: one realm-styled sector per plot, swapped by PlotLook, neutral buttresses at the sector seams, gate towers keep `GateTower<i>`/`GateDoor` for the portal), the shut rifts' scar smoke is faint, the effects duplicate TitanAnimator's, the Return was not watched on its own. Later: the full Gravekeeper as a world boss (phase 2: 16 hands).
