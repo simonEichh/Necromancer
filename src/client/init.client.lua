@@ -179,6 +179,7 @@ require(Modules.WallStages) -- damage stages of the modelled walls (cracks, coll
 require(Modules.TitanAnimator) -- idle animation of the realm titans behind the outer wall
 require(Modules.PortalFx) -- the portal behind the gate (door bursts open, rune progress, rejection)
 require(Modules.CodexPanel) -- the Codex: every unit, read in the necromancer's grimoire (tile + C)
+require(Modules.OutfitsPanel) -- the wardrobe: outfit items (tile + O)
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)
