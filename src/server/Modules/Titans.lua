@@ -2,8 +2,16 @@
 -- tools/studio/build_titan_gravekeeper.lua) standing outside the outer wall beside its lane's gate tower, leaning over
 -- the battlements and turned a little towards the lane. Each player has their own; empty plots have none; it is removed
 -- when the player leaves. The coliseum is centred on the origin.
+-- A player's titan first waits sunk behind the wall ("Waiting"; walls that break meanwhile just rise, see
+-- plotState.titanBusyUntil in Walls) and climbs up over it ("Enter") the first time the owner steps onto their plot
+-- (players join on the plaza, see Plots).
 local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local PlotRegistry = require(script.Parent.PlotRegistry)
+local PlotFrame = require(script.Parent.PlotFrame)
 
 local Titans = {}
 
@@ -11,6 +19,9 @@ local RING_OUTER = 404 -- outer face of the outer wall (build_ring.lua R_IN + TH
 local WALL_TOP_Y = -1.7 + 70 -- top of the outer wall
 local LATERAL = -66 -- studs beside the lane axis (clear of the 125-high gate tower), on the side of his weaving hand
 local TURN = math.rad(12) -- turned a little towards the lane
+local ENTER_TIME = 8.8 -- the "Enter" climb (its timeline in TitanAnimator; keep in sync)
+local PLOT_HALF_LENGTH = 24 -- the plot Base runs -24..24 along the lane from its centre
+local PLOT_HALF_WIDTH = 20
 
 local function flat(v)
 	return Vector3.new(v.X, 0, v.Z).Unit
@@ -54,10 +65,55 @@ function Titans.spawn(plotState)
 	titan:SetAttribute("LaneBack", -laneDir)
 	titan:SetAttribute("LaneLength", 308 - 24)
 	CollectionService:AddTag(titan, "RealmTitan") -- animated on the clients (Modules/TitanAnimator)
+	-- he waits out of sight until the owner first steps onto the plot
+	titan:SetAttribute("SummonKind", "Waiting")
+	titan:SetAttribute("SummonAt", workspace:GetServerTimeNow())
+	plotState.titanWaiting = true
+	-- (a grace period: right after the join the server can still see the character where it spawned for a moment,
+	-- before the teleport to the plaza has come back from the client)
+	plotState.titanWatchFrom = os.clock() + 3
+	plotState.titanOnPlot = 0
+	plotState.titanBusyUntil = math.huge
 	titan.Parent = workspace
 	plotState.titan = titan
 	Titans.setFocus(plotState)
 end
+
+-- the owner stepped onto the plot: he climbs up over the wall
+local function enter(plotState)
+	plotState.titanWaiting = false
+	if plotState.titan then
+		plotState.titan:SetAttribute("SummonKind", "Enter")
+		plotState.titan:SetAttribute("SummonAt", workspace:GetServerTimeNow())
+	end
+	plotState.titanBusyUntil = os.clock() + ENTER_TIME
+end
+
+local lastCheck = 0
+RunService.Heartbeat:Connect(function()
+	local now = os.clock()
+	if now - lastCheck < 0.25 then
+		return
+	end
+	lastCheck = now
+	for ownerId, plotState in pairs(PlotRegistry.playerPlots) do
+		if plotState.titanWaiting and now >= (plotState.titanWatchFrom or 0) then
+			local player = Players:GetPlayerByUserId(tonumber(ownerId))
+			local root = player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local lateral, forward = PlotFrame.toLocal(plotState, root.Position)
+				if math.abs(lateral) < PLOT_HALF_WIDTH and forward > -PLOT_HALF_LENGTH and forward < PLOT_HALF_LENGTH + 40 then
+					plotState.titanOnPlot += 1
+					if plotState.titanOnPlot >= 2 then -- (two checks in a row)
+						enter(plotState)
+					end
+				else
+					plotState.titanOnPlot = 0
+				end
+			end
+		end
+	end
+end)
 
 -- Where the titan looks: the wall the army is fighting (Walls.setFront calls this when the front moves)
 function Titans.setFocus(plotState)

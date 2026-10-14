@@ -203,12 +203,12 @@ initPlotForPlayer = function(player)
 		end
 	end
 	playerPlots[tostring(player.UserId)] = plotState
-	local spawnPart = plotModel:FindFirstChild("PlayerSpawn")
-	if spawnPart then
-		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			hrp.CFrame = CFrame.new(spawnPart.Position + Vector3.new(0, 3, 0))
-		end
+	-- players join on the plaza, facing their plot (the titan climbs up when they first step onto it, see Titans)
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		local hub = workspace:GetAttribute("HubSpawn") or Vector3.new(0, 3, 24)
+		local toPlot = Vector3.new(frame.Position.X - hub.X, 0, frame.Position.Z - hub.Z)
+		hrp.CFrame = CFrame.lookAt(hub, hub + (toPlot.Magnitude > 0.1 and toPlot.Unit or Vector3.new(0, 0, -1)))
 	end
 	print("✅ Assigned Plot" .. plotIndex .. " to " .. player.Name)
 end

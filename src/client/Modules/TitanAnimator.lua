@@ -71,8 +71,12 @@ local TIMELINES = {
 	},
 	-- (lowering the raised arms onto the wall is slow and heavy)
 	Return = { { 0, "SUNK" }, { 1.8, "RISE_REACH" }, { 3.8, "RISE_UP" }, { 6.6, "IDLE" }, { 7.4, "IDLE" } },
+	-- a player's first visit: he waits sunk behind the wall until the owner first steps onto the plot ("Waiting"), then
+	-- climbs up like the Return but with his lantern still in his hand ("Enter")
+	Waiting = { { 0, "DEEP" }, { 1, "DEEP" } }, -- (two keys: a single key is not sampled)
+	Enter = { { 0, "DEEP" }, { 1.2, "SUNK" }, { 3.0, "RISE_REACH" }, { 5.0, "RISE_UP" }, { 7.8, "IDLE" }, { 8.6, "IDLE" } },
 }
-local HOLD_END = { Defeat = true } -- these keep their last pose after the timeline (he stays down)
+local HOLD_END = { Defeat = true, Waiting = true } -- these keep their last pose after the timeline (he stays down)
 local LANTERN_DROP = 4.6 -- Defeat: the lantern slips from his hand as he lowers his arms from the recoil (still high over the wall)
 local DEFEAT_LAG = 1.6 -- the beaten giant's arms trail his body even further (JOINT_LAG x this)
 local DEFEAT_EYES = { 5.2, 2 } -- Defeat: the eyes start to die at 5.2 s and are out 2 s later
@@ -143,6 +147,8 @@ local function makePoses(t)
 		-- (and he keeps his arms raised, so his hands come back over the battlements instead of through the wall)
 		SINK_HALF = { Waist = pitch(0.3), Neck = pitch(-0.3), Sink = 0.5, RShoulder = pitch(0.8), RElbow = pitch(0.45), LShoulder = pitch(0.3), LElbow = pitch(0.25), LWrist = pitch(0.3) },
 		SUNK = { Waist = pitch(0.38), Neck = pitch(-0.35), Sink = 1, RShoulder = pitch(0.8), RElbow = pitch(0.45), LShoulder = pitch(0.3), LElbow = pitch(0.25), LWrist = pitch(0.3) },
+		-- (deeper than SUNK: nothing, not even the shovel on his back, shows over the wall while he waits)
+		DEEP = { Waist = pitch(0.38), Neck = pitch(-0.35), Sink = 1.9, RShoulder = pitch(0.8), RElbow = pitch(0.45), LShoulder = pitch(0.3), LElbow = pitch(0.25), LWrist = pitch(0.3) },
 		-- return: the raised hands come over the wall first, then the head
 		RISE_REACH = { Sink = 0.72, Waist = pitch(0.3), Neck = pitch(0.15), RShoulder = pitch(1.15), RElbow = pitch(0.35), LShoulder = pitch(0.45), LElbow = pitch(0.25), LWrist = pitch(0.2) },
 		RISE_UP = { Sink = 0.08, Waist = pitch(0.1), Neck = pitch(0.05), RShoulder = pitch(0.95), RElbow = pitch(0.3), LShoulder = pitch(0.35), LElbow = pitch(0.25), LWrist = pitch(0.2) },
@@ -379,7 +385,7 @@ lanternOnGround = function(t, kind, ta, swing)
 	end
 	if onGround <= 0 then
 		t.lanternGround = nil
-		if kind ~= "Defeat" and kind ~= "Return" then
+		if kind ~= "Defeat" and kind ~= "Return" and kind ~= "Waiting" and kind ~= "Enter" then
 			-- remember where it hangs while he rests (in front of the wall): that is where it will land
 			t.lanternIdle = (joint.Part0.CFrame * joint.C0 * swing * joint.C1:Inverse()).Position
 		end
@@ -576,7 +582,7 @@ RunService.RenderStepped:Connect(function(dt)
 		local sway = CFrame.Angles(0, math.rad(math.sin(tl * 0.55) * 2.5) * stagger, math.rad(math.sin(tl * 0.42 + 1) * 6) * stagger)
 		set(j.Waist, CFrame.new(t.sinkDir * (t.sinkDepth * sink)) * p("Waist") * sway * CFrame.Angles(math.rad(breath * 1.4 * calm + hardBreath * 2.5), math.rad(math.sin(c * 0.12) * 2) * calm, math.rad(math.sin(c * 0.17) * 1) * calm))
 		local look = aimHead(t, dt)
-		if kind == "Defeat" or kind == "Return" then
+		if kind == "Defeat" or kind == "Return" or kind == "Enter" or kind == "Waiting" then
 			look = ID -- (he does not watch the army while he is beaten or climbing back)
 		end
 		set(j.Neck, look * p("Neck") * CFrame.Angles(math.rad(math.sin(c * 0.21) * 1.5), math.rad(math.sin(c * 0.15) * 2.5), 0))
@@ -619,6 +625,10 @@ RunService.RenderStepped:Connect(function(dt)
 			dark = (fade > 0 and fade < 1) and ((math.sin(ta * 40) > 0.2) and fade or fade * 0.3) or fade
 		elseif kind == "Return" and acting then
 			dark = 1 - math.clamp((ta - 2.2) / 1, 0, 1)
+		elseif kind == "Enter" and acting then
+			dark = 1 - math.clamp((ta - 3.4) / 1, 0, 1)
+		elseif kind == "Waiting" then
+			dark = 1
 		end
 		for _, eye in ipairs(t.eyes) do
 			eye.part.Color = eye.calm:Lerp(EYE_ANGRY, anger):Lerp(EYE_DEAD, dark)
