@@ -177,6 +177,7 @@ require(Modules.SpellEffects)
 require(Modules.HitEffects)
 require(Modules.WallStages) -- damage stages of the modelled walls (cracks, collapse)
 require(Modules.TitanAnimator) -- idle animation of the realm titans behind the outer wall
+require(Modules.HandsAnimator) -- the realm keeper's hands, rifts and eyes behind every claimed lane
 require(Modules.PortalFx) -- the portal behind the gate (door bursts open, rune progress, rejection)
 require(Modules.CodexPanel) -- the Codex: every unit, read in the necromancer's grimoire (tile + C)
 require(Modules.OutfitsPanel) -- the wardrobe: outfit items (tile + O)

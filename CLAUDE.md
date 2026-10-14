@@ -43,7 +43,7 @@ Roblox idle/gacha game ("Necro Buddies"). Players buy and dig graves to roll und
 
 ## World in short
 
-The world (plots, shops, walls, lane, titan, lava, the altar islands, every model) lives only in the place file, built by scripts in `tools/studio/` (safe to re-run) and saved by the user. A circular plaza (`Workspace.HubFloor`) with 8 plots round it; a run is 4 walls down the plot's lane, the last is THE GATE (unlocks ascending); the realm titan stands behind the outer ring; the hazard sea is lava. Claimed plots get the realm look (`PlotLook`: plot, lane decor, Soul Altar). Models: `ServerStorage.Models` (units, copied to `ReplicatedStorage.UnitModels` by `publish_unit_models.lua`), `ReplicatedStorage.GraveModels`, `ReplicatedStorage.ItemModels`, `ServerStorage.LaneModels`, `ServerStorage.WallModels`, `ServerStorage.TitanModels`.
+The world (plots, shops, walls, lane, titan, lava, the altar islands, every model) lives only in the place file, built by scripts in `tools/studio/` (safe to re-run) and saved by the user. A circular plaza (`Workspace.HubFloor`) with 8 plots round it; a run is 4 walls down the plot's lane, the last is THE GATE (unlocks ascending); the realm keeper (only his hands from two rifts and his eyes in black fog) waits behind each lane's end; the hazard sea is lava. Claimed plots get the realm look (`PlotLook`: plot, lane decor, Soul Altar). Models: `ServerStorage.Models` (units, copied to `ReplicatedStorage.UnitModels` by `publish_unit_models.lua`), `ReplicatedStorage.GraveModels`, `ReplicatedStorage.ItemModels`, `ServerStorage.LaneModels`, `ServerStorage.WallModels`, `ServerStorage.TitanModels`.
 
 ## Next (details in `docs/backlog.md`)
 

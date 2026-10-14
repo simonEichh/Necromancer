@@ -1,5 +1,7 @@
 # Backlog, state and open issues
 
+**Keeper hands (2026-10-14):** the titan behind each lane is replaced by his hands from two rifts and his eyes in fog (docs/world.md). Open: the resting hands sit slightly inside the outer wall (fix with the outer wall rework: one realm-styled sector per plot, swapped by PlotLook, neutral buttresses at the sector seams, gate towers keep `GateTower<i>`/`GateDoor` for the portal), the shut rifts' scar smoke is faint, the effects duplicate TitanAnimator's, the Return was not watched on its own. Later: the full Gravekeeper as a world boss (phase 2: 16 hands).
+
 **On hold (2026-10-14, the user's idea, discussed):** raise the quality floor of the standard units with a reusable "attack kit" (4-5 attack styles + hit effects, one per unit, scaled by rarity: Common/Uncommon own attack motion + hit effect, Rare/Cursed visible ranged/area attack, Legendary+ a small in-world special, Signature cinematic specials + a second skill unlocked by awakening (Forge level 10 or Star Dust)). Keep the current Signatures as Signatures. Proposal per unit to be made and approved batch by batch when the user picks it up.
 
 Moved out of CLAUDE.md: what was built when, the agreed next steps, small known issues, the before-publishing checklist and discarded ideas.
