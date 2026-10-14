@@ -8,7 +8,6 @@
 -- the graves). Builds its UI when required (no init call).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -20,6 +19,7 @@ local Format = require(script.Parent.Format)
 local UnitPortrait = require(script.Parent.UnitPortrait)
 local SignatureName = require(script.Parent.SignatureName)
 local NecroRitual = require(script.Parent.NecroRitual)
+local WorldView = require(script.Parent.WorldView)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 
@@ -236,7 +236,7 @@ end
 -- ============================================================
 -- Opening and closing: the grimoire in the character's hand, the camera zooms onto its pages
 -- ============================================================
-local session -- the running open / read / close
+local session -- the running WorldView session (open / read / close)
 
 local function hideCharacter(char, hidden)
 	for _, d in ipairs(char:GetDescendants()) do
@@ -248,118 +248,84 @@ end
 
 function CodexPanel.open()
 	if CodexPanel.active then return end
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local camera = workspace.CurrentCamera
-	if not hrp or not camera then return end
+	local ritual
+	local s = WorldView.open({
+		keep = { ui },
+		openTime = T_OPEN,
+		closeTime = T_CLOSE,
+		fov = 50,
+		-- the camera's zoom onto the pages starts a little after the book is raised
+		blend = function(v)
+			if v.phase == "open" then
+				return smooth((v.t - 0.25) / (T_OPEN - 0.25))
+			elseif v.phase == "shown" then
+				return 1
+			end
+			return 1 - smooth(v.t / T_CLOSE / 0.8)
+		end,
+		goal = function(v)
+			local open, shown
+			if v.phase == "open" then
+				shown = smooth(v.t / 0.4)
+				open = smooth((v.t - 0.3) / 0.5)
+			elseif v.phase == "shown" then
+				open, shown = 1, 1
+			else
+				local k = v.t / T_CLOSE
+				open = 1 - smooth((k - 0.3) / 0.4)
+				shown = 1 - smooth((k - 0.7) / 0.3)
+			end
+			ritual.update(0, 0)
+			ritual.pose(0, 0, true)
+			-- the grimoire is held up in front of the chest like a book being read, tipped towards the reader (the pages face
+			-- them); the camera glides to just behind the eyes and looks straight at the pages, always upright
+			local held = v.hrp.CFrame * CFrame.new(0, 1.2, -1.9) * CFrame.Angles(math.rad(65), 0, 0)
+			local _, hinge = ritual.placeBook(open, shown, held)
+			local eye = hinge.Position + hinge.UpVector * 2.6
+			return CFrame.lookAt(eye, hinge.Position, Vector3.yAxis)
+		end,
+		onStep = function(v, _, zoom)
+			hideCharacter(v.char, zoom > 0.55) -- (the head would block the view)
+		end,
+		onShown = function()
+			ui.Enabled = true
+			TweenService:Create(book, TweenInfo.new(0.25), { GroupTransparency = 0 }):Play()
+		end,
+		onClose = function(v)
+			TweenService:Create(book, TweenInfo.new(0.2), { GroupTransparency = 1 }):Play()
+			task.delay(0.2, function()
+				if session ~= v then return end
+				ui.Enabled = false
+			end)
+		end,
+		onFinish = function(v)
+			if session == v then
+				session = nil
+			end
+			ritual.restore()
+			v.folder:Destroy()
+			ui.Enabled = false
+			book.GroupTransparency = 1
+			hideCharacter(v.char, false)
+			CodexPanel.active = false
+		end,
+	})
+	if not s then return end
 	CodexPanel.active = true
-
-	local s = { phase = "open", t = 0, camera = camera, hrp = hrp, char = char }
 	session = s
-	s.savedCam = camera.CFrame
-	s.savedType = camera.CameraType
-	s.savedFov = camera.FieldOfView
-	s.savedAnchored = hrp.Anchored
-	hrp.Anchored = true
-	pcall(function()
-		s.controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
-		s.controls:Disable()
-	end)
-	-- the game's other screens step back while the book is read
-	s.hidden = {}
-	for _, g in ipairs(player.PlayerGui:GetChildren()) do
-		if g:IsA("ScreenGui") and g.Enabled and g ~= ui and g.Name ~= "Freecam" then
-			g.Enabled = false
-			table.insert(s.hidden, g)
-		end
-	end
 	s.folder = Instance.new("Folder")
 	s.folder.Name = "CodexFX"
 	s.folder.Parent = workspace
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local feet = hrp.Position - Vector3.new(0, (hum and hum.HipHeight or 2) + hrp.Size.Y / 2, 0)
-	s.ritual = NecroRitual.new({ hrp = hrp, folder = s.folder, target = hrp, feet = feet, color = Color3.fromRGB(150, 70, 255) })
-	camera.CameraType = Enum.CameraType.Scriptable
+	local hum = s.char:FindFirstChildOfClass("Humanoid")
+	local feet = s.hrp.Position - Vector3.new(0, (hum and hum.HipHeight or 2) + s.hrp.Size.Y / 2, 0)
+	ritual = NecroRitual.new({ hrp = s.hrp, folder = s.folder, target = s.hrp, feet = feet, color = Color3.fromRGB(150, 70, 255) })
 	paint()
-
-	s.conn = RunService.RenderStepped:Connect(function(dt)
-		s.t += dt
-		local open, shown, zoom
-		if s.phase == "open" then
-			shown = smooth(s.t / 0.4)
-			open = smooth((s.t - 0.3) / 0.5)
-			zoom = smooth((s.t - 0.25) / (T_OPEN - 0.25))
-			if s.t >= T_OPEN then
-				s.phase = "read"
-				ui.Enabled = true
-				TweenService:Create(book, TweenInfo.new(0.25), { GroupTransparency = 0 }):Play()
-			end
-		elseif s.phase == "read" then
-			open, shown, zoom = 1, 1, 1
-		else -- closing
-			local k = s.t / T_CLOSE
-			zoom = 1 - smooth(k / 0.8)
-			open = 1 - smooth((k - 0.3) / 0.4)
-			shown = 1 - smooth((k - 0.7) / 0.3)
-			if k >= 1 then
-				CodexPanel.finish()
-				return
-			end
-		end
-		s.ritual.update(0, 0)
-		s.ritual.pose(0, 0, true)
-		-- the grimoire is held up in front of the chest like a book being read, tipped towards the reader (the pages face
-		-- them); the camera glides to just behind the eyes and looks straight at the pages, always upright
-		local held = s.hrp.CFrame * CFrame.new(0, 1.2, -1.9) * CFrame.Angles(math.rad(65), 0, 0)
-		local _, hinge = s.ritual.placeBook(open, shown, held)
-		local eye = hinge.Position + hinge.UpVector * 2.6
-		local read = CFrame.lookAt(eye, hinge.Position, Vector3.yAxis)
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = s.savedCam:Lerp(read, zoom)
-		camera.FieldOfView = s.savedFov + (50 - s.savedFov) * zoom
-		hideCharacter(char, zoom > 0.55) -- (the head would block the view)
-	end)
 end
 
 function CodexPanel.close()
-	local s = session
-	if not s or s.phase == "close" then return end
-	if s.phase == "open" then
-		s.t = 0
+	if session then
+		session:close()
 	end
-	s.phase = "close"
-	s.t = 0
-	TweenService:Create(book, TweenInfo.new(0.2), { GroupTransparency = 1 }):Play()
-	task.delay(0.2, function()
-		if session ~= s then return end
-		ui.Enabled = false
-	end)
-end
-
-function CodexPanel.finish()
-	local s = session
-	if not s then return end
-	session = nil
-	s.conn:Disconnect()
-	s.ritual.restore()
-	s.folder:Destroy()
-	ui.Enabled = false
-	book.GroupTransparency = 1
-	hideCharacter(s.char, false)
-	if s.hrp.Parent then
-		s.hrp.Anchored = s.savedAnchored
-	end
-	s.camera.CameraType = (s.savedType == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or s.savedType
-	s.camera.FieldOfView = s.savedFov
-	for _, g in ipairs(s.hidden) do
-		if g.Parent then
-			g.Enabled = true
-		end
-	end
-	if s.controls then
-		pcall(function() s.controls:Enable() end)
-	end
-	CodexPanel.active = false
 end
 
 function CodexPanel.toggle()

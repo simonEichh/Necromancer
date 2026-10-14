@@ -5,7 +5,6 @@
 -- Opened with the "Outfits" tile (right HUD column, under Codex) or O; Esc / X / O closes. Builds its UI when required.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -14,6 +13,7 @@ local State = require(script.Parent.State)
 local Sync = require(script.Parent.Sync)
 local screenGui = require(script.Parent.Gui)
 local Items = require(ReplicatedStorage.Shared.Items)
+local WorldView = require(script.Parent.WorldView)
 
 local player = Players.LocalPlayer
 local C = Theme.Color
@@ -27,11 +27,6 @@ local CAM_DIST = 9.5
 local CAM_SHIFT = 2.4 -- the camera slides right so the character stands left of the panel
 local CAM_FOV = 50
 local DRAG_SPEED = 0.012 -- radians per pixel
-
-local function smooth(x)
-	x = math.clamp(x, 0, 1)
-	return x * x * (3 - 2 * x)
-end
 
 -- ============================================================
 -- UI
@@ -305,9 +300,10 @@ end
 -- ============================================================
 -- Opening and closing: the camera glides round to the front of the character
 -- ============================================================
-local session
+local session -- the running WorldView session
+local yaw = 0 -- dragging turns the view round the character
 
-local function viewCFrame(hrp, yaw)
+local function viewCFrame(hrp)
 	local base = hrp.CFrame * CFrame.Angles(0, yaw, 0)
 	local focus = hrp.Position + Vector3.new(0, 0.5, 0)
 	local pos = focus + base.LookVector * CAM_DIST + Vector3.new(0, 1.2, 0)
@@ -318,91 +314,45 @@ function OutfitsPanel.open()
 	if OutfitsPanel.active then
 		return
 	end
-	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local camera = workspace.CurrentCamera
-	if not hrp or not camera then
+	yaw = 0
+	local s = WorldView.open({
+		keep = { ui },
+		openTime = T_MOVE,
+		fov = CAM_FOV,
+		goal = function(v)
+			return viewCFrame(v.hrp)
+		end,
+		onStep = function(v)
+			updateViews(v.clock)
+		end,
+		onClose = function()
+			TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(1, PANEL_W + 80, 0.5, 0) }):Play()
+		end,
+		onFinish = function(v)
+			if session == v then
+				session = nil
+			end
+			ui.Enabled = false
+			OutfitsPanel.active = false
+		end,
+	})
+	if not s then
 		return
 	end
 	OutfitsPanel.active = true
-	local s = { phase = "open", t = 0, yaw = 0, camera = camera, hrp = hrp, clock = 0 }
 	session = s
-	s.savedCam = camera.CFrame
-	s.savedType = camera.CameraType
-	s.savedFov = camera.FieldOfView
-	s.savedAnchored = hrp.Anchored
-	hrp.Anchored = true
-	pcall(function()
-		s.controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
-		s.controls:Disable()
-	end)
-	s.hidden = {}
-	for _, g in ipairs(player.PlayerGui:GetChildren()) do
-		if g:IsA("ScreenGui") and g.Enabled and g ~= ui and g.Name ~= "Freecam" then
-			g.Enabled = false
-			table.insert(s.hidden, g)
-		end
-	end
 	selected = {}
 	paint()
 	ui.Enabled = true
 	frame.Visible = true
 	frame.Position = UDim2.new(1, PANEL_W, 0.5, 0)
 	TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(1, -70, 0.5, 0) }):Play()
-	camera.CameraType = Enum.CameraType.Scriptable
-
-	s.conn = RunService.RenderStepped:Connect(function(dt)
-		s.t += dt
-		s.clock += dt
-		local k
-		if s.phase == "open" then
-			k = smooth(s.t / T_MOVE)
-		else
-			k = 1 - smooth(s.t / T_MOVE)
-			if s.t >= T_MOVE then
-				OutfitsPanel.finish()
-				return
-			end
-		end
-		camera.CameraType = Enum.CameraType.Scriptable
-		camera.CFrame = s.savedCam:Lerp(viewCFrame(s.hrp, s.yaw), k)
-		camera.FieldOfView = s.savedFov + (CAM_FOV - s.savedFov) * k
-		updateViews(s.clock)
-	end)
 end
 
 function OutfitsPanel.close()
-	local s = session
-	if not s or s.phase == "close" then
-		return
+	if session then
+		session:close()
 	end
-	s.phase = "close"
-	s.t = 0
-	TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(1, PANEL_W + 80, 0.5, 0) }):Play()
-end
-
-function OutfitsPanel.finish()
-	local s = session
-	if not s then
-		return
-	end
-	session = nil
-	s.conn:Disconnect()
-	ui.Enabled = false
-	if s.hrp.Parent then
-		s.hrp.Anchored = s.savedAnchored
-	end
-	s.camera.CameraType = (s.savedType == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or s.savedType
-	s.camera.FieldOfView = s.savedFov
-	for _, g in ipairs(s.hidden) do
-		if g.Parent then
-			g.Enabled = true
-		end
-	end
-	if s.controls then
-		pcall(function() s.controls:Enable() end)
-	end
-	OutfitsPanel.active = false
 end
 
 function OutfitsPanel.toggle()
@@ -451,7 +401,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 UserInputService.InputChanged:Connect(function(input)
 	if dragging and session and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		session.yaw -= input.Delta.X * DRAG_SPEED
+		yaw -= input.Delta.X * DRAG_SPEED
 	end
 end)
 
