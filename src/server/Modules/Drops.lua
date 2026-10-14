@@ -20,7 +20,7 @@ local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
 
 local Drops = {}
 
-Drops.COLLECTOR_WALLS = 10 -- walls to break for the Soul Wisp
+Drops.COLLECTOR_WALLS = 2 -- walls to break for the Soul Wisp
 local MAGNET_RADIUS = 7
 local MAX_DROPS = 80
 local OVERFLOW_SHARE = 0.5

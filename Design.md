@@ -96,6 +96,36 @@ of 2-3 bosses later keeps the event fresh.
 Rejected: the boss breaching one gate (armies leave their lanes, messy pathing), a bigger plaza (rebuilds the whole
 world, the shop conflict stays).
 
+### Wall rework (before the world boss; discussed 2026-10-14, not final)
+
+Problems today: the walls are stacked rectangles (32 thin slabs 6.4 studs apart), nothing explains why they are there,
+and players can swim, jump or walk around them and stand between them.
+
+**The reason: an entity that keeps making walls.** Behind the end of each lane is a god / entity guarding what lies
+beyond, and it keeps conjuring new walls to stop the army. The gate at the end does not have to be a gate: it can be
+its portal. New walls are spawned as the army approaches; later a cool animation: ghostly hands reach out of the
+portal and weave / build the wall with magic. (Open: what the entity is and how its walls look.)
+
+**Walls break in stages.** Agreed: a wall shows its damage (cracks, chunks falling off, half caved in) before it
+collapses. Decided: a run is **4 walls with 4 damage stages each** (done in the economy: each wall is the sum of 8 old
+layers, sim preset "four"; the stages are not built yet). Fewer breaks are fine because the gold comes from hits; each
+break drops more dust, and another dust source is needed later.
+
+**Spawned as the army approaches** (agreed in principle): only the wall being fought and maybe the next one exist; the
+entity conjures the next one ahead of the army. This also removes the stacked-slices look and the gaps to stand in.
+
+**Not getting around them:**
+1. **Wider walls with flanks** (agreed): the wall reaches past the lane edge with towers / spikes / rubble / pillars
+   angled backwards, so it reads as a defence line. The lane side walls stay low (a tall walled road was rejected).
+2. **Soul mist behind the front** (agreed): a dense ghostly fog curtain behind the wall being fought; walking or
+   swimming into it gently pushes the player back ("The mist will not let you pass"), with player-only invisible
+   collision hidden in the fog.
+3. **Lava next to the lanes** (agreed): replaces the terrain water between the lanes (`set_water.lua`, place file).
+   Default orange-red for now; later the lava colour may change per ascension. Touching it sends the player back to
+   their plot with a short burn effect (no death).
+
+Next step when we start: one wall type with its damage stages as a test model, the user judges the look first.
+
 ### Monetization
 
 | Idea | Fit | Impact | Effort | Risk | Score | Notes |

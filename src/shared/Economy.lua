@@ -21,7 +21,10 @@ local function steps(list, count)
 	return product
 end
 
-Economy.WALLS_PER_RUN = 32 -- the 32nd wall of a run is the gate: breaking it unlocks the ascension
+Economy.WALLS_PER_RUN = 4 -- the 4th wall of a run is the gate: breaking it unlocks the ascension
+-- Each wall stands for LAYERS_PER_WALL of the old 32 thin walls ("sub-layers"): its HP, gold and dust are theirs added
+-- up, so the pacing of the old design is kept (sim preset "four"). Every wall shows 4 damage stages in game.
+Economy.LAYERS_PER_WALL = 8
 local GATE_HP_MULT = 1.5
 
 function Economy.isGate(layer)
@@ -57,18 +60,24 @@ function Economy.damageMultiplier(rebirthCount)
 	return Economy.DAMAGE_PER_ASCENSION ^ rebirthCount
 end
 
--- HP of the wall at `layer` after `rebirthCount` ascensions
+-- HP of the wall at `layer` (1..WALLS_PER_RUN) after `rebirthCount` ascensions: the sum of its sub-layers (the gate's
+-- last sub-layer counts GATE_HP_MULT times)
 function Economy.wallHp(layer, rebirthCount)
-	local hp = WALL_HP_BASE * WALL_HP_GROWTH ^ (layer - 1) * steps(HP_STEP, rebirthCount)
-	if Economy.isGate(layer) then
-		hp *= GATE_HP_MULT
+	local hp = 0
+	local last = Economy.WALLS_PER_RUN * Economy.LAYERS_PER_WALL
+	for sub = (layer - 1) * Economy.LAYERS_PER_WALL + 1, layer * Economy.LAYERS_PER_WALL do
+		hp += WALL_HP_BASE * WALL_HP_GROWTH ^ (sub - 1) * (sub == last and GATE_HP_MULT or 1)
 	end
-	return math.floor(hp)
+	return math.floor(hp * steps(HP_STEP, rebirthCount))
 end
 
--- Gold for breaking the wall of `layer` (before the coin boost)
+-- Gold for breaking the wall of `layer` (before the coin boost): the sum of its sub-layers
 function Economy.wallGold(layer, rebirthCount)
-	return math.floor(WALL_GOLD_BASE * WALL_GOLD_GROWTH ^ (layer - 1) * steps(GOLD_STEP, rebirthCount))
+	local gold = 0
+	for sub = (layer - 1) * Economy.LAYERS_PER_WALL + 2, layer * Economy.LAYERS_PER_WALL + 1 do
+		gold += WALL_GOLD_BASE * WALL_GOLD_GROWTH ^ (sub - 1)
+	end
+	return math.floor(gold * steps(GOLD_STEP, rebirthCount))
 end
 
 -- ============================================================
@@ -212,17 +221,32 @@ function Economy.dustIndex(dust)
 	return nil
 end
 
--- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { dust, amount }.
--- Mostly the dust of the best rarity the player has reached (one higher than their ascensions), sometimes of the rarity
--- below; boss walls and the gate add three times as much of the dust of the rarity above.
-function Economy.wallMaterials(layer, rebirthCount, roll)
+-- What breaking the wall of `layer` drops after `rebirthCount` ascensions: a list of { dust, amount }, the sum of its
+-- sub-layers. Each sub-layer drops mostly the dust of the best rarity the player has reached (one higher than their
+-- ascensions), sometimes of the rarity below; every BOSS_EVERY-th sub-layer and the gate's last one add three times as
+-- much of the dust of the rarity above.
+function Economy.wallMaterials(layer, rebirthCount)
 	local top = math.min(#Economy.RARITIES_ASC, rebirthCount + 2) -- index into RARITIES_ASC (1 = Common)
-	local amount = 1 + layer // 3
-	local tier = ((roll or math.random()) < 0.7) and top or math.max(1, top - 1)
-	local drops = { { dust = Economy.dustOf(Economy.RARITIES_ASC[tier]), amount = amount } }
-	if layer % BOSS_EVERY == 0 or layer == Economy.WALLS_PER_RUN then
-		local above = Economy.RARITIES_ASC[math.min(#Economy.RARITIES_ASC, top + 1)]
-		table.insert(drops, { dust = Economy.dustOf(above), amount = amount * 3 })
+	local last = Economy.WALLS_PER_RUN * Economy.LAYERS_PER_WALL
+	local total, order = {}, {}
+	local function add(rarityIndex, amount)
+		local dust = Economy.dustOf(Economy.RARITIES_ASC[rarityIndex])
+		if not total[dust] then
+			total[dust] = 0
+			table.insert(order, dust)
+		end
+		total[dust] += amount
+	end
+	for sub = (layer - 1) * Economy.LAYERS_PER_WALL + 2, layer * Economy.LAYERS_PER_WALL + 1 do
+		local amount = 1 + sub // 3
+		add((math.random() < 0.7) and top or math.max(1, top - 1), amount)
+		if sub % BOSS_EVERY == 0 or sub == last then
+			add(math.min(#Economy.RARITIES_ASC, top + 1), amount * 3)
+		end
+	end
+	local drops = {}
+	for _, dust in ipairs(order) do
+		table.insert(drops, { dust = dust, amount = total[dust] })
 	end
 	return drops
 end

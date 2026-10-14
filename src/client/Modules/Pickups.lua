@@ -13,7 +13,7 @@ local Sync = require(script.Parent.Sync)
 local screenGui = require(script.Parent.Gui)
 
 local C = Theme.Color
-local COLLECTOR_WALLS = 10 -- keep in sync with Drops.COLLECTOR_WALLS on the server
+local COLLECTOR_WALLS = 2 -- keep in sync with Drops.COLLECTOR_WALLS on the server
 local ARC_TIME = 0.55
 local FLY_TIME = 0.35
 local MAX_DISTANCE = 260 -- drops farther from the camera are not animated

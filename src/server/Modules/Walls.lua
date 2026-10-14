@@ -15,7 +15,7 @@ local incrementQuest = Quests.increment
 -- Lane layout, in "forward" studs along the lane measured from the plot centre (see PlotFrame):
 --   0 .. 24     the plot's Base (graves, spawn)
 --   24 .. 105   open battlefield: the army marches here and forms up (see Army: formation rows)
---   105 .. 302  the walls of a run (Economy.WALLS_PER_RUN, 32 of them), WALL_SPACING apart, ALL standing from the start. The
+--   105 .. 302  the walls of a run (Economy.WALLS_PER_RUN, 4 of them), WALL_SPACING apart, ALL standing from the start. The
 --               front wall is the first one; breaking it crumbles it and the army marches on to the next, so it advances
 --               down the lane until it reaches the last wall: THE GATE, in front of the outer ring's gate tower.
 --   308         the lane ends at the gate tower of the outer ring (radius 392 minus the plot centre radius 84,
@@ -25,7 +25,7 @@ local WALL_FWD = 105         -- distance of the FIRST wall from the plot centre
 local GATE_FWD = 302         -- distance of the last wall (the gate)
 local LANE_START_FWD = 24    -- outer edge of the plot's Base
 local LANE_END_FWD = 308
-local WALL_SPACING = (GATE_FWD - WALL_FWD) / (NUM_WALLS - 1) -- about 6.4 studs: a thick corridor of walls
+local WALL_SPACING = (GATE_FWD - WALL_FWD) / (NUM_WALLS - 1) -- about 66 studs with 4 walls
 local WALL_WIDTH = 40        -- across the lane
 local WALL_THICKNESS = 3
 local WALL_HEIGHT = 20       -- height of an ordinary wall
@@ -325,7 +325,7 @@ local function breakWall(plotState)
 		plotState.wallHP = 0
 	end
 
-	local goldReward = Economy.wallGold(plotState.wallLayer, ownerRebirths(plotState))
+	local goldReward = Economy.wallGold(brokenLayer, ownerRebirths(plotState))
 	for _, p in ipairs(Players:GetPlayers()) do
 		if tostring(p.UserId) == plotState.ownerId then
 			local profile = PlayerData.get(p)

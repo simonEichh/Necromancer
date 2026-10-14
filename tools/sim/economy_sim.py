@@ -170,6 +170,10 @@ PRESETS["income"] = dict(
     wall_hp=lambda L, r: 300 * 1.20 ** (L - 1) * prod(INCOME_HP_STEP[:r]),
 )
 
+# "four" preset: like "income", but a run is 4 walls (the 4th is the gate); each stands for 8 of the old 32 layers
+# (their HP, gold and dust added up). In game every wall shows 4 damage stages.
+PRESETS["four"] = dict(PRESETS["income"], gate=dict(walls=4, hp_mult=1.5, group=8))
+
 # Pace targets in ACTIVE minutes per stage (my proposal; the user agreed): ascension k takes this long after the previous one.
 TARGETS = {1: (10, 15), 2: (20, 40), 3: (20, 40), 4: (20, 40), 5: (60, 180), 6: (60, 180), 7: (60, 180), 8: (180, 1440), 9: (180, 1440)}
 
@@ -215,13 +219,32 @@ class Player:
         self.stage_from = []  # gold_from per stage (copied at every ascension)
 
     # ---- helpers -------------------------------------------------
+    def subs(self, layer):
+        """The old 32-wall layers that wall `layer` stands for (gate["group"] of them; 1 without grouping)."""
+        g = (self.R.get("gate") or {}).get("group", 1)
+        return range((layer - 1) * g + 1, layer * g + 1)
+
     def hp_for(self, layer):
-        """HP of the wall at `layer`; in gate mode the last wall (the gate) is tougher."""
-        hp = self.R["wall_hp"](layer, self.r)
+        """HP of the wall at `layer`; in gate mode the last wall (the gate) is tougher. A grouped wall has the HP of all
+        the old layers it stands for."""
         gate = self.R.get("gate")
-        if gate and layer == gate["walls"]:
-            hp *= gate["hp_mult"]
+        hp = 0
+        for sub in self.subs(layer):
+            h = self.R["wall_hp"](sub, self.r)
+            if gate and sub == gate["walls"] * gate.get("group", 1):
+                h *= gate["hp_mult"]
+            hp += h
         return hp
+
+    def pay_wall(self, layer):
+        """Gold and materials for breaking wall `layer` (a grouped wall pays for every old layer it stands for)."""
+        R = self.R
+        for sub in self.subs(layer):
+            g = R["wall_gold"](sub + 1, self.r, self.coin_lv)
+            self.gold += g
+            self.gold_from["wall"] += g
+            if R["upgrades"]:
+                self.drop_materials(sub + 1)
 
     def do_ascend(self):
         self.gold = 0
@@ -463,29 +486,29 @@ class Player:
             gate = R.get("gate")
             if gate and self.layer == gate["walls"]:
                 self.log("gate", f"cleared at {self.t / 60:.1f} min")
+                if gate.get("group", 1) > 1 and R["upgrades"]:
+                    # a grouped gate still drops the dust of its old layers (all but the last, like the 32 walls did)
+                    for sub in list(self.subs(self.layer))[:-1]:
+                        self.drop_materials(sub + 1)
                 self.do_ascend()  # beating the gate ascends
                 continue
-            self.layer += 1
             broke += 1
-            g = R["wall_gold"](self.layer, self.r, self.coin_lv)
-            self.gold += g
-            self.gold_from["wall"] += g
-            if R["upgrades"]:
-                self.drop_materials()
+            self.pay_wall(self.layer)
+            self.layer += 1
             self.wall_hp = self.hp_for(self.layer)
         self.wall_hp -= dmg
 
-    def drop_materials(self):
+    def drop_materials(self, layer):
         """Every wall drops materials of a tier around the player's ascension; boss walls drop a better tier."""
         R = self.R
         top = min(len(MATERIALS) - 1, self.r + 1)
-        amount = R["wall_mats"](self.layer, self.r)
+        amount = R["wall_mats"](layer, self.r)
         # mostly the top unlocked tier, sometimes one below
         tier = top if self.rng.random() < 0.7 else max(0, top - 1)
         self.mats[self.mat_index(tier + 1)] += amount
-        if R["boss_every"] and self.layer % R["boss_every"] == 0:
+        if R["boss_every"] and layer % R["boss_every"] == 0:
             self.mats[self.mat_index(min(len(MATERIALS) - 1, top + 1) + 1)] += amount * 3
-            self.log("boss", f"layer {self.layer}")
+            self.log("boss", f"layer {layer}")
 
 
 def apply_overrides(rules):

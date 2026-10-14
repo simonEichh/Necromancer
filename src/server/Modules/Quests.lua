@@ -6,7 +6,7 @@ local PlayerData = require(script.Parent.PlayerData)
 local DAILY_QUESTS = {
 	{ id = "d_graves",   label = "Open 50 Graves",      type = "openGraves", target = 50,      reward = 15 },
 	{ id = "d_playtime", label = "Play for 30 Minutes", type = "playtime",   target = 1800,    reward = 20 },
-	{ id = "d_walls",    label = "Break 5 Walls",       type = "breakWalls", target = 5,       reward = 25 },
+	{ id = "d_walls",    label = "Break 3 Walls",       type = "breakWalls", target = 3,       reward = 25 },
 }
 local WEEKLY_QUESTS = {
 	{ id = "w_graves",   label = "Open 300 Graves",     type = "openGraves", target = 300,     reward = 75  },
