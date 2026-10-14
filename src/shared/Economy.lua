@@ -66,6 +66,10 @@ function Economy.damageMultiplier(rebirthCount)
 	return Economy.DAMAGE_PER_ASCENSION ^ rebirthCount
 end
 
+-- Walls get this much tougher per ascension on top of HP_STEP (it balances the realm upgrades, which make the army
+-- stronger the longer a realm lasts; sim preset "realm")
+local HP_PER_ASCENSION = 0.15
+
 -- HP of the wall at `layer` (1..WALLS_PER_RUN) after `rebirthCount` ascensions: the sum of its sub-layers (the gate's
 -- last sub-layer counts GATE_HP_MULT times)
 function Economy.wallHp(layer, rebirthCount)
@@ -74,7 +78,45 @@ function Economy.wallHp(layer, rebirthCount)
 	for sub = (layer - 1) * Economy.LAYERS_PER_WALL + 1, layer * Economy.LAYERS_PER_WALL do
 		hp += WALL_HP_BASE * WALL_HP_GROWTH ^ (sub - 1) * (sub == last and GATE_HP_MULT or 1)
 	end
-	return math.floor(hp * steps(HP_STEP, rebirthCount))
+	return math.floor(hp * steps(HP_STEP, rebirthCount) * (1 + HP_PER_ASCENSION * rebirthCount))
+end
+
+-- ============================================================
+-- Realm upgrades: bought with gold, kept through the ascensions of a realm and reset (like the gold) when a new realm
+-- starts. Each level costs `base` x `growth`^level, scaled by the gold steps of the realm's first ascension.
+-- Tuned with tools/sim/economy_sim.py (preset "realm": might and harvest; march and magnet do not change the economy).
+-- ============================================================
+Economy.REALM_UPGRADES = {
+	{ key = "might", name = "Army Might", per = 0.08, base = 80, growth = 2.2, text = "damage of all units" },
+	{ key = "harvest", name = "Soul Harvest", per = 0.08, base = 96, growth = 2.2, text = "gold from hits" },
+	{ key = "march", name = "Swift March", per = 0.10, base = 150, growth = 2.4, max = 10, text = "marching speed" },
+	{ key = "magnet", name = "Grasping Souls", per = 1.5, base = 120, growth = 2.4, max = 8, text = "coin pickup reach", studs = true },
+}
+Economy.REALM_UPGRADE = {}
+for _, u in ipairs(Economy.REALM_UPGRADES) do
+	Economy.REALM_UPGRADE[u.key] = u
+end
+
+-- gold for taking realm upgrade `key` from `level` to level + 1 (nil at the max)
+function Economy.realmUpgradeCost(key, level, rebirthCount)
+	local u = Economy.REALM_UPGRADE[key]
+	if not u or (u.max and level >= u.max) then
+		return nil
+	end
+	local realmStart = rebirthCount - rebirthCount % Economy.ASCENSIONS_PER_REALM
+	return math.floor(u.base * steps(GOLD_STEP, realmStart) * u.growth ^ level)
+end
+
+-- the effect of realm upgrade `key` at `level`: a multiplier (1 + per x level), or extra studs for "studs" upgrades
+function Economy.realmUpgradeEffect(key, level)
+	local u = Economy.REALM_UPGRADE[key]
+	if not u then
+		return 1
+	end
+	if u.studs then
+		return u.per * (level or 0)
+	end
+	return 1 + u.per * (level or 0)
 end
 
 -- Gold for breaking the wall of `layer` (before the coin boost): the sum of its sub-layers

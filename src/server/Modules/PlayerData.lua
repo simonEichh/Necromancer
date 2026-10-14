@@ -43,6 +43,7 @@ function PlayerData.create(player, saved)
 		inventory = {}, -- [slot 1..INVENTORY_MAX] = { unitType, oneIn }
 		ownedGraves = newOwnedGraves(),
 		upgrades = { luckBoost = 0, coinBoost = 0 },
+		realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level; kept through a realm's ascensions, reset with the gold
 		wallsBroken = 0, -- walls ever broken (the first objective: Drops.COLLECTOR_WALLS earns the Soul Wisp)
 		collector = false, -- has the Soul Wisp (collects the loot drops, see Drops)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
@@ -72,6 +73,13 @@ function PlayerData.create(player, saved)
 			for key, max in pairs(Economy.UPGRADE_MAX) do
 				profile.upgrades[key] = math.floor(clampNumber(saved.upgrades[key], 0, 0))
 				profile.upgrades[key] = math.min(profile.upgrades[key], max)
+			end
+		end
+
+		if type(saved.realmUpgrades) == "table" then
+			for _, u in ipairs(Economy.REALM_UPGRADES) do
+				local level = math.floor(clampNumber(saved.realmUpgrades[u.key], 0, 0))
+				profile.realmUpgrades[u.key] = u.max and math.min(level, u.max) or level
 			end
 		end
 
@@ -164,6 +172,7 @@ function PlayerData.snapshot(profile)
 		ownedGraves = owned,
 		luckBoostLevel = profile.upgrades.luckBoost,
 		coinBoostLevel = profile.upgrades.coinBoost,
+		realmUpgrades = table.clone(profile.realmUpgrades),
 		inventory = inventory,
 		materials = materials,
 		wallsBroken = profile.wallsBroken,
@@ -451,6 +460,7 @@ function PlayerData.ascend(player)
 	-- gold is kept through the ascensions of a realm; a new realm starts from zero
 	if profile.rebirthCount % Economy.ASCENSIONS_PER_REALM == 0 then
 		profile.gold = 0
+		profile.realmUpgrades = {} -- the realm upgrades go with it
 	end
 	PlayerData.changed(player)
 	return profile.rebirthCount

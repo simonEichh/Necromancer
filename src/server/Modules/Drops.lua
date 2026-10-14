@@ -315,8 +315,11 @@ RunService.Heartbeat:Connect(function(dt)
 			local char = player.Character
 			local hrp = char and char:FindFirstChild("HumanoidRootPart")
 			if hrp then
+				-- (realm upgrade Grasping Souls widens the reach)
+				local profile = PlayerData.get(player)
+				local reach = MAGNET_RADIUS + Economy.realmUpgradeEffect("magnet", profile and profile.realmUpgrades.magnet or 0)
 				for i = #s.list, 1, -1 do
-					if (s.list[i].pos - hrp.Position).Magnitude <= MAGNET_RADIUS then
+					if (s.list[i].pos - hrp.Position).Magnitude <= reach then
 						collect(player, s, i, "player")
 					end
 				end

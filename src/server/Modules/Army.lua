@@ -73,7 +73,12 @@ local standDistance -- (unit def) -> distance in front of the wall where the uni
 local function ownerDamageMultiplier(plotState)
 	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
 	local profile = owner and PlayerData.get(owner)
-	return Economy.damageMultiplier(profile and profile.rebirthCount or 0)
+	if not profile then
+		return 1
+	end
+	-- ascensions x the realm upgrade Army Might; Swift March is cached here too (read every frame by the movement)
+	plotState.marchMult = Economy.realmUpgradeEffect("march", profile.realmUpgrades.march)
+	return Economy.damageMultiplier(profile.rebirthCount) * Economy.realmUpgradeEffect("might", profile.realmUpgrades.might)
 end
 
 local function setDamageMultiplier(plotState)
@@ -475,6 +480,7 @@ local function payHitGold(plotState, now)
 			-- whole gold only; the fraction stays with the unit for its next coins
 			local mult = Economy.hitIncomeStep(profile.rebirthCount)
 				* Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost)
+				* Economy.realmUpgradeEffect("harvest", profile.realmUpgrades.harvest) -- (realm upgrade Soul Harvest)
 			local exact = u.hitGold * mult
 			local gold = math.floor(exact)
 			u.hitGold = (exact - gold) / mult
@@ -1011,7 +1017,8 @@ local function update(now, dt)
 				if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
 				setState(u, "walk")
 				local dir = (flatTarget - flatPos).Unit
-				u.bv.Velocity = Vector3.new(dir.X * u.def.speed, 0, dir.Z * u.def.speed)
+				local speed = u.def.speed * (plotState.marchMult or 1) -- (realm upgrade Swift March)
+				u.bv.Velocity = Vector3.new(dir.X * speed, 0, dir.Z * speed)
 				u.bg.CFrame = CFrame.new(pos, pos + Vector3.new(dir.X, 0, dir.Z))
 			end
 		end

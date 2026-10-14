@@ -6,6 +6,7 @@ local EVENTS = {
 	-- client -> server requests
 	"BuyGraveRequest",
 	"BuyUpgrade",
+	"BuyRealmUpgrade", -- (key) a realm upgrade level for gold (Upgrades)
 	"ClaimQuest",
 	"DevClearUnits", -- Studio-only dev tools (see DevTools / client DevPanel)
 	"DevGiveGems",

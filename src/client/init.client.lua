@@ -187,7 +187,7 @@ require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 / 1
 require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
 require(Modules.FingerBeam) -- the finger-beam attack (Hush): magic circle at the fingertip, beam to the wall
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
-require(Modules.UpgradePanel)
+require(Modules.UpgradesPanel) -- realm upgrades + permanent luck / coin (the Upgrades tile, the upgrade stall)
 WheelPanel = require(Modules.WheelPanel)
 require(Modules.DevPanel) -- Studio only, drawn on top
 

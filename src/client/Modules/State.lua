@@ -35,6 +35,7 @@ local State = {
 	-- Upgrade levels (synced from server via UpgradeGranted)
 	luckBoostLevel = 0,
 	coinBoostLevel = 0,
+	realmUpgrades = {}, -- [Economy.REALM_UPGRADES key] = level (kept through a realm)
 
 	-- Wheel
 	wheelSpins = 0,

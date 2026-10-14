@@ -174,6 +174,16 @@ PRESETS["income"] = dict(
 # (their HP, gold and dust added up). In game every wall shows 4 damage stages.
 PRESETS["four"] = dict(PRESETS["income"], gate=dict(walls=4, hp_mult=1.5, group=8), realm_size=5)
 
+# "realm" preset: like "four" (what the game does now), plus the realm upgrades bought with gold and kept through a
+# realm (Economy.REALM_UPGRADES: might = +8 % damage, harvest = +8 % hit gold per level; cost base x growth^level x the
+# gold steps of the realm's first ascension; the player spends up to `share` of the gold on the cheaper one), and walls
+# 15 % tougher per ascension to balance them (Economy HP_PER_ASCENSION).
+PRESETS["realm"] = dict(
+    PRESETS["four"],
+    realm_upgrades=dict(might=(80, 2.2, 0.08), harvest=(96, 2.2, 0.08), share=0.3),
+    wall_hp=lambda L, r: 300 * 1.20 ** (L - 1) * prod(INCOME_HP_STEP[:r]) * (1 + 0.15 * r),
+)
+
 # Pace targets in ACTIVE minutes per stage (my proposal; the user agreed): ascension k takes this long after the previous one.
 TARGETS = {1: (10, 15), 2: (20, 40), 3: (20, 40), 4: (20, 40), 5: (60, 180), 6: (60, 180), 7: (60, 180), 8: (180, 1440), 9: (180, 1440)}
 
@@ -216,6 +226,7 @@ class Player:
         self.pulls = 0
         self.snap = []
         self.gold_from = {"wall": 0.0, "hit": 0.0, "sell": 0.0}
+        self.realm_lv = {}  # realm upgrade levels (reset with the gold when a new realm starts)
         self.stage_from = []  # gold_from per stage (copied at every ascension)
 
     # ---- helpers -------------------------------------------------
@@ -250,6 +261,7 @@ class Player:
         keep = self.R.get("realm_size")  # gold is kept through the ascensions of a realm (reset when a new realm starts)
         if not keep or (self.r + 1) % keep == 0:
             self.gold = 0
+            self.realm_lv = {}
         self.stage_from.append(dict(self.gold_from))
         self.gold_from = {k: 0.0 for k in self.gold_from}
         self.r += 1
@@ -273,7 +285,28 @@ class Player:
     def unit_dps(self, u):
         s = GAME["stats"][u["type"]]
         lvl = 1 + self.R.get("level_damage", 0) * u["level"] if self.R["upgrades"] else 1
-        return s["damage"] / s["cd"] * lvl * self.R["damage_mult"](self.r)
+        return s["damage"] / s["cd"] * lvl * self.R["damage_mult"](self.r) * self.realm_mult("might")
+
+    def realm_mult(self, key):
+        ru = self.R.get("realm_upgrades")
+        return 1 + ru[key][2] * self.realm_lv.get(key, 0) if ru else 1
+
+    def realm_cost(self, key):
+        base, growth, _ = self.R["realm_upgrades"][key]
+        realm_start = self.r - self.r % self.R.get("realm_size", 5)
+        return base * prod(GOLD_STEP[:realm_start]) * growth ** self.realm_lv.get(key, 0)
+
+    def buy_realm_upgrades(self):
+        ru = self.R.get("realm_upgrades")
+        if not ru:
+            return
+        for _ in range(30):
+            key = min(("might", "harvest"), key=self.realm_cost)
+            cost = self.realm_cost(key)
+            if cost > self.gold * ru["share"]:
+                break
+            self.gold -= cost
+            self.realm_lv[key] = self.realm_lv.get(key, 0) + 1
 
     def placed(self):
         return sorted(self.units, key=lambda u: -self.unit_dps(u))[: min(10, 5 + self.r)]
@@ -355,6 +388,8 @@ class Player:
                 self.coin_lv += 1
             else:
                 break
+
+        self.buy_realm_upgrades()
 
         # is the wall stalling? then save for the next ascension, otherwise spend everything
         dps = max(self.total_dps(), 1e-9)
@@ -474,7 +509,7 @@ class Player:
         for u in self.placed():
             lvl = 1 + self.R.get("level_damage", 0) * u["level"]
             tot += f(RANK[GAME["unit_rarity"][u["type"]]], self.r, self.coin_lv) * lvl
-        return tot * self.R.get("hit_uptime", 1.0)
+        return tot * self.R.get("hit_uptime", 1.0) * self.realm_mult("harvest")
 
     def fight(self, dt):
         dmg = self.total_dps() * dt

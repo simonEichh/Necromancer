@@ -140,7 +140,7 @@ local function paint()
 	end
 	local level = State.wispLevel or 0
 	if not State.collector then
-		wispCard.desc.Text = "Earn the Soul Wisp first (break 10 walls). It collects the loot on your lane."
+		wispCard.desc.Text = "Earn the Soul Wisp first (break 2 walls). It collects the loot on your lane."
 		wispCard.button.label.Text = "Locked"
 		wispCard.button.root:SetAttribute("Disabled", true)
 	elseif level >= Economy.WISP_MAX_LEVEL then
@@ -157,7 +157,7 @@ local function paint()
 end
 
 -- ============================================================
--- HUD tiles: Shop (right column, third) and Forge (left column, under Graves, once the Remote Forge is owned)
+-- HUD tiles: Shop (right column, third) and Forge (left column, under Upgrades, once the Remote Forge is owned)
 -- ============================================================
 Theme.iconTile(screenGui, {
 	icon = Theme.Image.Icon.Gems, text = "Shop",
@@ -168,7 +168,7 @@ Theme.iconTile(screenGui, {
 })
 local forgeTile = Theme.iconTile(screenGui, {
 	icon = Theme.Image.Dust.Gold, text = "Forge",
-	position = UDim2.new(0, 16, 0.5, -200 + 3 * 84), zIndex = 5,
+	position = UDim2.new(0, 16, 0.5, -200 + 4 * 84), zIndex = 5, -- (under the Upgrades tile)
 	onClick = function()
 		ForgePanel.toggle()
 	end,
