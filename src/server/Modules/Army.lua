@@ -10,6 +10,8 @@ local Collision = require(script.Parent.Collision)
 local PlotFrame = require(script.Parent.PlotFrame)
 local PlayerData = require(script.Parent.PlayerData)
 local PlotRegistry = require(script.Parent.PlotRegistry)
+local Quests = require(script.Parent.Quests)
+local Drops = require(script.Parent.Drops)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
@@ -436,7 +438,59 @@ local function sendWallHit(plotState, position, damage, isGhost)
 	Remotes.WallHit:FireAllClients(position, PlotFrame.forwardFlat(plotState), damage, isGhost)
 end
 
-local function shootArrow(fromPos, targetPos, damage, plotState)
+-- ============================================================
+-- Hit income: every hit on the wall also earns gold for its owner, ON TOP of the break gold (Economy.hitIncome).
+-- Damage is turned into gold at the unit's income / DPS, so every attack style (hits, arrows, barrages, beams,
+-- specials) pays the same gold per second. Each unit collects its own; every HIT_COIN_INTERVAL seconds it pops out of
+-- the wall where that unit hits as a few coins (Drops.spawnHitCoins) that the player or the Soul Wisp has to pick up.
+-- Stronger units (rarity rank, level) throw more and bigger coins; the gold per second is the same either way.
+-- ============================================================
+local HIT_COIN_INTERVAL = 3.5
+local HIT_PAY_CHECK = 0.5 -- how often a plot looks for units whose coins are due
+local MAX_RANK = 0
+for _, r in pairs(Rarities.Rank) do MAX_RANK = math.max(MAX_RANK, r) end
+
+local function earnHitGold(plotState, u, damage)
+	local dps = u.def.damage / u.def.attackCD
+	if not (dps > 0 and damage > 0) then return end
+	local rank = Rarities.Rank[UNIT_RARITY[u.block.Name]] or 1
+	-- (ascension and coin boost are applied when the coins drop)
+	u.hitGold = (u.hitGold or 0) + damage / dps * Economy.hitIncome(rank, u.level, 0)
+	u.hitGoldSince = u.hitGoldSince or os.clock()
+end
+
+local function payHitGold(plotState, now)
+	if now - (plotState.hitGoldAt or 0) < HIT_PAY_CHECK then return end
+	plotState.hitGoldAt = now
+	local owner, profile
+	for _, u in ipairs(plotState.activeUnits) do
+		if (u.hitGold or 0) > 0 and os.clock() - u.hitGoldSince >= HIT_COIN_INTERVAL then
+			if not owner then
+				for _, p in ipairs(Players:GetPlayers()) do
+					if tostring(p.UserId) == plotState.ownerId then owner = p break end
+				end
+				profile = owner and PlayerData.get(owner)
+				if not profile then return end
+			end
+			-- whole gold only; the fraction stays with the unit for its next coins
+			local mult = Economy.hitIncomeStep(profile.rebirthCount)
+				* Economy.wallGoldMultiplier(profile.rebirthCount, profile.upgrades.coinBoost)
+			local exact = u.hitGold * mult
+			local gold = math.floor(exact)
+			u.hitGold = (exact - gold) / mult
+			u.hitGoldSince = os.clock()
+			if gold > 0 then
+				local rank = Rarities.Rank[UNIT_RARITY[u.block.Name]] or 1
+				local t = math.clamp((rank - 1) / math.max(1, MAX_RANK - 1) + (u.level or 0) * 0.02, 0, 1)
+				local count = 1 + math.floor((rank - 1) / 3) + ((u.level or 0) >= 5 and 1 or 0)
+				Drops.spawnHitCoins(owner, plotState, gold, u.slotLat or u.lateral or 0, count, t)
+				Quests.increment(owner, "earnGold", gold)
+			end
+		end
+	end
+end
+
+local function shootArrow(fromPos, targetPos, damage, plotState, u)
 	local arrowStart = fromPos + Vector3.new(0, 0.5, 0)
 	local arrow = Instance.new("Part")
 	arrow.Size = Vector3.new(0.2, 0.2, 1.5)
@@ -455,7 +509,9 @@ local function shootArrow(fromPos, targetPos, damage, plotState)
 	):Play()
 	task.delay(travelTime, function()
 		if arrow and arrow.Parent then arrow:Destroy() end
+		if not plotState.wall then return end -- the gate already fell
 		plotState.wallHP = math.max(0, plotState.wallHP - damage)
+		earnHitGold(plotState, u, damage)
 		updateWallGui(plotState)
 		sendWallHit(plotState, targetPos, damage, true)
 		if plotState.wallHP <= 0 then breakWall(plotState) end
@@ -734,6 +790,7 @@ local function startSpecial(u, plotState, lat, now)
 			if not plotState.wall or not u.block or not u.block.Parent then return end
 			local dmg = total * h.share
 			plotState.wallHP = math.max(0, plotState.wallHP - dmg)
+			earnHitGold(plotState, u, dmg)
 			updateWallGui(plotState)
 			if plotState.wallHP <= 0 then breakWall(plotState) end
 		end)
@@ -756,6 +813,7 @@ local function settleBarrages(plotState, now)
 			local total = beamDamageBy(beam, math.min(t, beam.endTime or t))
 			if total > beam.dealt then
 				damage += total - beam.dealt
+				earnHitGold(plotState, u, total - beam.dealt)
 				beam.dealt = total
 			end
 			if beam.endTime then
@@ -768,6 +826,7 @@ local function settleBarrages(plotState, now)
 			local landed = shotsFiredBy(b, firedBy)
 			if landed > b.landed then
 				damage += (landed - b.landed) * b.shotDamage
+				earnHitGold(plotState, u, (landed - b.landed) * b.shotDamage)
 				b.landed = landed
 			end
 			if b.endTime and b.landed >= shotsFiredBy(b, b.endTime) then
@@ -895,7 +954,7 @@ local function update(now, dt)
 					local face = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
 					local targetPos = Vector3.new(face.X, fromPos.Y + 0.5, face.Z)
 					if u.block.Name == "Goblin" then
-						shootArrow(fromPos, targetPos, u.def.damage, plotState)
+						shootArrow(fromPos, targetPos, u.def.damage, plotState, u)
 					else
 						-- on the wall face right in front of this unit, around chest height, with a little jitter
 						local unitHeight = u.model and (u.model:GetAttribute("Height") or 5) * u.model:GetScale()
@@ -907,6 +966,7 @@ local function update(now, dt)
 						local function hit()
 							if not plotState.wall then return end -- the gate already fell
 							plotState.wallHP = math.max(0, plotState.wallHP - damage)
+							earnHitGold(plotState, u, damage)
 							updateWallGui(plotState)
 							sendWallHit(plotState, impactPos, damage, u.def.transparent)
 							if plotState.wallHP <= 0 then breakWall(plotState) end
@@ -933,6 +993,7 @@ local function update(now, dt)
 		end
 
 		settleBarrages(plotState, now)
+		payHitGold(plotState, now)
 	end
 end
 

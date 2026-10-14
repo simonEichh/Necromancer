@@ -76,6 +76,7 @@ local function track(part)
 		from = (age < ARC_TIME) and part:GetAttribute("From") or nil,
 		t0 = os.clock() - math.max(0, age),
 		phase = math.random() * math.pi * 2,
+		arc = part:GetAttribute("ArcHeight") or 5, -- how high the burst arc flies (bigger hit coins fly higher)
 	}
 	part:GetAttributeChangedSignal("Collected"):Connect(function()
 		local d = tracked[part]
@@ -127,7 +128,7 @@ RunService.RenderStepped:Connect(function()
 			if d.from and age < ARC_TIME then
 				-- the burst: an arc from the wall to the landing spot
 				local f = age / ARC_TIME
-				pos = d.from:Lerp(d.home, f) + Vector3.new(0, math.sin(f * math.pi) * 5, 0)
+				pos = d.from:Lerp(d.home, f) + Vector3.new(0, math.sin(f * math.pi) * d.arc, 0)
 			else
 				pos = d.home + Vector3.new(0, 0.25 + math.sin(now * 2.5 + d.phase) * 0.25, 0)
 			end

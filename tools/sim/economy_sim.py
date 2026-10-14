@@ -158,6 +158,18 @@ PRESETS["dust"] = dict(
     mat_price=lambda d: 20 * 50 ** d,  # gold per dust of kind d (0 = Stone)
 )
 
+# "income" preset: like "dust", plus hit income: every unit hitting the wall earns gold per second (on top of the
+# break gold), geometric by rarity rank, x the level bonus, x the ascension gold steps, x the coin boost.
+# hit_uptime = share of the time the army is actually hitting (the rest is marching to the next wall).
+INCOME_STEP = [4, 4, 3, 2, 1.5, 1.5, 1.5, 1.5, 1.5]  # per-ascension growth of hit income (weaker late: stages last hours)
+INCOME_HP_STEP = [5, 5.5, 5.5, 7.5, 7, 10, 9, 7, 6]  # walls a bit tougher than "gate": hit income keeps the gold flowing
+PRESETS["income"] = dict(
+    PRESETS["dust"],
+    hit_income=lambda rank, r, coin: 3.0 * 1.5 ** (rank - 1) * prod(INCOME_STEP[:r]) * (1 + 0.5 * coin),
+    hit_uptime=0.85,
+    wall_hp=lambda L, r: 300 * 1.20 ** (L - 1) * prod(INCOME_HP_STEP[:r]),
+)
+
 # Pace targets in ACTIVE minutes per stage (my proposal; the user agreed): ascension k takes this long after the previous one.
 TARGETS = {1: (10, 15), 2: (20, 40), 3: (20, 40), 4: (20, 40), 5: (60, 180), 6: (60, 180), 7: (60, 180), 8: (180, 1440), 9: (180, 1440)}
 
@@ -199,6 +211,8 @@ class Player:
         self.uid = 0
         self.pulls = 0
         self.snap = []
+        self.gold_from = {"wall": 0.0, "hit": 0.0, "sell": 0.0}
+        self.stage_from = []  # gold_from per stage (copied at every ascension)
 
     # ---- helpers -------------------------------------------------
     def hp_for(self, layer):
@@ -211,6 +225,8 @@ class Player:
 
     def do_ascend(self):
         self.gold = 0
+        self.stage_from.append(dict(self.gold_from))
+        self.gold_from = {k: 0.0 for k in self.gold_from}
         self.r += 1
         self.snap.append((self.pulls, round(self.total_dps()), [GAME["unit_rarity"][u["type"]][:4] for u in self.placed()][:5]))
         self.ascend_times.append(self.t)
@@ -375,7 +391,9 @@ class Player:
                 self.mats[self.mat_index(RANK[rar])] += round(R["dismantle_base"] * R["dismantle_growth"] ** (RANK[rar] - 1))
             else:
                 one_in = GAME["one_in"][u["type"]]
-                self.gold += math.floor(one_in ** 1.2 * 5) * (1 + 0.5 * self.coin_lv)
+                v = math.floor(one_in ** 1.2 * 5) * (1 + 0.5 * self.coin_lv)
+                self.gold += v
+                self.gold_from["sell"] += v
         self.units = keep
         if R["upgrades"]:
             self.buy_materials()
@@ -422,9 +440,23 @@ class Player:
                     self.fail_streak[u["id"]] = self.fail_streak.get(u["id"], 0) + 1
 
     # ---- the wall ------------------------------------------------
+    def hit_income(self):
+        """Gold per second the placed units earn by hitting the wall (0 without the income rule)."""
+        f = self.R.get("hit_income")
+        if not f:
+            return 0.0
+        tot = 0.0
+        for u in self.placed():
+            lvl = 1 + self.R.get("level_damage", 0) * u["level"]
+            tot += f(RANK[GAME["unit_rarity"][u["type"]]], self.r, self.coin_lv) * lvl
+        return tot * self.R.get("hit_uptime", 1.0)
+
     def fight(self, dt):
         dmg = self.total_dps() * dt
         R = self.R
+        inc = self.hit_income() * dt
+        self.gold += inc
+        self.gold_from["hit"] += inc
         broke = 0
         while dmg >= self.wall_hp and broke < 200:
             dmg -= self.wall_hp
@@ -435,7 +467,9 @@ class Player:
                 continue
             self.layer += 1
             broke += 1
-            self.gold += R["wall_gold"](self.layer, self.r, self.coin_lv)
+            g = R["wall_gold"](self.layer, self.r, self.coin_lv)
+            self.gold += g
+            self.gold_from["wall"] += g
             if R["upgrades"]:
                 self.drop_materials()
             self.wall_hp = self.hp_for(self.layer)
@@ -572,6 +606,12 @@ def report(runs, preset, hours_per_day):
         times = [0.0] + [e[0] for e in p.events if e[1] in ("new_rarity", "level_up", "ascend", "boss", "better_unit")] + [p.t]
         g = [(b - a) / 60 for a, b in zip(times, times[1:])]
         gaps.append(max(g) if g else 0)
+    p = runs[0]
+    if p.stage_from:
+        print("\nfirst run, gold earned per stage: walls / hits / selling (hit share)")
+        for i, gf in enumerate(p.stage_from):
+            tot = sum(gf.values()) or 1
+            print(f"  #{i + 1}: {gf['wall']:>12.3g} {gf['hit']:>12.3g} {gf['sell']:>12.3g}   hits {100 * gf['hit'] / tot:4.0f}%")
     print(f"longest gap without any progress event (new rarity / level up / ascension / boss wall): median {statistics.median(gaps):.1f} min")
 
     p = runs[0]

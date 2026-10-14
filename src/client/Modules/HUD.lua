@@ -201,8 +201,12 @@ function HUD.init(screenGui, deps)
 	goldLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
 	goldLbl.TextXAlignment = Enum.TextXAlignment.Left
 	goldLbl.TextScaled = true
+	goldLbl.RichText = true -- "+X/s" (the army's measured gold rate) after the amount
 	goldLbl.Font = Enum.Font.GothamBold
 	goldLbl.ZIndex = 6
+	game:GetService("Players").LocalPlayer:GetAttributeChangedSignal("GoldRate"):Connect(function()
+		HUD.update()
+	end)
 
 	gemsLbl = Instance.new("TextLabel", currencyFrame)
 	gemsLbl.Size = UDim2.new(1, -50, 0.5, -4)
@@ -266,7 +270,10 @@ function HUD.update()
 		dustFrame.Visible = any
 	end
 	if goldLbl then
+		-- what the army earned (hit coins + wall gold) over the last 30 s, measured by the server (Drops)
+		local rate = game:GetService("Players").LocalPlayer:GetAttribute("GoldRate") or 0
 		goldLbl.Text = fmtCurrency(getGold())
+			.. (rate > 0 and ('  <font color="#B89A4A">+' .. fmtCurrency(math.floor(rate)) .. '/s</font>') or "")
 	end
 	if gemsLbl then
 		gemsLbl.Text = tostring(getGems())

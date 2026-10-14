@@ -4,12 +4,12 @@ local Economy = {}
 Economy.INVENTORY_MAX = 300
 
 -- ============================================================
--- Tuned with tools/sim/economy_sim.py (the "proposed" preset); change the numbers there first and check the pace table.
+-- Tuned with tools/sim/economy_sim.py (the "income" preset); change the numbers there first and check the pace table.
 -- ============================================================
 -- Per ascension, the wall gets tougher and pays more (index k = going from k to k+1 ascensions). Tuned for the gate design.
-local HP_STEP = { 3.5, 3.5, 3.5, 9, 6, 9, 8, 6, 6 }
+local HP_STEP = { 5, 5.5, 5.5, 7.5, 7, 10, 9, 7, 6 }
 local GOLD_STEP = { 4, 4, 4, 5, 5, 5, 4.5, 4, 4 }
-local WALL_HP_BASE, WALL_HP_GROWTH = 300, 1.22 -- HP of layer L = base * growth^(L-1) * ascension steps
+local WALL_HP_BASE, WALL_HP_GROWTH = 300, 1.20 -- HP of layer L = base * growth^(L-1) * ascension steps
 local WALL_GOLD_BASE, WALL_GOLD_GROWTH = 45, 1.12
 Economy.DAMAGE_PER_ASCENSION = 1.5 -- every ascension multiplies the damage of all units
 
@@ -69,6 +69,23 @@ end
 -- Gold for breaking the wall of `layer` (before the coin boost)
 function Economy.wallGold(layer, rebirthCount)
 	return math.floor(WALL_GOLD_BASE * WALL_GOLD_GROWTH ^ (layer - 1) * steps(GOLD_STEP, rebirthCount))
+end
+
+-- ============================================================
+-- Hit income: every unit hitting the wall earns gold per second ON TOP of the break gold, so a player stuck on a tough
+-- wall still earns. Geometric by rarity rank, x the unit's level multiplier, x the per-ascension steps, x the coin boost.
+-- ============================================================
+local INCOME_BASE, INCOME_GROWTH = 3, 1.5 -- gold/s of a Common unit at ascension 0, x1.5 per rarity rank
+local INCOME_STEP = { 4, 4, 3, 2, 1.5, 1.5, 1.5, 1.5, 1.5 }
+
+-- Growth of the hit income from ascensions (the same for every unit)
+function Economy.hitIncomeStep(rebirthCount)
+	return steps(INCOME_STEP, rebirthCount)
+end
+
+-- Gold per second a unit of `rank` and `level` earns while hitting the wall (before the coin boost)
+function Economy.hitIncome(rank, level, rebirthCount)
+	return INCOME_BASE * INCOME_GROWTH ^ ((rank or 1) - 1) * Economy.levelMultiplier(level) * Economy.hitIncomeStep(rebirthCount)
 end
 
 -- Kept for the old ascend panel text: the "multiplier" of an ascension is now the damage multiplier

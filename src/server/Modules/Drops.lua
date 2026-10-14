@@ -22,8 +22,9 @@ local Drops = {}
 
 Drops.COLLECTOR_WALLS = 10 -- walls to break for the Soul Wisp
 local MAGNET_RADIUS = 7
-local MAX_DROPS = 40
+local MAX_DROPS = 80
 local OVERFLOW_SHARE = 0.5
+local WISP_SWEEP = 3 -- the wisp also picks up every drop this close to the one it grabs (coins land in clusters)
 local WISP_SPEED = 14 -- studs per second (slow at first; meant to become a gold upgrade later)
 local WISP_PAUSE = 0.5 -- seconds it lingers after each pick-up
 local WISP_HEIGHT = 5
@@ -46,13 +47,20 @@ root.Parent = workspace
 local byOwner = {} -- [userId] = { folder, plotState, list = { drop }, wisp = Part?, wispTarget = drop? }
 local nextId = 0
 
+-- the army's income for the HUD's "+X/s": gold of every coin dropped (walls and hits) over the last RATE_WINDOW
+-- seconds, set as the player attribute `GoldRate` once per second
+local RATE_WINDOW = 30
+local function noteEarned(s, gold)
+	table.insert(s.earned, { t = os.clock(), gold = gold })
+end
+
 local function stateFor(player, plotState)
 	local s = byOwner[player.UserId]
 	if not s then
 		local folder = Instance.new("Folder")
 		folder.Name = "Drops_" .. player.UserId
 		folder.Parent = root
-		s = { folder = folder, list = {}, phase = math.random() * 100 }
+		s = { folder = folder, list = {}, phase = math.random() * 100, earned = {}, startedAt = os.clock() }
 		byOwner[player.UserId] = s
 	end
 	s.plotState = plotState or s.plotState
@@ -139,6 +147,7 @@ function Drops.spawnWallDrops(player, plotState, gold, dusts, faceFwd)
 	-- gold: 3 to 6 coins depending on the amount
 	gold = math.floor(gold)
 	if gold > 0 then
+		noteEarned(s, gold)
 		local coins = math.clamp(math.floor(math.log10(gold + 1)) + 2, 3, 6)
 		local each = math.floor(gold / coins)
 		for k = 1, coins do
@@ -156,6 +165,37 @@ function Drops.spawnWallDrops(player, plotState, gold, dusts, faceFwd)
 		end
 	end
 	-- overflow: too many drops on the lane, the oldest are collected at a reduced value
+	while #s.list > MAX_DROPS do
+		collect(player, s, 1, "overflow", OVERFLOW_SHARE)
+	end
+end
+
+-- Called by Army with the gold one unit earned by hitting the wall (hit income, already multiplied): `count` coins pop
+-- out of the wall face at `lateral` (where that unit hits) and land on the lane in front of it. `t` (0..1, the unit's
+-- strength) makes the coins bigger, fly higher and land further out.
+function Drops.spawnHitCoins(player, plotState, gold, lateral, count, t)
+	gold = math.floor(gold)
+	if gold <= 0 then return end
+	count = math.clamp(math.min(count, gold), 1, 6)
+	local s = stateFor(player, plotState)
+	noteEarned(s, gold)
+	local faceFwd = plotState.wallFaceFwd
+	local floorY = plotState.frame.Position.Y
+	local from = PlotFrame.toWorld(plotState, lateral, faceFwd + 1.5) + Vector3.new(0, 5, 0)
+	local scale = 0.8 + 0.7 * t
+	local each = math.floor(gold / count)
+	for k = 1, count do
+		local spread = 3 + 3 * t
+		local landLat = math.clamp(lateral + (math.random() * 2 - 1) * spread, -LANE_HALF, LANE_HALF)
+		local p = PlotFrame.toWorld(plotState, landLat, faceFwd - 2 - math.random() * (5 + 6 * t))
+		local pos = Vector3.new(p.X, floorY + 0.9, p.Z)
+		nextId += 1
+		local drop = { id = nextId, kind = "Gold", amount = (k == count) and (gold - each * (count - 1)) or each, pos = pos, born = os.clock() }
+		drop.part = makePart(s, "Gold", pos, from)
+		drop.part.Size *= scale
+		drop.part:SetAttribute("ArcHeight", 4 + 5 * t)
+		table.insert(s.list, drop)
+	end
 	while #s.list > MAX_DROPS do
 		collect(player, s, 1, "overflow", OVERFLOW_SHARE)
 	end
@@ -236,7 +276,13 @@ local function updateWisp(player, s, dt)
 		if s.wispTarget then
 			for i, drop in ipairs(s.list) do
 				if drop == s.wispTarget then
+					local at = drop.pos
 					collect(player, s, i, "wisp")
+					for k = #s.list, 1, -1 do
+						if (s.list[k].pos - at).Magnitude <= WISP_SWEEP then
+							collect(player, s, k, "wisp")
+						end
+					end
 					s.pauseUntil = os.clock() + Economy.wispPause(profile.wispLevel or 0)
 					break
 				end
@@ -276,6 +322,20 @@ RunService.Heartbeat:Connect(function(dt)
 				end
 			end
 			updateWisp(player, s, dt)
+			local now = os.clock()
+			if now - (s.rateAt or 0) >= 1 then
+				s.rateAt = now
+				local sum = 0
+				for i = #s.earned, 1, -1 do
+					if now - s.earned[i].t > RATE_WINDOW then
+						table.remove(s.earned, i)
+					else
+						sum += s.earned[i].gold
+					end
+				end
+				-- (divide by the time the plot has been running while it is shorter than the window)
+				player:SetAttribute("GoldRate", sum / math.clamp(now - s.startedAt, 5, RATE_WINDOW))
+			end
 		end
 	end
 end)
