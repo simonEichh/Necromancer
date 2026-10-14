@@ -181,6 +181,7 @@ require(Modules.HandsAnimator) -- the realm keeper's hands, rifts and eyes behin
 require(Modules.PortalFx) -- the portal behind the gate (door bursts open, rune progress, rejection)
 require(Modules.CodexPanel) -- the Codex: every unit, read in the necromancer's grimoire (tile + C)
 require(Modules.OutfitsPanel) -- the wardrobe: outfit items (tile + O)
+require(Modules.CapeSway) -- the equipped cape sways with walking speed
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)
