@@ -754,9 +754,10 @@ end
 -- gets SpecialAt (server time it starts), SpecialKind, SpecialAim (the spot on the wall) and SpecialSeed (so every client
 -- draws the same chains); basic attacks pause for `duration`, and the damage lands at the `hits` moments. The special
 -- deals `share` of the unit's damage per cycle and basic attacks the rest, so the unit's DPS stays damage / attackCD.
-local SPECIAL_TEST_COOLDOWN = 10 -- in Studio specials charge this fast, to test them
+local SPECIAL_TEST_COOLDOWN = 10 -- in Studio specials charge this fast, to test them (DEV panel: "Specials: fast / real")
 local function specialCooldown(def)
-	return game:GetService("RunService"):IsStudio() and SPECIAL_TEST_COOLDOWN or def.special.cooldown
+	local fast = game:GetService("RunService"):IsStudio() and workspace:GetAttribute("DevFastSpecials") ~= false
+	return fast and SPECIAL_TEST_COOLDOWN or def.special.cooldown
 end
 
 local function chargeSpecial(u, now, cooldown)

@@ -16,6 +16,7 @@ local spawnEvent = ReplicatedStorage:WaitForChild("DevSpawnUnit")
 local clearEvent = ReplicatedStorage:WaitForChild("DevClearUnits")
 local gemsEvent = ReplicatedStorage:WaitForChild("DevGiveGems")
 local goldEvent = ReplicatedStorage:WaitForChild("DevGiveGold")
+local fastSpecialsEvent = ReplicatedStorage:WaitForChild("DevFastSpecials")
 
 local BG = Color3.fromRGB(24, 22, 34)
 local BTN = Color3.fromRGB(44, 40, 62)
@@ -290,10 +291,23 @@ goldX10.Position = UDim2.new(0.6, 4, 0, 168)
 goldX10.MouseButton1Click:Connect(function()
 	goldEvent:FireServer(math.max(1000, (require(script.Parent.State).gold or 0) * 9))
 end)
+-- specials: fast (10 s charge, to test them) or real (the units' own cooldowns and damage per special)
+local specialsBtn = makeButton(panel, "", Color3.fromRGB(255, 170, 190))
+specialsBtn.Size = UDim2.new(1, -16, 0, 28)
+specialsBtn.Position = UDim2.fromOffset(8, 202)
+local function paintSpecials()
+	local fast = workspace:GetAttribute("DevFastSpecials") ~= false
+	specialsBtn.Text = fast and "Specials: FAST (10 s)" or "Specials: REAL cooldowns"
+end
+paintSpecials()
+workspace:GetAttributeChangedSignal("DevFastSpecials"):Connect(paintSpecials)
+specialsBtn.MouseButton1Click:Connect(function()
+	fastSpecialsEvent:FireServer(not (workspace:GetAttribute("DevFastSpecials") ~= false))
+end)
 
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -210)
-list.Position = UDim2.fromOffset(8, 204)
+list.Size = UDim2.new(1, -16, 1, -244)
+list.Position = UDim2.fromOffset(8, 238)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6

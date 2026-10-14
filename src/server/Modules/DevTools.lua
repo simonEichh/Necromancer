@@ -86,6 +86,14 @@ Remotes.DevGiveGems.OnServerEvent:Connect(function(player, amount)
 end)
 
 -- ============================================================
+-- Specials: fast (10 s charge, the default in Studio) or real (the units' own cooldowns); a workspace attribute the
+-- Army reads when a special starts charging, so units already charging keep their current charge
+-- ============================================================
+Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)
+	workspace:SetAttribute("DevFastSpecials", fast == true)
+end)
+
+-- ============================================================
 -- Gold
 -- ============================================================
 Remotes.DevGiveGold.OnServerEvent:Connect(function(player, amount)
