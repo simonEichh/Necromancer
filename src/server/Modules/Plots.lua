@@ -255,7 +255,7 @@ local function releasePlot(player)
 	local id = tostring(player.UserId)
 	local plotState = playerPlots[id]
 	if plotState then
-		for _, w in ipairs(plotState.wallQueue or {}) do
+		for _, w in pairs(plotState.wallQueue or {}) do
 			if w and w.Parent then w:Destroy() end
 		end
 		for _, ext in ipairs(plotState.groundExtensions) do

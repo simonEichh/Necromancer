@@ -181,7 +181,8 @@ local WALL_MATERIALS = {
 }
 
 -- ── Walls ─────────────────────────────────────────────────────
--- All walls of a run stand in the lane from the start, WALL_SPACING apart. plotState.wallQueue[layer] is the wall of that
+-- Only the wall being fought stands: the entity conjures the next one when a wall breaks, and it rises out of the ground
+-- (WALL_RISE_TIME) while the army marches on. plotState.wallQueue[layer] is the wall of that
 -- layer. The army fights the wall of plotState.wallLayer; when it breaks the army marches on to the next one
 -- (plotState.wallFwd / wallTargetFwd / wallFaceFwd follow the front wall, Army reads them every frame).
 local function wallFwdOf(layer)
@@ -200,7 +201,9 @@ local function setFront(plotState, layer)
 	plotState.wallTarget = PlotFrame.toWorld(plotState, 0, plotState.wallTargetFwd)
 end
 
-local function spawnWall(layer, plotState)
+local WALL_RISE_TIME = 2.5 -- seconds a new wall takes to rise out of the ground
+
+local function spawnWall(layer, plotState, rise)
 	local height = wallHeight(layer)
 	local gate = Economy.isGate(layer)
 	local wallPart = Instance.new("Part")
@@ -225,10 +228,21 @@ local function spawnWall(layer, plotState)
 			end
 		end
 		CollectionService:AddTag(m, "StagedWall")
+		if rise then
+			-- the clients raise it out of the ground (Modules/WallStages); the invisible collider stands at once
+			m:SetAttribute("RiseStart", workspace:GetServerTimeNow())
+			m:SetAttribute("RiseTime", WALL_RISE_TIME)
+		end
 		m.Parent = wallPart
 		height += WALL_MODEL_GUI_LIFT
 	end
 	wallPart.Parent = workspace
+	if rise and not template then
+		-- a plain slab (the gate, for now) rises on the server
+		local up = wallPart.CFrame
+		wallPart.CFrame = up - Vector3.new(0, height, 0)
+		TweenService:Create(wallPart, TweenInfo.new(WALL_RISE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = up }):Play()
+	end
 
 	-- small "Wall N" tag above the wall (sized in studs, so it shrinks with distance); only the gate is visible from afar
 	local gui = Instance.new("BillboardGui", wallPart)
@@ -300,10 +314,7 @@ local function initWallQueue(plotState)
 		table.insert(plotState.groundExtensions, cap)
 	end
 
-	plotState.wallQueue = {}
-	for layer = 1, NUM_WALLS do
-		plotState.wallQueue[layer] = spawnWall(layer, plotState)
-	end
+	plotState.wallQueue = { spawnWall(1, plotState, false) }
 	activateWall(plotState, 1)
 	updateWallGui(plotState)
 end
@@ -366,6 +377,7 @@ local function breakWall(plotState)
 		plotState.WALL_MAX_HP = Economy.wallHp(plotState.wallLayer, ownerRebirths(plotState))
 		plotState.wallHP = plotState.WALL_MAX_HP
 		plotState.wallRegen = plotState.wallLayer * 2
+		plotState.wallQueue[plotState.wallLayer] = spawnWall(plotState.wallLayer, plotState, true)
 		activateWall(plotState, plotState.wallLayer)
 		updateWallGui(plotState)
 	else

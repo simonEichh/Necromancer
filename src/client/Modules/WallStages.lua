@@ -4,11 +4,15 @@
 --   2 (50 %)     cracks with soul light open in the middle, the cross tilts
 --   3 (25 %)     the middle caves in, its coping slides off, the middle fence falls, the lanterns drop
 --   4 (broken)   everything collapses, the middle first and the wings last, then it fades (the server removes it)
+-- A new wall (attributes RiseStart / RiseTime, set by the server when the next wall is conjured) first rises out of the
+-- ground with dust and a tremble; its stages are applied after the rise.
 -- Purely cosmetic and client side. A wall first seen at a later stage gets the earlier stages instantly.
 local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
+local RISE_DEPTH = 30 -- studs below the floor a rising wall starts (the tallest piece, the cross, reaches about 28)
 local MIDDLE_ANGLE = 28 -- degrees: segments / pickets inside this are "the middle" (where the fence stands)
 local DUST_COLOR = Color3.fromRGB(120, 112, 100)
 
@@ -279,6 +283,34 @@ STAGES[4] = function(w, t)
 end
 
 -- ============================================================
+-- Rising out of the ground (blocks until done; `left` = seconds of the rise still to go)
+-- ============================================================
+local function rise(w, left, total)
+	local model = w.model
+	local final = w.pivot
+	for i, seg in ipairs(w.segments) do
+		if i % 3 == 1 then
+			dust(seg:GetPivot().Position + Vector3.new(0, 1, 0) + w.front * 2, 18)
+		end
+	end
+	local t0 = os.clock() - (total - left)
+	while model.Parent do
+		local f = math.clamp((os.clock() - t0) / total, 0, 1)
+		local e = 1 - (1 - f) ^ 2
+		local shake = 0.25 * (1 - e)
+		model:PivotTo(final * CFrame.new((math.random() - 0.5) * shake, -RISE_DEPTH * (1 - e), (math.random() - 0.5) * shake))
+		if f >= 1 then
+			break
+		end
+		RunService.Heartbeat:Wait()
+	end
+	if model.Parent then
+		model:PivotTo(final)
+		dust(w.center + w.front * 3, 20)
+	end
+end
+
+-- ============================================================
 -- Registering walls
 -- ============================================================
 local registered = setmetatable({}, { __mode = "k" })
@@ -339,6 +371,16 @@ local function register(model)
 			end
 		end
 	end
+	local riseStart = model:GetAttribute("RiseStart")
+	if riseStart then
+		local total = model:GetAttribute("RiseTime") or 2.5
+		local left = riseStart + total - workspace:GetServerTimeNow()
+		if left > 0.1 then
+			model:PivotTo(w.pivot * CFrame.new(0, -RISE_DEPTH, 0)) -- hidden until the rise starts moving
+			rise(w, left, total)
+		end
+	end
+	if not model.Parent then return end
 	apply(false)
 	model:GetAttributeChangedSignal("Stage"):Connect(function()
 		apply(true)
