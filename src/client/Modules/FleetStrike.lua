@@ -1429,14 +1429,14 @@ local CUES = {
 		at = PULSE_AT - VOICE_CALL_LENGTH - 0.25, name = "voice_call", near = true, voice = true, duration = VOICE_CALL_LENGTH,
 		phrases = {
 			{ at = 0, text = "HIGH COMMAND. ", reveal = 0.9 },
-			{ at = 1.65, text = "GRANT US PASSAGE.", reveal = 1.25 },
+			{ at = 2.0, text = "GRANT US PASSAGE.", reveal = 1.25 },
 		},
 	},
 	{
 		at = FIRE_AT - VOICE_VERDICT_LENGTH - 0.5, name = "voice_verdict", near = true, voice = true, duration = VOICE_VERDICT_LENGTH,
 		phrases = {
 			{ at = 0, text = "ABSOLUTION. ", reveal = 0.95 },
-			{ at = 1.8, text = "DELIVER MY VERDICT.", reveal = 1.5 },
+			{ at = 2.1, text = "DELIVER MY VERDICT.", reveal = 1.5 },
 		},
 	},
 	{
