@@ -131,17 +131,19 @@ local function blade(to, name, cf, w, L, t, opts)
 	local d = w / math.sqrt(2)
 	local plateColor = opts.color or CHROME
 	deco(to, name, Vector3.new(w, body, t), cf * CFrame.new(0, body / 2, 0), plateColor)
-	deco(to, name .. "Tip", Vector3.new(d, d, t), cf * CFrame.new(0, body, 0) * CFrame.Angles(0, 0, math.rad(45)), plateColor)
+	-- (no two faces of different colour may share a plane, or they flicker (z-fighting): the tip is a hair thinner than
+	-- the plate, its lining thinner than the body's lining, and the silver edges stand a little proud of the plate)
+	deco(to, name .. "Tip", Vector3.new(d, d, t * 0.94), cf * CFrame.new(0, body, 0) * CFrame.Angles(0, 0, math.rad(45)), plateColor)
 	if opts.lining then
 		deco(to, name .. "Lining", Vector3.new(w * 0.86, body - 0.08, t * 0.4),
 			cf * CFrame.new(0, body / 2, -t * 0.65), LINING, FABRIC)
-		deco(to, name .. "LiningTip", Vector3.new(d * 0.86, d * 0.86, t * 0.4),
-			cf * CFrame.new(0, body, -t * 0.65) * CFrame.Angles(0, 0, math.rad(45)), LINING_DARK, FABRIC)
+		deco(to, name .. "LiningTip", Vector3.new(d * 0.86, d * 0.86, t * 0.24),
+			cf * CFrame.new(0, body, -t * 0.65) * CFrame.Angles(0, 0, math.rad(45)), LINING, FABRIC)
 	end
 	for _, s in ipairs({ -1, 1 }) do
-		deco(to, name .. "Edge", Vector3.new(0.045, body, t + 0.025), cf * CFrame.new(s * (w / 2 - 0.0225), body / 2, 0), SILVER)
-		deco(to, name .. "TipEdge", Vector3.new(0.045, d, t + 0.025),
-			cf * CFrame.new(s * w / 4, body + w / 4, 0) * CFrame.Angles(0, 0, s * math.rad(45)), SILVER)
+		deco(to, name .. "Edge", Vector3.new(0.045, body + 0.024, t + 0.025), cf * CFrame.new(s * (w / 2 - 0.0105), body / 2, 0), SILVER)
+		deco(to, name .. "TipEdge", Vector3.new(0.045, d + 0.03, t + 0.035),
+			cf * CFrame.new(s * w / 4, body + w / 4, 0) * CFrame.Angles(0, 0, s * math.rad(45)) * CFrame.new(s * 0.012, 0, 0), SILVER)
 	end
 	local side = opts.seamSide or 1
 	if body > 0.4 then
@@ -265,7 +267,7 @@ for i, y in ipairs({ 5.42, 5.12, 4.82 }) do
 	end
 	if i == 2 then
 		for _, s in ipairs({ -1, 1 }) do
-			bar(torso, "ChevronGlow", Vector3.new(s * half * 0.8, y + 0.04, -0.445), Vector3.new(s * 0.04, y - 0.13, -0.445), 0.025, 0.02, GLOW, NEON)
+			bar(torso, "ChevronGlow", Vector3.new(s * half * 0.8, y + 0.04, -0.452), Vector3.new(s * 0.04, y - 0.13, -0.452), 0.025, 0.02, GLOW, NEON)
 		end
 	end
 end
@@ -274,7 +276,7 @@ glow(torso, "ChestGem", Vector3.new(0.13, 0.13, 0.05), CFrame.new(0, 4.4, -0.44)
 glow(torso, "ChestGemCore", Vector3.new(0.05, 0.05, 0.05), CFrame.new(0, 4.4, -0.46) * CFrame.Angles(0, 0, math.rad(45))).Color = GLOW_CORE
 -- abdomen plates below the chest
 for i, y in ipairs({ 4.18, 4.32 }) do
-	deco(torso, "AbPlate" .. i, Vector3.new(0.6 - i * 0.06, 0.11, 0.06), Vector3.new(0, y, -0.38), CHROME_LIGHT)
+	deco(torso, "AbPlate" .. i, Vector3.new(0.6 - i * 0.06, 0.11, 0.06), Vector3.new(0, y, -0.392), CHROME_LIGHT)
 end
 -- a chain hanging in a sag across the chest, from the left chevron to a pin on the right
 do
@@ -296,7 +298,7 @@ for _, s in ipairs({ -1, 1 }) do
 	glow(torso, "CoatBackSeamSide", Vector3.new(0.03, 1.1, 0.02), Vector3.new(s * 0.4, 4.6, 0.465))
 	deco(torso, "CoatSide", Vector3.new(0.12, 1.72, 0.84), Vector3.new(s * 0.67, 4.8, 0.02), CHROME)
 	deco(torso, "CoatFront", Vector3.new(0.32, 1.66, 0.1), Vector3.new(s * 0.52, 4.8, -0.4), CHROME)
-	deco(torso, "CoatFrontEdge", Vector3.new(0.035, 1.66, 0.12), Vector3.new(s * 0.37, 4.8, -0.4), SILVER)
+	deco(torso, "CoatFrontEdge", Vector3.new(0.035, 1.69, 0.12), Vector3.new(s * 0.37, 4.8, -0.4), SILVER)
 	glow(torso, "CoatFrontSeam", Vector3.new(0.03, 1.2, 0.02), Vector3.new(s * 0.6, 4.65, -0.455))
 	-- buckled straps across the coat front
 	for j, y in ipairs({ 4.3, 4.55 }) do
@@ -337,7 +339,7 @@ deco(head, "Chin", Vector3.new(0.38, 0.38, 0.1), CFrame.new(0, 5.92, -0.35) * CF
 for _, s in ipairs({ -1, 1 }) do
 	-- cheek plates angled back along the sides of the face, silver edged
 	deco(head, "Cheek", Vector3.new(0.08, 0.6, 0.44), CFrame.new(s * 0.31, 6.15, -0.18) * CFrame.Angles(0, s * 0.25, s * -0.08), CHROME)
-	deco(head, "CheekEdge", Vector3.new(0.09, 0.6, 0.03), CFrame.new(s * 0.27, 6.15, -0.39) * CFrame.Angles(0, s * 0.25, s * -0.08), SILVER)
+	deco(head, "CheekEdge", Vector3.new(0.096, 0.62, 0.03), CFrame.new(s * 0.27, 6.15, -0.392) * CFrame.Angles(0, s * 0.25, s * -0.08), SILVER)
 	-- the side module (ear): a disc, a silver ring and a light
 	cyl(head, "EarDisc", Vector3.new(s * 0.33, 6.25, 0.08), Vector3.new(1, 0, 0), 0.08, 0.34, CHROME_LIGHT)
 	cyl(head, "EarRing", Vector3.new(s * 0.36, 6.25, 0.08), Vector3.new(1, 0, 0), 0.03, 0.3, SILVER)
@@ -443,7 +445,7 @@ do
 		local b = (hf * CFrame.new(f.x, 0.04 * f.curl, -0.33 - f.l)).Position
 		local c = (hf * CFrame.new(f.x, 0.14 * f.curl, -0.33 - f.l - (f.curl < 1 and 0.14 or 0.11))).Position
 		bar(rHand, i == 4 and "IndexFinger" or "Finger" .. i, a, b, 0.065, 0.065, CHROME_LIGHT)
-		bar(rHand, i == 4 and "IndexTip" or "FingerTip" .. i, b, c, 0.06, 0.06, SILVER)
+		bar(rHand, i == 4 and "IndexTip" or "FingerTip" .. i, b, c, 0.052, 0.052, SILVER)
 	end
 	local ta = (hf * CFrame.new(0.16, 0, -0.1)).Position
 	local tb = (hf * CFrame.new(0.26, 0.06, -0.24)).Position
@@ -458,8 +460,14 @@ do
 	local pane = deco(rHand, "HoloPanel", Vector3.new(W, H, 0.02), pf, GLOW, NEON)
 	pane.Transparency = 0.86
 	light(pane, 6, 1.1)
+	-- each kind of line on its own layer in front of the pane (lines in the pane's own plane flicker: z-fighting)
+	local HOLO_DEPTH = {
+		HoloFrameV = -0.014, HoloFrameH = -0.016, HoloCornerH = -0.02, HoloCornerV = -0.022, HoloMarker = -0.014,
+		HoloMarkerDot = -0.014, HoloRing = -0.026, HoloRingInner = -0.032, HoloCrossH = -0.038,
+		HoloCrossV = -0.042, HoloTick = -0.046, HoloCore = -0.052, HoloGlyphs = -0.058,
+	}
 	local function holo(name, size, cf, transparency, color)
-		local p = deco(rHand, name, size, pf * cf, color or GLOW, NEON)
+		local p = deco(rHand, name, size, pf * CFrame.new(0, 0, HOLO_DEPTH[name] or -0.014) * cf, color or GLOW, NEON)
 		p.Transparency = transparency
 		return p
 	end
@@ -562,7 +570,7 @@ local function leg(side, x)
 	deco(shin, "Greave", Vector3.new(0.34, 0.95, 0.08), Vector3.new(x, 1.78, -0.22), CHROME)
 	deco(shin, "GreaveTip", Vector3.new(0.24, 0.24, 0.08), CFrame.new(x, 1.3, -0.22) * CFrame.Angles(0, 0, math.rad(45)), CHROME)
 	for _, s in ipairs({ -1, 1 }) do
-		deco(shin, "GreaveEdge", Vector3.new(0.03, 0.85, 0.1), Vector3.new(x + s * 0.16, 1.83, -0.22), SILVER)
+		deco(shin, "GreaveEdge", Vector3.new(0.03, 0.83, 0.1), Vector3.new(x + s * 0.16, 1.83, -0.22), SILVER)
 	end
 	glow(shin, "GreaveSeam", Vector3.new(0.03, 0.7, 0.02), Vector3.new(x, 1.85, -0.265))
 	deco(shin, "CalfPlate", Vector3.new(0.32, 0.8, 0.08), Vector3.new(x, 1.9, 0.23), CHROME_LIGHT)
@@ -687,12 +695,12 @@ end
 do
 	local hinge, frame = droneRing(2, CFrame.Angles(math.rad(-20), 0, math.rad(-38)), -1.1)
 	ringSegments(hinge, "DroneRing2", frame, 0.62, 28, 0.07, 0.12, CHROME)
-	ringSegments(hinge, "DroneRing2Edge", frame, 0.62, 28, 0.08, 0.025, SILVER)
+	ringSegments(hinge, "DroneRing2Edge", frame, 0.62, 31, 0.085, 0.025, SILVER) -- (31 segments: their joins never line up with the band's)
 	for k = 0, 2 do
 		local a = k / 3 * math.pi * 2
 		local at = frame * CFrame.Angles(0, -a, 0) * CFrame.new(0.62, 0, 0)
 		deco(hinge, "DroneNode", Vector3.new(0.12, 0.16, 0.12), at, SILVER)
-		glow(hinge, "DroneNodeGlow", Vector3.new(0.06, 0.08, 0.13), at * CFrame.new(0.03, 0, 0))
+		glow(hinge, "DroneNodeGlow", Vector3.new(0.07, 0.08, 0.13), at * CFrame.new(0.03, 0, 0)) -- (a hair proud of the node)
 	end
 end
 -- ring 3: the broken outer C-ring, nearly upright, turning slowly; pointed ends at the gap
