@@ -1,5 +1,25 @@
 # Backlog, state and open issues
 
+## State at the end of the 2026-10-15 / 16 session (read this first)
+
+**Built and committed:** Malak's pull cinematic (`SovereignArrival`: sky tear, the Absolution's bow, the drop pod,
+his line) and his pull (Celestial only, weight 0.05); the plaza redesign "The Ossuary Court" (floor + sigil, Soul Well,
+balustrade rim, atmosphere, the Reliquary showcase with "Pulled by" via `ShowcasePulls`); Codex titles + Knell fix +
+clickable tabs; grave runes instead of "Empty"; the outer wall as dark fortress stone in 8 sections with rose windows;
+the Forgotten Cemetery wall section behind claimed plots (crypts open with realm progress, the keeper's hands now rest
+on the parapet: `Titans` HANDS_RAISE / HANDS_BACK); the ascension cinematic (`AscensionCinematic`, DEV Anim: Ascend).
+
+**Untested / to check first:**
+- A REAL ascension with the cinematic (new tombstone rising, the crypt bursting open, the timing); only the preview ran.
+- The keeper's hand animations (slam, weave, defeat, return) at the new raised position.
+- Malak's pull in a real Celestial pull; the Reliquary's "Pulled by" across servers.
+- Save the place file after the Studio builds (plaza, ring, cemetery section, Reliquary, Absolution).
+
+**Open, agreed for later:** Soul Well reactions to rare pulls / ascensions (server-wide banner), leaderboard obelisks,
+plaza ambient sounds (need files), the luck rework (point 7 below), a crypt-opening effect outside the cinematic, the
+realm's last ascension through the portal (its own cinematic, when realm 2 exists). Next big feature suggested:
+necromancer spells (design with the user).
+
 ## State at the end of the 2026-10-15 Malak session (read this first)
 
 **Built and committed:** formation spacing; **Malak, the Envoy** (first Sovereign; model + drone, idle, orbital tag

@@ -77,3 +77,19 @@ Dark gothic restyle, no emojis anywhere, 3D rendered unit portraits (ViewportFra
 ## Batch dismantle and the upgrade refund
 
 The Forge panel's third tab **Dismantle** (`ForgePanel`, `salvage` frame): "Up to" rarity cycle, "Keep Lv 1+" toggle (on by default), a live preview (units, dust per type with icons) and a list of exactly which units it takes (grouped "Skelly  x3", rarity stripe, Lv tag, highest rarity first), red "Dismantle all" with a "Sure?" confirm. Server `UnitUpgrades` `DismantleAll(maxRank, keepUpgraded)` (Forge only like single dismantle: `ShopNpcs.nearForge`, Remote Forge counts; locked units and units on graves never touched; 1 s rate limit) answers `DismantleAllResult(count, totals)` BEFORE the deferred DataSync, so the panel holds the sync (`Sync.hold`) while `ForgeScene.playBatchDismantle` plays one combined burst (anvil flash and fire flare, one dust stream per dust type into its crucible, ~2 s, Skip/Quick). **Refund:** `Economy.dismantleDust(rarity, level)` = the base `dismantleYield(rank)` + `DISMANTLE_REFUND` (50 %) of the dust the unit's levels cost (successful steps only); single and batch dismantle both use it (the user: low-rarity units fall off fast and upgrades should not feel wasted).
+
+## The ascension cinematic (2026-10-16)
+
+Client `Modules/AscensionCinematic` (~15 s, Skip), played by the Ascend button (`AscendPanel`; falls back to the plain
+ascend if it cannot play). A fade puts the character on its own plot facing the lane (plots carry the attribute
+`OwnerId`, set by the server's Plots); 1. every own unit on the lane dissolves into a soul (neon ball + trail) that
+flies along an arc into the necromancer (`NecroRitual`, hands forward); 2. the rite: the necromancer rises in a rune
+circle with one `MagicCircle` ring per ascension (max 9), hands up, "x1.5 DAMAGE / ASCENSION n" burns in; at
+`ASCEND_AT` 5 s it fires `PlayerAscend("cinematic")`: the server ascends but does not teleport the character;
+3. the reward: the server's new tombstone at `GraveSpot<5 + n>` rises out of the earth (locally), the newly unlocked
+grave tier's model (`Graves.unlockAscension`) appears turning over the plot with its name; 4. the camera looks down
+the lane to the realm wall: a crypt the server just opened (PlotLook) is kept looking sealed until `CRYPT_AT`, then
+bursts open in green souls; the keeper's hands return (server). 5. a fade and the client puts the character in the
+plaza. AscendPanel's "ASCENDED!" banner is skipped while it plays. DEV panel `Anim: Ascend` plays it as a preview
+(never ascends: no new tombstone, no crypt). The realm's last ascension (through the portal) gets its own cinematic
+later.

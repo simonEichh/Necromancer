@@ -103,19 +103,23 @@ ascendConfirmBtn.MouseButton1Click:Connect(function()
 	if not State.gateCleared then
 		return
 	end
-	-- The server checks the cost and performs the ascension; Sync reports back
+	-- The server checks the cost and performs the ascension; Sync reports back. Normally through the ascension
+	-- cinematic (Modules/AscensionCinematic: it fires PlayerAscend itself, mid-way); the plain way if it cannot play.
+	ascendPanel.Visible = false
+	if require(script.Parent.AscensionCinematic).play() then
+		return
+	end
 	local ascendRemote = ReplicatedStorage:FindFirstChild("PlayerAscend")
 	if ascendRemote then
 		ascendRemote:FireServer()
 	end
-	ascendPanel.Visible = false
 end)
 
 Sync.onApplied(function(ascended)
 	if ascendPanel.Visible then
 		updateAscendPanel()
 	end
-	if ascended then
+	if ascended and not require(script.Parent.AscensionCinematic).active then
 		showBigText(
 			"ASCENDED!",
 			"Ascension " .. State.rebirthCount .. "  |  " .. string.format("%.1fx", Economy.damageMultiplier(State.rebirthCount)) .. " Damage",

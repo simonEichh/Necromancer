@@ -205,6 +205,7 @@ initPlotForPlayer = function(player)
 		end
 	end
 	playerPlots[tostring(player.UserId)] = plotState
+	plotModel:SetAttribute("OwnerId", player.UserId) -- (the client finds its own plot by this: the ascension cinematic)
 	Portal.open(plotState, player, true) -- the run's portal stands sealed behind the gate
 	-- players join on the plaza, facing their plot (the titan climbs up when they first step onto it, see Titans)
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -217,7 +218,9 @@ initPlotForPlayer = function(player)
 end
 
 -- Ascends the player (the Ascend button, or walking through the open portal at a realm's last ascension)
-local function ascendPlayer(player)
+-- mode "cinematic": the client's ascension cinematic (Modules/AscensionCinematic) is playing on the plot and moves the
+-- character to the plaza itself when it ends, so the server does not teleport it
+local function ascendPlayer(player, mode)
 	local plotState = getPlot(player)
 	if not plotState then return end
 	if not PlayerData.ascend(player) then return end -- can't afford it
@@ -255,7 +258,7 @@ local function ascendPlayer(player)
 	end
 	-- the player goes back to the main plaza (the same spot the SHOPS button uses)
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if hrp then
+	if hrp and mode ~= "cinematic" then
 		local hub = workspace:GetAttribute("HubSpawn") or Vector3.new(0, 3, 24)
 		hrp.CFrame = CFrame.lookAt(hub, hub + Vector3.new(0, 0, -1))
 	end
@@ -286,6 +289,9 @@ local function releasePlot(player)
 			if slot.slab and slot.slab.Parent then slot.slab:Destroy() end
 		end
 		plotOccupied[plotState.plotIndex] = false
+		if plotState.plotModel then
+			plotState.plotModel:SetAttribute("OwnerId", nil)
+		end
 		playerPlots[id] = nil
 	end
 end
