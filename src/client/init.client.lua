@@ -189,6 +189,7 @@ require(Modules.ForgePanel)
 require(Modules.GemShopPanel) -- the Gem Shop (Shop tile, right) and the Remote Forge tile (left)
 require(Modules.SettingsPanel) -- the Settings tile (top right) and panel: sound volumes, saved
 require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
+require(Modules.ReliquaryShowcase) -- the plaza's showcase pedestal: a big chase unit turning, its real odds on the plate
 require(Modules.AltarFx) -- the Soul Altar's braziers burn as high as the realm upgrade levels
 require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 (none from 10: the shadow form)
 require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
