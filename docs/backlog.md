@@ -36,6 +36,10 @@ the originals (`sounds/_source/`, git-ignored) and the .wav drafts in `impacts/`
    the same factor (ship model, SKY_HEIGHT / SKY_SIDE / SKY_LEFT, PORTAL_RADIUS, the tear's vortex, beam / projectile
    lengths), so it looks the same but sits inside ~300 studs. **Done (untested by the user): `SKY_SCALE = 1/3` in FleetStrike.lua
    (the ship is `ScaleTo`'d, projectile speeds scaled so flight times stay, beam width x0.6 = `BEAM_WIDTH`).**
+   **User (2026-10-15): fine that it is closer, but the ship should look a bit BIGGER.** Options: scale the ship on its
+   own (e.g. a separate SHIP_SCALE ~0.4-0.45 while the distances stay at SKY_SCALE 1/3: check it still clears the
+   portal, the ship-relative offsets in warpIn / barrage / finale use SKY_SCALE and would need SHIP_SCALE), or tighter
+   lenses (lower FOV) in the warp-in / barrage camera keys. Keep it within ~300 studs of the camera.
 
 ## State at the end of the 2026-10-14 / 15 session (read this first)
 
