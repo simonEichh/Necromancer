@@ -6,7 +6,7 @@
 -- the unit's projectileSpeed:
 --   * a burst ring at the bow on release, then a shockwave ring every RING_EVERY studs along the flight (a thin neon disc
 --     across the path that bursts outward and fades), a short bright trail behind it;
---   * on arrival it sticks in the stone (the head buried), quivers on a damped wobble, throws chips, dust and a flash
+--   * on arrival it sticks in the stone (the head buried), quivers on a damped wobble, throws chips, dust and a
 --     ring, stays a moment and fades.
 -- Base form: a bone arrow, pale rings; shadow form (model attribute Form = "Shadow"): an obsidian arrow with a violet
 -- head, violet rings and trail. Arrows far from the camera are not drawn.
@@ -152,15 +152,6 @@ local function impact(arrow, tip, dir, pal)
 	end)
 	-- a flash ring on the stone, chips and dust thrown back towards the archer
 	ring(tip - dir * 0.1, dir, pal, 0.4, 2.6, 0.25)
-	local flash = newPart("ArrowFlash", Vector3.one * 0.3, pal.ring, Enum.Material.Neon)
-	flash.Shape = Enum.PartType.Ball
-	flash.CFrame = CFrame.new(tip - dir * 0.2)
-	flash.Transparency = 0.1
-	TweenService:Create(flash, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.one * 1.4,
-		Transparency = 1,
-	}):Play()
-	Debris:AddItem(flash, 0.2)
 	local src = newPart("ArrowChips", Vector3.one * 0.2, Color3.new())
 	src.Transparency = 1
 	src.CFrame = CFrame.lookAt(tip - dir * 0.2, tip - dir * 1.2)

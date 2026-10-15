@@ -116,18 +116,8 @@ local function slash(origin, normal, scale, shadow)
 	local bulge = (right - up).Unit * 0.45 * scale -- the arc of the swing bows out a little
 	stroke(normal, a, b, bulge, 0.3, SLASH_COLOR, glowColor, 0, SLASH_SWEEP, scale)
 
-	-- the flash where the edge bites (the middle of the cut)
+	-- (no flash ball: the cut itself is the hit; the sparks fly from where the edge bites)
 	local centre = (a + b) / 2 + bulge + normal * 0.3
-	local core = newPart("HitCore", Vector3.one * 0.5 * scale, CFrame.new(centre))
-	core.Shape = Enum.PartType.Ball
-	core.Color = SLASH_COLOR
-	core.Material = Enum.Material.Neon
-	core.Transparency = 0.1
-	TweenService:Create(core, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.one * 2.2 * scale,
-		Transparency = 1,
-	}):Play()
-	Debris:AddItem(core, 0.25)
 
 	-- sparks fly off along the cut, away from the wall
 	local cut = (b - a).Unit
@@ -289,18 +279,6 @@ local function crush(origin, normal, scale, shadow)
 	}):Play()
 	Debris:AddItem(ring, 0.4)
 
-	-- the core flash
-	local core = newPart("HitCore", Vector3.one * 0.6 * scale, CFrame.new(origin + normal * 0.3))
-	core.Shape = Enum.PartType.Ball
-	core.Material = Enum.Material.Neon
-	core.Color = pal.hot
-	core.Transparency = 0.1
-	TweenService:Create(core, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.one * 2.6 * scale,
-		Transparency = 1,
-	}):Play()
-	Debris:AddItem(core, 0.3)
-
 	-- the cracks: CRACK_COUNT jagged lines of 3 segments each, spreading outward
 	for i = 1, CRACK_COUNT do
 		local angle = (i / CRACK_COUNT) * math.pi * 2 + (math.random() - 0.5) * 0.5
@@ -409,6 +387,55 @@ local function crush(origin, normal, scale, shadow)
 	end
 end
 
+-- Style "Screech" (the Crypt Bat's dive): three small, sharp gashes raked by its hind claws, then the screech: a pale
+-- sound ring bursts out over the wall face and a fainter second one follows; a puff of stone dust. The shadow form's
+-- gashes keep a white core (its fangs) with violet round them, and violet rings.
+local SCREECH_RING = Color3.fromRGB(220, 226, 240)
+
+local function screech(origin, normal, scale, shadow)
+	local right = (-normal):Cross(Vector3.yAxis)
+	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
+	local up = Vector3.yAxis
+	local ringColor = shadow and SHADOW_GLOW or SCREECH_RING
+	for i = -1, 1 do
+		local off = right * (i * 0.22 * scale)
+		local a = origin + off + (up * 0.55 + right * 0.15) * scale
+		local b = origin + off - (up * 0.45 + right * 0.05) * scale
+		stroke(normal, a, b, right * 0.06 * scale, 0.08, Color3.fromRGB(245, 242, 232), shadow and SHADOW_GLOW or Color3.fromRGB(190, 182, 165), math.abs(i) * 0.02, 0.05, scale)
+	end
+	for k, delay in ipairs({ 0.03, 0.14 }) do
+		task.delay(delay, function()
+			local ringCF = CFrame.lookAt(origin + normal * (0.1 + k * 0.05), origin + normal * 1.1) * CFrame.Angles(0, math.rad(90), 0)
+			local ring = newPart("ScreechRing", Vector3.new(0.05, 0.6 * scale, 0.6 * scale), ringCF)
+			ring.Shape = Enum.PartType.Cylinder
+			ring.Material = Enum.Material.Neon
+			ring.Color = ringColor
+			ring.Transparency = (k == 1) and 0.35 or 0.6
+			TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = Vector3.new(0.02, (k == 1 and 5.5 or 7) * scale, (k == 1 and 5.5 or 7) * scale),
+				Transparency = 1,
+			}):Play()
+			Debris:AddItem(ring, 0.4)
+		end)
+	end
+	local emitterPart = newPart("HitEmitter", Vector3.one * 0.2, CFrame.lookAt(origin + normal * 0.3, origin + normal * 1.3))
+	emitterPart.Transparency = 1
+	local dust = Instance.new("ParticleEmitter")
+	dust.Texture = DUST_TEXTURE
+	dust.Color = ColorSequence.new(Color3.fromRGB(165, 158, 145))
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6 * scale), NumberSequenceKeypoint.new(1, 2 * scale) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 1) })
+	dust.Lifetime = NumberRange.new(0.4, 0.7)
+	dust.Speed = NumberRange.new(2, 4)
+	dust.SpreadAngle = Vector2.new(60, 60)
+	dust.EmissionDirection = Enum.NormalId.Front
+	dust.LightInfluence = 1
+	dust.Rate = 0
+	dust.Parent = emitterPart
+	dust:Emit(3)
+	Debris:AddItem(emitterPart, LIFETIME)
+end
+
 -- The server sends a point on the wall's nominal face plane, but the wall models have stones sticking out past it, so a
 -- flat cut drawn there sits inside the stone. Cast a ray from in front of the wall back along -normal and return the
 -- real surface point (only anchored parts count: the units in the way are unanchored); nil if nothing was hit.
@@ -460,7 +487,7 @@ local function flash(position, forward, damage, isGhost, style)
 	if style == "Arrow" or style == "Venom" then
 		return -- (projectiles draw their own impact when they arrive: ArrowFx, VenomFx)
 	end
-	if style == "Slash" or style == "Claw" or style == "Crush" then
+	if style == "Slash" or style == "Claw" or style == "Crush" or style == "Screech" then
 		-- the cuts lie flat on the wall: sample the real (bumpy) surface across the area they cover and put them just in
 		-- front of the stone that sticks out furthest
 		local right = (-normal):Cross(Vector3.yAxis)
@@ -477,6 +504,8 @@ local function flash(position, forward, damage, isGhost, style)
 			slash(at, normal, scale, shadow)
 		elseif style == "Claw" then
 			claw(at, normal, scale, shadow)
+		elseif style == "Screech" then
+			screech(at, normal, scale, shadow)
 		else
 			crush(at, normal, scale, shadow)
 		end

@@ -267,6 +267,22 @@ local SPIT_KEYS = {
 	{ 1.00, 0, 0, 0, 0, 0, 0, 0.05, 0, 0.05, 0 },
 }
 
+-- AttackStyle "Dive" (the Crypt Bat; see the Bat block). Keys over one attack cycle (0..1, stretched to AttackCD):
+-- { t, rise, forward (a fraction of the lunge measured to the wall: -1 = at the wall), pitch (+ = nose up), wing beat
+-- amplitude, wing fold (0 spread .. 1 folded back), hind feet forward (the rake), jaw }. It climbs with strong beats,
+-- tips over and folds its wings, dives at the wall, flares open and rakes with its feet while it screeches (contact at
+-- 0.55: the unit def's hitDelay = 0.55 x attackCD), pulls up and flaps back to its hover spot.
+local DIVE_KEYS = {
+	{ 0.00, 0, 0, 0, 1, 0, 0, 0.05 },
+	{ 0.25, 1.2, 0.08, 0.35, 1.4, 0, 0, 0.05 },
+	{ 0.36, 1.5, 0.1, -0.7, 0, 1, 0, 0.1 },
+	{ 0.50, -0.2, -0.9, -0.9, 0, 1, 0.3, 0.3 },
+	{ 0.55, -0.3, -1, 0.6, 0.3, 0.25, 1.3, 0.9 },
+	{ 0.62, 0.5, -0.75, 0.5, 1.3, 0, 0.4, 0.7 },
+	{ 0.85, 0.2, -0.1, 0.1, 1.0, 0, 0, 0.15 },
+	{ 1.00, 0, 0, 0, 1, 0, 0, 0.05 },
+}
+
 local ArrowFx = require(script.Parent.ArrowFx)
 local VenomFx = require(script.Parent.VenomFx)
 local Units = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Units"))
@@ -974,6 +990,131 @@ local function animate(model, rig, dt, now)
 		end
 	end
 
+	-- Pose "Bat" (the Crypt Bat, AttackStyle "Dive", build_cryptbat.lua): it never touches the ground. Joints Root,
+	-- Neck, Jaw, L/RWing (shoulder: up/down about Z, swept back about Y), L/RWingTip (elbow: the outer wing lags the beat
+	-- and folds back), L/RLeg (the clawed feet).
+	--   flying (walk): fast deep beats, nose a little down, the body rising on each downstroke;
+	--   hover (idle): quick, slightly uneven beats, a bobbing body, the head jerking to new spots (an underdamped
+	--     spring), and now and then a quick barrel roll;
+	--   fight: DIVE_KEYS stretched to AttackCD, the lunge measured once per attack (rays at hover and dive height to the
+	--     real wall surface) so the snout stops just short of the stone.
+	if model:GetAttribute("Pose") == "Bat" then
+		local bt = rig.bat
+		if not bt then
+			bt = { sm = {}, fight = 0, phase = 0, lunge = 0, yaw = 0, yawV = 0, pitch = 0, pitchV = 0 }
+			rig.bat = bt
+		end
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+		local function sm01(x)
+			x = clamp01(x)
+			return x * x * (3 - 2 * x)
+		end
+		local cd = model:GetAttribute("AttackCD") or 1.6
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.0
+		bt.fight += ((fighting and 1 or 0) - bt.fight) * clamp01(dt * (fighting and 8 or 2.5))
+		local fw = bt.fight * bt.fight * (3 - 2 * bt.fight) * (1 - w)
+		local sw = 1 - w
+		bt.phase += dt * (mix(10 + math.sin(t * 1.7) * 1.5, 13, w))
+		local ph = bt.phase
+
+		-- flying / hovering
+		local amp = 1
+		local fold = 0
+		local rise, fwd, lat = 0, 0, 0
+		local pitch, yaw, roll = -0.2 * w, 0, 0
+		local legs, mouth = 0, 0.05
+		local neckP, neckY = 0, 0
+		if sw > 0.001 then
+			local idx = math.floor(t * 0.8)
+			local r1 = (math.sin(idx * 12.9898) * 43758.5453) % 1
+			local r2 = (math.sin(idx * 78.233) * 12345.6789) % 1
+			bt.yaw, bt.yawV = springStep(bt.yaw, bt.yawV, (r1 - 0.5) * 0.8, 380, 16, dt)
+			bt.pitch, bt.pitchV = springStep(bt.pitch, bt.pitchV, (r2 - 0.5) * 0.4, 380, 16, dt)
+			neckY = mix(neckY, bt.yaw, sw)
+			neckP = mix(neckP, bt.pitch, sw)
+			lat = mix(lat, math.sin(t * 0.9) * 0.2, sw)
+			yaw = mix(yaw, math.sin(t * 0.6) * 0.15, sw)
+			-- a quick barrel roll every ~8 s
+			local cyc = (t * 0.12) % 1
+			if cyc < 0.07 then
+				roll = mix(roll, sm01(cyc / 0.07) * math.pi * 2, sw * (1 - fw))
+			end
+		end
+
+		-- the dive's lunge, measured once per attack
+		if rig.lastShot and bt.measuredShot ~= rig.lastShot then
+			bt.measuredShot = rig.lastShot
+			bt.lunge = 0
+			local hrp = model.PrimaryPart
+			if hrp then
+				local look = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+				if look.Magnitude > 0.1 then
+					look = look.Unit
+					local room
+					for _, dy in ipairs({ 0, -0.5 }) do
+						local d = distanceAhead(hrp.Position + Vector3.new(0, dy * scale, 0), look, 30)
+						if d then
+							room = math.min(room or d, d)
+						end
+					end
+					if room then
+						-- (at the bottom of the dive the snout is ~0.5 design units ahead of the root's start: measured in play)
+						bt.lunge = math.max(0, room - 0.5 * scale - 0.2) / scale
+					end
+				end
+			end
+		end
+
+		-- fight
+		if fw > 0.001 then
+			local a = math.min(since / cd, 1.0)
+			local function key(i)
+				return sampleKeys(DIVE_KEYS, a, i)
+			end
+			rise = mix(rise, key(2), fw)
+			fwd = mix(fwd, key(3) * bt.lunge, fw)
+			pitch = mix(pitch, key(4), fw)
+			amp = mix(amp, key(5), fw)
+			fold = mix(fold, clamp01(key(6)), fw)
+			legs = mix(legs, key(7), fw)
+			mouth = mix(mouth, key(8), fw)
+			lat = mix(lat, 0, fw)
+			yaw = mix(yaw, 0, fw)
+			neckY = mix(neckY, 0, fw)
+			neckP = mix(neckP, -key(4) * 0.5, fw) -- (the head stays on the wall through the climb and the dive)
+		end
+
+		local function sm(name, x, k, d)
+			local e = bt.sm[name]
+			if not e then
+				e = { x = x, v = 0 }
+				bt.sm[name] = e
+			end
+			e.x, e.v = springStep(e.x, e.v, x, k or 900, d or 60, dt)
+			return e.x
+		end
+		amp, fold = sm("amp", amp), sm("fold", fold)
+		-- the body rises on each downstroke
+		local bob = -math.cos(ph) * 0.12 * amp
+		set(rig, "Root", CFrame.new(sm("lat", lat) * scale, (sm("rise", rise) + bob) * scale + float, sm("fwd", fwd) * scale)
+			* ANGLES(sm("pitch", pitch), sm("yaw", yaw), roll))
+		set(rig, "Neck", ANGLES(sm("neckP", neckP), sm("neckY", neckY), 0))
+		jaw = sm("mouth", mouth) -- (the generic code sets the Jaw joint from this at the end)
+		local beat = math.sin(ph)
+		local lagBeat = math.sin(ph - 0.7)
+		local legsS = sm("legs", legs)
+		for _, s in ipairs({ "L", "R" }) do
+			local side = (s == "R") and 1 or -1
+			local flapAngle = (beat * 0.8 + 0.1) * amp * (1 - fold)
+			set(rig, s .. "Wing", ANGLES(0, -side * 0.9 * fold, side * (flapAngle + 1.1 * fold)))
+			set(rig, s .. "WingTip", ANGLES(0, -side * 1.4 * fold, side * lagBeat * 0.5 * amp * (1 - fold)))
+			set(rig, s .. "Leg", ANGLES(legsS + 0.1, 0, 0))
+		end
+	end
+
 	-- Pose "Crawler" (the Ghoul, AttackStyle "Pounce"): a starved thing on all fours (build_ghoul.lua). Every joint turns
 	-- about the model's own axes. Three layers, mixed and then run through stiff springs (no snapping):
 	--   walk: a fast skittering diagonal gait (left front with right hind), the paws lift as they swing forward and stay
@@ -1530,7 +1671,7 @@ local function animate(model, rig, dt, now)
 	end
 
 	-- wings (bats and other fliers): LWing/RWing flap up and down around Z; they flap faster while moving
-	if rig.joints.LWing or rig.joints.RWing then
+	if (rig.joints.LWing or rig.joints.RWing) and model:GetAttribute("Pose") ~= "Bat" then -- (the Crypt Bat flies in its own block)
 		local flap = math.sin(t * (9 + 5 * w)) * 0.55 + 0.15
 		set(rig, "RWing", ANGLES(0, 0, flap))
 		set(rig, "LWing", ANGLES(0, 0, -flap))

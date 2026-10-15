@@ -78,10 +78,13 @@ local UNITS = {
 	CryptBat = {
 		color = BrickColor.new("Dark grey"),
 		size = Vector3.new(1.5, 1.5, 1.5),
-		damage = 29,
+		damage = 77.3, -- (DPS 48.3: one slow, hard dive)
 		speed = 22,
 		attackRange = 12,
-		attackCD = 0.6,
+		attackCD = 1.6,
+		hitDelay = 0.88, -- (the dive hits the wall 0.55 into the cycle, UnitAnimator "Dive")
+		hitFx = "Screech",
+		hitHeight = 2.3, -- (studs above the floor: above the wall's plinth)
 	},
 	-- ── Rare ────────────────────────────────────────────────────────────
 	BaronBone = {
