@@ -50,7 +50,8 @@ Sfx.Sounds = {
 	rune_click = { id = "rbxassetid://129592415819508", volume = 0.35 },
 	rune_confirm = { id = "rbxassetid://80333702320714", volume = 0.7 },
 	drone_transform = { id = "rbxassetid://71750103238347", volume = 0.12 },
-	transmit_pulse = { id = "rbxassetid://120112861024931", volume = 1 },
+	transmit_laser = { id = "rbxassetid://92306050351845", volume = 0.5 }, -- (replaces transmit_pulse: the beam into the sky)
+	sublift_scanner = { id = "rbxassetid://121738784959373", volume = 0.6 }, -- (under it, up to the open portal)
 	tear_rumble = { id = "rbxassetid://100815269897042", volume = 0.6 },
 	tear_crack = { id = "rbxassetid://77959564792451", volume = 0.2 },
 	tear_open = { id = "rbxassetid://87782507820851", volume = 0.9 },

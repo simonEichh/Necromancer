@@ -42,3 +42,5 @@ sounds/malak/voice_verdict.ogg -> rbxassetid://122907832067254
 sounds/malak/high_command_passage.ogg -> rbxassetid://137755688226874
 sounds/malak/voice_defiance.ogg -> rbxassetid://105269459367929
 sounds/malak/transmit_pulse.ogg -> rbxassetid://120112861024931
+sounds/malak/transmit_laser.ogg -> rbxassetid://92306050351845
+sounds/malak/sublift_scanner.ogg -> rbxassetid://121738784959373

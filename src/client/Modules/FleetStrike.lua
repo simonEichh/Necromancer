@@ -1448,7 +1448,10 @@ local CUES = {
 	},
 	{ at = 5.3, name = "rune_confirm", near = true },
 	{ at = 6.0, name = "drone_transform", near = true },
-	{ at = PULSE_AT, name = "transmit_pulse" },
+	-- the transmission: the laser into the sky (fades out by ~17 s) and the sublift hum under it, which fades into the
+	-- portal hum (16.4 s on)
+	{ at = PULSE_AT, name = "transmit_laser" },
+	{ at = PULSE_AT, name = "sublift_scanner" },
 	-- the tear: the sky groans (under all of it), the cracks spread (tear_open, the sucking swell, was taken out)
 	{ at = TEAR_AT, name = "tear_rumble" },
 	{ at = CRACKS_AT, name = "tear_crack" },
