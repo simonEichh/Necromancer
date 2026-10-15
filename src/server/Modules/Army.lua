@@ -521,7 +521,10 @@ end
 -- Every unit gets slotLat (across the lane) and slotStand (distance in front of the wall's target line).
 local FORMATION_BAND = 5         -- studs between two formation rows (a unit's stand distance is its range rounded down to this)
 local FORMATION_MIN_STAND = 1.5  -- nearest a unit stands to the wall's target line
-local FORMATION_HALF_WIDTH = 16  -- units stay this close to the lane's centre line (the lane is 40 wide)
+local FORMATION_HALF_WIDTH = 17  -- units stay this close to the lane's centre line (the lane is 40 wide)
+local FORMATION_SPACING_SCALE = 2.6 -- studs between two units in a row, times the widest unit's body width
+local FORMATION_MIN_SPACING = 6  -- never closer than this across the lane
+local FORMATION_RANK_DEPTH = 3.5 -- a full row puts its extra units into another rank this far behind it
 local ARRIVE_RADIUS = 1.2        -- how close a unit must get to its slot before it stops and attacks
 local STAY_RADIUS = 3            -- a unit that has arrived keeps attacking unless it is pushed further than this
 RANGED_STAY_RADIUS = 10    -- ranged units (they stand 15+ studs back) re-march only when the front is this far off: the walls
@@ -583,22 +586,22 @@ local function layoutFormation(plotState)
 	for rowIndex, stand in ipairs(stands) do
 		local row = rows[stand]
 		table.sort(row, function(a, b) return a.id < b.id end)
-		-- wide units need more room; squeeze the row if it would not fit across the lane
-		local spacing = 0
+		-- wide units need more room; a row that would not fit across the lane is never squeezed, the extra units
+		-- form another rank just behind it (staggered against the one in front)
+		local spacing = FORMATION_MIN_SPACING
 		for _, u in ipairs(row) do
-			spacing = math.max(spacing, u.def.size.X * 1.7)
+			spacing = math.max(spacing, u.def.size.X * FORMATION_SPACING_SCALE)
 		end
-		local reach = math.ceil((#row - 1) / 2)
-		if reach > 0 and reach * spacing > FORMATION_HALF_WIDTH then
-			spacing = FORMATION_HALF_WIDTH / reach
-		end
-		local shift = (rowIndex % 2 == 0) and spacing / 2 or 0 -- stagger every other row, like a proper battle line
+		local perRank = math.max(1, math.floor(FORMATION_HALF_WIDTH / spacing) * 2 + 1)
 		for i, u in ipairs(row) do
-			local k = i - 1 -- slot 0 is the centre, then +1, -1, +2, -2 ...
+			local rank = math.floor((i - 1) / perRank)
+			local k = (i - 1) % perRank -- slot 0 is the centre, then +1, -1, +2, -2 ...
 			local side = (k % 2 == 1) and 1 or -1
 			local lat = (k == 0) and 0 or side * math.ceil(k / 2) * spacing
+			-- stagger every other row and every other rank, like a proper battle line
+			local shift = ((rowIndex + rank) % 2 == 0) and spacing / 2 or 0
 			u.slotLat = math.clamp(lat + shift, -FORMATION_HALF_WIDTH, FORMATION_HALF_WIDTH)
-			u.slotStand = stand
+			u.slotStand = stand + rank * FORMATION_RANK_DEPTH
 		end
 	end
 end
