@@ -44,10 +44,13 @@ Sfx.Sounds = {
 	drone_bolt = { id = "rbxassetid://77110040590592", volume = 0.6 },
 	drone_hit = { id = "rbxassetid://99175078643431", volume = 0.6 },
 	-- the Fleet Strike (stereo, played flat; the cue sheet is in FleetStrike.lua)
+	voice_call = { id = "rbxassetid://137755688226874", volume = 1 }, -- high_command_passage.ogg
+	voice_verdict = { id = "rbxassetid://98769145369327", volume = 1 }, -- corrected: the former opening clip
+	voice_defiance = { id = "rbxassetid://105269459367929", volume = 1 }, -- the final standing shot
 	rune_click = { id = "rbxassetid://129592415819508", volume = 0.35 },
 	rune_confirm = { id = "rbxassetid://80333702320714", volume = 0.7 },
 	drone_transform = { id = "rbxassetid://71750103238347", volume = 0.12 },
-	transmit_pulse = { id = "rbxassetid://87438287538171", volume = 1 },
+	transmit_pulse = { id = "rbxassetid://120112861024931", volume = 1 },
 	tear_rumble = { id = "rbxassetid://100815269897042", volume = 0.6 },
 	tear_crack = { id = "rbxassetid://77959564792451", volume = 0.2 },
 	tear_open = { id = "rbxassetid://87782507820851", volume = 0.9 },

@@ -119,12 +119,26 @@ sounded off and is switched off (empty id): the slot waits for a real one. Wired
 
 **The Fleet Strike** (54 s; times are seconds from its start; each is one moment, so they can be big)
 
+Voice lines (2026-10-15, assignment corrected by the user): **"High Command. Grant us passage."** uses
+`high_command_passage.ogg` (3.38 s, asset `137755688226874`, Sfx slot `voice_call`) at 5.37 s. Original:
+`_source/malak/high_command_passage.mp3`, prepared with `prep_sound.py shot`. **"Absolution. Deliver my verdict."**
+uses `voice_verdict.ogg` (3.81 s, asset `98769145369327`) at 41.69 s: this is the former opening clip, originally
+uploaded as `voice_call.ogg`. The old presence-required clip (`122907832067254`) is no longer cued. Leading silence
+trimmed, peak normalized, original pitch and pauses kept. Played flat for viewers only, through Effects; music drops
+to 30% during speech. The call ends before the drone pulse; the verdict ends half a second before the main beam.
+FleetStrike.lua also carries the matching military-style typewriter subtitles and phrase pauses. Cue lengths and
+subtitle timings must match these files if replaced.
+
+Final standing shot: `voice_defiance.ogg` (2.06 s, asset `105269459367929`) at 51 s, **"Their defiance was noted."**
+Source: `_source/malak/defiance was noted.mp3`, prepared with `prep_sound.py shot`; original pitch retained.
+Ends before the cutscene's 54 s finish, with the same watcher-only playback, music duck and typewriter subtitles.
+
 | File | Length | Sound | At | Prio | Asset id |
 |---|---|---|---|---|---|
 | `rune_click.ogg` | 0.1-0.2 s | tiny precise click (several variants ok) | his left hand typing (1.5-5 s) | B || 129592415819508 |
 | `rune_confirm.ogg` | 0.4-0.8 s | a clean confirm tone, slightly ominous | the last rune clicks home (5.3 s) | A || 80333702320714 |
 | `drone_transform.ogg` | 1.5-2.5 s | mechanical servos, rings locking, rising whine | the drone stacking into a transmitter (6-8 s) | A || 71750103238347 |
-| `transmit_pulse.ogg` | 1.5-3 s | a powerful pulse shooting upwards, then fading pings (stereo) | the pulse into the sky (9.0 s) | A || 99067426480453 |
+| `transmit_pulse.ogg` | 1.5-3 s | a powerful pulse shooting upwards, then fading pings (stereo) | the pulse into the sky (9.0 s) | A || 120112861024931 |
 | `sky_tear.ogg` | 4-6 s | the sky tearing: a deep groan, crackling, glass-like cracks (stereo) | the tear (13-19 s) | A | |
 | `portal_hum.ogg` | 3-5 s loop | deep unstable hum of the open portal | while the portal is open | B || 133901763364756 |
 | `warp_in.ogg` | 8-10 s | the big one: a slow sub-bass swell, pressure building, metal groaning (stereo) | the Absolution sliding out (20-29.5 s) | A || 3 layers: suspense 84069854063299, scanner 132548472903596, warhorn 83144722290957 |
@@ -153,8 +167,8 @@ clunk + the end clunk from 3.85 s, which lands 1.35 s in = the bow fully open), 
 1.25x, hard cut at its peak 0.5 s before the beam (46), main_beam 4.3 s, keeper_roar and gate_collapse whole, warp_out
 whole (replaces the portal snap when the ship leaves). After the user's first listen: drone_transform volume halved, target_lock (his basic attack's) plays at each reticle
 locking on after the scan fan (LOCKS, rising pitch). The barrage plays cannon_far (his basic attack's gun) per salvo instead of broadside, and the missiles are
-silent (the user wants only the distant cannons; missile_launch is uploaded but not cued). Second listen: drone_transform volume 0.12, transmit_pulse cut to 2.3 s (silent when the beam is
-gone, 11.2 s), turret_turn not cued (too far to hear servos), shell_impact (his basic attack's) at the barrage's shell
+silent (the user wants only the distant cannons; missile_launch is uploaded but not cued). Second listen: drone_transform volume 0.12, transmit_pulse cut to 4 s (9.0-13.0, 1 s fade:
+it runs until the sky tear begins), turret_turn not cued (too far to hear servos), shell_impact (his basic attack's) at the barrage's shell
 and missile hits (boom() in FleetStrike.lua, at most one per 0.12 s, lower pitch). sky_tear is three files: tear_rumble (6 s from 0.5 s of
 _source/deep_tear_rumble_thunder.ogg, 2 s fade, at 13), tear_crack (from 0.45 s, at 15.2), tear_open (a swell from 0.5 s,
 2.54 s, timed so its peak lands on OPEN_AT 17.4; taken out again after a listen: uploaded, not cued). Volumes after

@@ -1420,7 +1420,32 @@ end
 -- ============================================================
 local SHIP_HUM = "ship_hum" -- (two versions to compare: "ship_hum" or "ship_hum2")
 local SKY_VOLUME = 0.35 -- (for players who are not watching, and for the ship lingering after the cutscene)
+-- The recordings keep their original pitch and pauses. Finish the call before the drone transmits, and the
+-- verdict before the half-second of silence ahead of the laser. Update these lengths if the recordings change.
+local VOICE_CALL_LENGTH, VOICE_VERDICT_LENGTH = 3.38, 3.81
+local VOICE_DEFIANCE_LENGTH = 2.06
 local CUES = {
+	{
+		at = PULSE_AT - VOICE_CALL_LENGTH - 0.25, name = "voice_call", near = true, voice = true, duration = VOICE_CALL_LENGTH,
+		phrases = {
+			{ at = 0, text = "HIGH COMMAND. ", reveal = 0.9 },
+			{ at = 1.65, text = "GRANT US PASSAGE.", reveal = 1.25 },
+		},
+	},
+	{
+		at = FIRE_AT - VOICE_VERDICT_LENGTH - 0.5, name = "voice_verdict", near = true, voice = true, duration = VOICE_VERDICT_LENGTH,
+		phrases = {
+			{ at = 0, text = "ABSOLUTION. ", reveal = 0.95 },
+			{ at = 1.8, text = "DELIVER MY VERDICT.", reveal = 1.5 },
+		},
+	},
+	{
+		at = 51, name = "voice_defiance", near = true, voice = true, duration = VOICE_DEFIANCE_LENGTH,
+		phrases = {
+			{ at = 0, text = "THEIR DEFIANCE ", reveal = 0.9 },
+			{ at = 0.95, text = "WAS NOTED.", reveal = 0.8 },
+		},
+	},
 	{ at = 5.3, name = "rune_confirm", near = true },
 	{ at = 6.0, name = "drone_transform", near = true },
 	{ at = PULSE_AT, name = "transmit_pulse" },
@@ -1462,6 +1487,91 @@ do
 	end
 end
 
+-- Military transmission subtitles. Reveal whole graphemes on the cutscene clock, so Skip, late watching and
+-- cleanup need no extra tasks or tweens. Each phrase keeps the deliberate pause in the recording.
+local function subtitleTrack(ui)
+	local group = Instance.new("CanvasGroup")
+	group.Name = "MalakSubtitles"
+	group.AnchorPoint = Vector2.new(0.5, 1)
+	group.Position = UDim2.fromScale(0.5, 0.885)
+	group.Size = UDim2.fromScale(0.84, 0.13)
+	group.BackgroundTransparency = 1
+	group.Visible = false
+	group.ZIndex = 10
+	group.Parent = ui
+
+	local speaker = Instance.new("TextLabel")
+	speaker.Name = "Speaker"
+	speaker.Size = UDim2.fromScale(1, 0.24)
+	speaker.BackgroundTransparency = 1
+	speaker.Font = Enum.Font.RobotoMono
+	speaker.Text = "MALAK"
+	speaker.TextColor3 = Color3.fromRGB(165, 188, 205)
+	speaker.TextScaled = true
+	speaker.ZIndex = 10
+	speaker.Parent = group
+	local speakerSize = Instance.new("UITextSizeConstraint")
+	speakerSize.MaxTextSize = 14
+	speakerSize.Parent = speaker
+
+	local line = Instance.new("TextLabel")
+	line.Name = "Dialogue"
+	line.Position = UDim2.fromScale(0, 0.3)
+	line.Size = UDim2.fromScale(1, 0.68)
+	line.BackgroundTransparency = 1
+	line.Font = Enum.Font.Sarpanch
+	line.TextColor3 = Color3.fromRGB(232, 238, 242)
+	line.TextScaled = true
+	line.TextWrapped = true
+	line.MaxVisibleGraphemes = 0
+	line.ZIndex = 10
+	line.Parent = group
+	local lineSize = Instance.new("UITextSizeConstraint")
+	lineSize.MaxTextSize = 30
+	lineSize.Parent = line
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(6, 9, 13)
+	stroke.Thickness = 1.5
+	stroke.Transparency = 0.15
+	stroke.Parent = line
+
+	local dialogue = {}
+	for _, cue in ipairs(CUES) do
+		if cue.phrases then
+			local entry = { cue = cue, text = "", phrases = {} }
+			for _, phrase in ipairs(cue.phrases) do
+				local count = 0
+				for _ in utf8.graphemes(phrase.text) do
+					count += 1
+				end
+				entry.text ..= phrase.text
+				table.insert(entry.phrases, { at = phrase.at, reveal = phrase.reveal, count = count })
+			end
+			table.insert(dialogue, entry)
+		end
+	end
+	return function(T, watching)
+		group.Visible = false
+		if not watching then
+			return
+		end
+		for _, entry in ipairs(dialogue) do
+			local elapsed = T - entry.cue.at
+			if elapsed >= 0 and elapsed < entry.cue.duration + 0.65 then
+				local visible = 0
+				for _, phrase in ipairs(entry.phrases) do
+					visible += math.floor(phrase.count * math.clamp((elapsed - phrase.at) / phrase.reveal, 0, 1))
+				end
+				line.Text = entry.text
+				line.MaxVisibleGraphemes = visible
+				group.GroupTransparency = smooth((elapsed - entry.cue.duration - 0.45) / 0.2)
+				group.Visible = true
+				return
+			end
+		end
+	end
+end
+
 -- update(T, watching) every frame; stop() at the end; takeHum() hands the ship's hum to lingerShip
 local MUSIC_AT = 1.5 -- the music (52.5 s, only for whoever watches) starts once the silence has fallen
 
@@ -1482,7 +1592,15 @@ local function soundtrack(ctx)
 		end
 		if music then
 			local duck = (T >= FIRE_AT - 0.8 and T < FIRE_AT) and 1 - smooth((T - FIRE_AT + 0.8) / 0.3) or 1
-			music.set(musicVol * duck)
+			-- Keep his quiet delivery clear: lower the score during each line, with short fades at either end.
+			local voiceDuck = 1
+			for _, c in ipairs(CUES) do
+				if c.voice then
+					local speaking = smooth((T - c.at + 0.15) / 0.15) * (1 - smooth((T - c.at - c.duration) / 0.2))
+					voiceDuck = math.min(voiceDuck, 1 - 0.7 * speaking)
+				end
+			end
+			music.set(musicVol * duck * voiceDuck)
 		end
 		for i, c in ipairs(CUES) do
 			if not fired[i] and T >= c.at then
@@ -1732,6 +1850,7 @@ function FleetStrike.play(opts)
 	ui.IgnoreGuiInset = true
 	ui.DisplayOrder = 100
 	ui.Parent = player:WaitForChild("PlayerGui")
+	local updateSubtitles = subtitleTrack(ui)
 	local function bar(anchorY)
 		local f = Instance.new("Frame")
 		f.AnchorPoint = Vector2.new(0, anchorY)
@@ -1907,6 +2026,7 @@ function FleetStrike.play(opts)
 			effect(T)
 		end
 		sound.update(T, watching)
+		updateSubtitles(T, watching)
 		if watchBtn.root.Visible and T >= 44 then
 			watchBtn.root.Visible = false -- (too late to start watching)
 		end

@@ -37,3 +37,8 @@ sounds/malak/tear_rumble.ogg -> rbxassetid://100815269897042
 sounds/malak/tear_crack.ogg -> rbxassetid://77959564792451
 sounds/malak/tear_open.ogg -> rbxassetid://87782507820851
 sounds/malak/fleet_music.ogg -> rbxassetid://74269987308643
+sounds/malak/voice_call.ogg -> rbxassetid://98769145369327
+sounds/malak/voice_verdict.ogg -> rbxassetid://122907832067254
+sounds/malak/high_command_passage.ogg -> rbxassetid://137755688226874
+sounds/malak/voice_defiance.ogg -> rbxassetid://105269459367929
+sounds/malak/transmit_pulse.ogg -> rbxassetid://120112861024931

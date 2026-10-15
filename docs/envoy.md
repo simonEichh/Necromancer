@@ -122,6 +122,31 @@ sight; the finisher is the first time players see it.
 
 ## Sound (later, important)
 
+**Voice lines (2026-10-15):** the opening is now **"High Command. Grant us passage."**, from
+`sounds/_source/malak/high_command_passage.mp3`, prepared as `sounds/malak/high_command_passage.ogg` (3.38 s,
+asset `137755688226874`, Sfx slot `voice_call`). It plays at 5.37 s during the rune/drone sequence and ends at
+8.75 s, before the 9 s transmission. The user corrected the original recordings' reversed assignment:
+the former opening clip (asset `98769145369327`, 3.81 s, originally uploaded as `voice_call.ogg`) is now the
+**"Absolution. Deliver my verdict."** laser line (`voice_verdict.ogg`, Sfx slot `voice_verdict`), at 41.69 s,
+ending 45.5 s before the 46 s laser. The old presence-required line (`122907832067254`) is no longer cued.
+Leading silence trimmed, levels normalized, natural pitch and internal pauses preserved. Both are flat,
+watcher-only audio (`near = true`), routed through Effects; the score ducks to 30% during speech. Malak's
+delivery is deep, nonchalant and assured, with devotion to his nation. IDs live in `Sfx.lua`; cue lengths and
+subtitle phrase timings live in `FleetStrike.lua`.
+
+**Final line:** "Their defiance was noted." plays at 51 s as the camera returns to Malak standing before the
+broken gate. Source: `sounds/_source/malak/defiance was noted.mp3`; prepared file `sounds/malak/voice_defiance.ogg`
+(2.06 s, asset `105269459367929`, Sfx slot `voice_defiance`). It ends around 53.06 s, before control returns at
+54 s, with the same music duck and typewriter subtitle treatment as his other lines.
+The asset loaded successfully in Studio; the user verified the final line works in-game.
+
+**Subtitles:** all three lines have uppercase Sarpanch military-style lettering, a small RobotoMono "MALAK" speaker
+label, pale text with a dark outline, centred above the bottom letterbox bar. `subtitleTrack` reveals text with
+`MaxVisibleGraphemes` on the shared cutscene clock, pausing between the two spoken phrases, holding briefly then
+fading. The text scales and wraps on small screens, hides on Skip/non-watching, and is destroyed with the cutscene UI.
+Studio check: both active voice assets fetched successfully; opening subtitle reveal, phrase pause, text fit and
+music duck verified in preview. The session ended before the laser subtitle and final cleanup could be checked.
+
 Gauntlet rune clicks and the confirm pulse, the drone's transformation and transmission, the silence beat, the sky
 tearing (deep groan + crackle), the warp-in (sub-bass swell), lock-on beeps, the broadside, the cannon charge whine
 cut to silence, the beam impact, the slow warp-out boom.
