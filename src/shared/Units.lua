@@ -11,6 +11,8 @@ local UNITS = {
 		speed = 8,
 		attackRange = 5,
 		attackCD = 1.2,
+		hitDelay = 0.4, -- (the sword chop meets the wall ~0.38 s into the swing, UnitAnimator "Strike")
+		hitFx = "Slash", -- (HitEffects draws a white sword cut instead of the plain flash)
 	},
 	Zombie = {
 		color = BrickColor.new("Medium green"),

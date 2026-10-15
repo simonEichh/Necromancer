@@ -439,8 +439,9 @@ end)
 
 -- Tells the clients a unit hit the wall at `position` (they draw the hit flash, see client HitEffects). Nothing is
 -- spawned on the server; `forward` is the lane direction, i.e. which way the wall's front face points away from.
-local function sendWallHit(plotState, position, damage, isGhost)
-	Remotes.WallHit:FireAllClients(position, PlotFrame.forwardFlat(plotState), damage, isGhost)
+-- `style` (optional, the unit def's hitFx) picks a different hit effect, e.g. "Slash" for sword units.
+local function sendWallHit(plotState, position, damage, isGhost, style)
+	Remotes.WallHit:FireAllClients(position, PlotFrame.forwardFlat(plotState), damage, isGhost, style)
 end
 
 -- ============================================================
@@ -1000,8 +1001,16 @@ local function update(now, dt)
 						-- on the wall face right in front of this unit, around chest height, with a little jitter
 						local unitHeight = u.model and (u.model:GetAttribute("Height") or 5) * u.model:GetScale()
 							or u.def.size.Y * 1.6
-						local impactPos = PlotFrame.toWorld(plotState, lat + (math.random() - 0.5) * 2.4, plotState.wallFaceFwd)
-							+ Vector3.new(0, unitHeight * (0.5 + math.random() * 0.2), 0)
+						-- (a unit def's hitHeight, in studs above the floor, overrides it: e.g. the crawling Ghoul leaps and
+						-- rakes high, above the wall's plinth)
+						local hitY = u.def.hitHeight and u.def.hitHeight * (0.95 + math.random() * 0.1)
+							or unitHeight * (0.5 + math.random() * 0.2)
+						-- (from where the unit really stands, not its slot: a fast unit stops up to ~2 studs off it; units
+						-- with their own hit effect scatter less, so the cut lines up with the claws / blade)
+						local standLat = PlotFrame.toLocal(plotState, fromPos)
+						local jitter = u.def.hitFx and 0.6 or 2.4
+						local impactPos = PlotFrame.toWorld(plotState, standLat + (math.random() - 0.5) * jitter, plotState.wallFaceFwd)
+							+ Vector3.new(0, hitY, 0)
 						-- (a unit with a special deals only the rest of its damage with basic attacks)
 						local damage = u.def.damage * (u.def.special and (1 - u.def.special.share) or 1)
 						local function hit()
@@ -1009,7 +1018,7 @@ local function update(now, dt)
 							plotState.wallHP = math.max(0, plotState.wallHP - damage)
 							earnHitGold(plotState, u, damage)
 							updateWallGui(plotState)
-							sendWallHit(plotState, impactPos, damage, u.def.transparent)
+							sendWallHit(plotState, impactPos, damage, u.def.transparent, u.def.hitFx)
 							if plotState.wallHP <= 0 then breakWall(plotState) end
 						end
 						if u.def.hitDelay then

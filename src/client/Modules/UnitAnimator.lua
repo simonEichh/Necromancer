@@ -106,6 +106,58 @@ local function isCasting(model)
 		and model:GetAttribute("State") ~= "walk"
 end
 
+-- Catmull-Rom through keyframes { t, v1, v2, ... } (channel c: 2 = v1): the curve keeps its speed through every key,
+-- so a motion flows on instead of easing to a stop at each pose (momentum)
+local function sampleKeys(keys, a, c)
+	local n = #keys
+	if a <= keys[1][1] then
+		return keys[1][c]
+	end
+	if a >= keys[n][1] then
+		return keys[n][c]
+	end
+	for i = 1, n - 1 do
+		local k1, k2 = keys[i], keys[i + 1]
+		if a <= k2[1] then
+			local f = (a - k1[1]) / (k2[1] - k1[1])
+			local p0 = (keys[i - 1] or k1)[c]
+			local p1, p2 = k1[c], k2[c]
+			local p3 = (keys[i + 2] or k2)[c]
+			return 0.5 * ((2 * p1) + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f)
+		end
+	end
+	return keys[n][c]
+end
+
+-- one damped-spring step (in small substeps, so stiff springs stay stable at low frame rates): new value, velocity
+local function springStep(x, v, target, stiffness, damping, dt)
+	dt = math.min(dt, 0.1)
+	local steps = math.max(1, math.ceil(dt / 0.008))
+	local h = dt / steps
+	for _ = 1, steps do
+		v += ((target - x) * stiffness - v * damping) * h
+		x += v * h
+	end
+	return x, v
+end
+
+-- AttackStyle "Strike" (a one-handed sword chop, Skelly; see the Strike block in animate). One attack cycle, keys
+-- { t, right shoulder pitch, right shoulder roll (+ = out), right elbow, wrist (+ = blade up), left shoulder pitch,
+-- left shoulder roll (+ = in), left elbow, waist pitch (- = lean in), waist yaw (+ = chest turns left), lift, forward
+-- (- = towards the wall) }. It starts and ends in the guard, so attack after attack is one unbroken motion.
+-- The blade meets the wall at ~0.38 s: the unit def's hitDelay (0.4, Units.lua) lands the WallHit then.
+local STRIKE_GUARD = { 0.55, 0.35, 1.45, 0.45, 0.45, -0.15, 0.7, -0.08, -0.25, -0.12, 0 }
+local STRIKE = {
+	{ 0.00, table.unpack(STRIKE_GUARD) }, -- high guard: the sword up at the right shoulder
+	{ 0.24, 2.7, 0.5, 1.1, 0.5, 1.0, -0.1, 0.25, 0.12, -0.55, -0.02, 0.12 }, -- anticipation: coiled back, the left hand points
+	{ 0.31, 2.9, 0.55, 1.15, 0.75, 1.05, -0.1, 0.2, 0.14, -0.62, 0.0, 0.14 }, -- the coil still tightens as the blow starts
+	{ 0.38, 1.25, -0.15, 0.1, -0.35, -0.25, -0.2, 0.6, -0.3, 0.4, -0.3, -0.25 }, -- contact: arm straight, body thrown in
+	{ 0.58, 0.35, -0.55, 0.35, -0.6, -0.35, -0.25, 0.7, -0.36, 0.6, -0.32, -0.28 }, -- follow-through past the left hip
+	{ 0.74, 0.25, -0.5, 0.6, -0.3, -0.1, -0.2, 0.75, -0.28, 0.45, -0.26, -0.2 }, -- momentum spent
+	{ 0.94, 0.3, 0.1, 1.2, 0.2, 0.25, -0.15, 0.7, -0.14, -0.05, -0.16, -0.08 }, -- the blade loops up the right side
+	{ 1.12, table.unpack(STRIKE_GUARD) },
+}
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -198,7 +250,7 @@ local function animate(model, rig, dt, now)
 				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 			end
 		end
-	elseif u then
+	elseif u and style ~= "Strike" then
 		local shoulder, elbow, lean, mouth = attackPose(u)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
@@ -250,6 +302,122 @@ local function animate(model, rig, dt, now)
 	set(rig, "Neck", ANGLES(-0.04 * w, math.sin(t * 0.8) * 0.12 * (1 - w), 0))
 	if verdictLift > 0 then
 		set(rig, "Root", CFrame.new(shake, bob + float + rise + verdictLift * scale, shake * 0.7))
+	end
+
+	-- AttackStyle "Strike" (Skelly): a one-handed sword chop as ONE continuous cycle, never a reset to rest. Between
+	-- attacks it stands in a high guard (sword up at the right shoulder, left foot forward, knees bent, bouncing a
+	-- little); each attack coils it further back (anticipation, the coil still tightening as the blow starts), chops
+	-- diagonally down across the body (contact ~0.38 s: the server's hitDelay lands the WallHit then and HitEffects
+	-- draws the white slash), momentum carries the blade on past the left hip (follow-through, the body thrown in, the
+	-- left arm pulling back as a counterweight) and the blade loops back up the right side into the guard (not back
+	-- along the cut). The keys (STRIKE) are joined by Catmull-Rom and every channel runs through a stiff spring that
+	-- absorbs jumps (an early attack, the blend in from walking). The guard eases out ~1 s after the last attack.
+	-- Idle (standing, not fighting): hunched, the weight rocking from foot to foot (the feet stay planted), the sword
+	-- swaying in a loose grip, the head roaming and cocking to one side on a spring (it overshoots and settles), and
+	-- every ~5 s a bone-rattling shiver with a clatter of the jaw.
+	if style == "Strike" then
+		local sk = rig.strike
+		if not sk then
+			sk = { sm = {}, fight = 0, tilt = 0, tiltV = 0 }
+			rig.strike = sk
+		end
+		local cd = model:GetAttribute("AttackCD") or 1.2
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.0
+		sk.fight += ((fighting and 1 or 0) - sk.fight) * clamp01(dt * (fighting and 10 or 2.5))
+		local fw = sk.fight * sk.fight * (3 - 2 * sk.fight) * (1 - w) -- weight of the fighting layer
+		local sw = 1 - w -- weight of the standing (idle) pose over the walk
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+
+		-- idle
+		local sh = math.sin(t * 0.8)
+		local look = math.sin(t * 0.45) * 0.3 + math.sin(t * 1.27) * 0.06
+		local cyc = (t * 0.21) % 1
+		local shiver = cyc < 0.07 and math.sin(cyc / 0.07 * math.pi) or 0
+		local rattle = math.sin(now * 47) * shiver
+		local cockTarget = (math.floor(t * 0.21) % 2 == 0) and 0.2 or -0.06
+		sk.tilt, sk.tiltV = springStep(sk.tilt, sk.tiltV, cockTarget, 70, 6, dt)
+
+		local rS = mix(rShoulder, 0.1 + breathe + rattle * 0.05, sw)
+		local rZ = mix(0, 0.1, sw)
+		local rE = mix(rElbow, 0.35, sw)
+		local wr = mix(-0.1, math.sin(t * 1.1) * 0.12, sw)
+		local lS = mix(lShoulder, -0.02 - breathe, sw)
+		local lZ = mix(0, -0.06, sw)
+		local lE = mix(lElbow, 0.3 + rattle * 0.06, sw)
+		local wp = mix(waistPitch, -0.12 + breathe, sw)
+		local wy = mix(0, look * 0.25, sw)
+		local wroll = mix(waistRoll, -sh * 0.05, sw)
+		local np = mix(-0.04, 0.12 + rattle * 0.05, sw)
+		local ny = mix(0, look, sw)
+		local nr = mix(0, sk.tilt, sw)
+		local lat = mix(0, sh * 0.08, sw)
+		local lift, fwd = 0, 0
+		local lH, rH = s * 0.75 * w, -s * 0.75 * w
+		local lK, rK = -math.max(0, -c) * 0.9 * w, -math.max(0, c) * 0.9 * w
+		local hipZ = -lat / 1.9 -- (the legs lean against the sideways shift so the feet stay put)
+		jaw = mix(jaw, 0.03 + shiver * math.abs(math.sin(now * 31)) * 0.22, sw)
+
+		-- fighting
+		if fw > 0.001 then
+			local a = math.min(since, STRIKE[#STRIKE][1])
+			local function key(i)
+				return sampleKeys(STRIKE, a, i)
+			end
+			local bounce = math.sin(t * 2.4) * 0.025
+			local l = key(11) + bounce
+			rS = mix(rS, key(2) + bounce, fw)
+			rZ = mix(rZ, key(3), fw)
+			rE = mix(rE, key(4), fw)
+			wr = mix(wr, key(5) - bounce, fw)
+			lS = mix(lS, key(6), fw)
+			lZ = mix(lZ, key(7), fw)
+			lE = mix(lE, key(8), fw)
+			wp = mix(wp, key(9), fw)
+			wy = mix(wy, key(10), fw)
+			wroll = mix(wroll, 0, fw)
+			np = mix(np, 0.05 - key(9) * 0.6, fw) -- the head stays on the wall while the body leans
+			ny = mix(ny, 0, fw)
+			nr = mix(nr, 0, fw)
+			lat = mix(lat, 0, fw)
+			lift = mix(lift, l, fw)
+			fwd = mix(fwd, key(12), fw)
+			-- the jaw gapes through the blow
+			jaw = mix(jaw, (a > 0.2 and a < 0.6) and math.sin((a - 0.2) / 0.4 * math.pi) * 0.22 or 0, fw)
+			-- the stance: left foot forward, right foot back; the knees take the dips of the body
+			lH = mix(lH, 0.3 - l * 0.4, fw)
+			rH = mix(rH, -0.25 - l * 0.4, fw)
+			lK = mix(lK, -0.35 + l * 1.2, fw)
+			rK = mix(rK, -0.2 + l * 1.0, fw)
+			hipZ = mix(hipZ, 0, fw)
+		end
+
+		local function sm(name, x)
+			local e = sk.sm[name]
+			if not e then
+				e = { x = x, v = 0 }
+				sk.sm[name] = e
+			end
+			e.x, e.v = springStep(e.x, e.v, x, 900, 60, dt)
+			return e.x
+		end
+		local wyS = sm("wy", wy)
+		local hz = sm("hipZ", hipZ)
+		set(rig, "RShoulder", ANGLES(sm("rS", rS), 0, sm("rZ", rZ)))
+		set(rig, "RElbow", ANGLES(sm("rE", rE), 0, 0))
+		set(rig, "RWrist", ANGLES(sm("wr", wr), 0, 0))
+		set(rig, "LShoulder", ANGLES(sm("lS", lS), 0, sm("lZ", lZ)))
+		set(rig, "LElbow", ANGLES(sm("lE", lE), 0, 0))
+		set(rig, "Waist", ANGLES(sm("wp", wp), wyS, sm("wroll", wroll)))
+		set(rig, "Neck", ANGLES(sm("np", np), sm("ny", ny) - wyS * 0.6, sm("nr", nr)))
+		set(rig, "LHip", ANGLES(sm("lH", lH), 0, hz))
+		set(rig, "RHip", ANGLES(sm("rH", rH), 0, hz))
+		set(rig, "LKnee", ANGLES(sm("lK", lK), 0, 0))
+		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
+		local jitter = rattle * 0.015 * (1 - fw)
+		set(rig, "Root", CFrame.new((sm("lat", lat) + jitter) * scale, bob + float + rise + sm("lift", lift) * scale, sm("fwd", fwd) * scale))
 	end
 
 	-- Knell (Pose "Bellbearer"): it carries its own belfry; the right hand holds the bell rope. Built on the classic
