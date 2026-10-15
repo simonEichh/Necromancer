@@ -686,12 +686,14 @@ local function warpIn(folder, portal, shipFinal, ctx)
 			cf = cf:Lerp(CFrame.lookAt(cf.Position, cf.Position + dir), turn * TURN_SHARE)
 		end
 		ship:PivotTo(cf)
-		ctx.bow = (cf * CFrame.new(0, 0, -215 * SKY_SCALE)).Position -- (the camera follows the bow round)
+		ctx.bow = (cf * CFrame.new(0, 0, -215 * SHIP_SCALE)).Position -- (the camera follows the bow round)
+		-- (ctx.spinT / ctx.windowRun: SovereignArrival holds the ship still on this clock, but its rings keep turning)
+		local spinT = ctx.spinT or T
 		for _, r in ipairs(rings) do
-			r.joint.Transform = CFrame.Angles(0, T * r.speed, 0)
+			r.joint.Transform = CFrame.Angles(0, spinT * r.speed, 0)
 		end
 		if core then
-			local pulse = 0.5 + 0.5 * math.sin(T * 1.6)
+			local pulse = 0.5 + 0.5 * math.sin(spinT * 1.6)
 			core.Size = coreSize * (0.96 + 0.06 * pulse)
 			coreHalo.Size = haloSize * (0.94 + 0.12 * pulse)
 			coreHalo.Transparency = haloBase + 0.08 * (1 - pulse)
@@ -707,7 +709,7 @@ local function warpIn(folder, portal, shipFinal, ctx)
 			end
 		end
 		-- the window lights running from bow to stern after the snap
-		local run = (T - SNAP_AT - 0.3) / 1.6
+		local run = ctx.windowRun or (T - SNAP_AT - 0.3) / 1.6
 		for _, w in ipairs(windows) do
 			if run >= w.along then
 				w.part.Transparency = w.base
@@ -2087,5 +2089,15 @@ if fleetRemote then
 		})
 	end)
 end
+
+-- the sky scene for other cinematics (SovereignArrival: Malak's pull): the tear and the warp-in run on this file's
+-- clock, so the caller maps its own time onto these beats
+FleetStrike.sky = {
+	tear = skyTear, -- skyTear(folder, portalCF) -> update(T), cleanup()
+	warpIn = warpIn, -- warpIn(folder, portalCF, shipFinalCF, ctx) -> update(T), cleanup()
+	TEAR_AT = TEAR_AT, CRACKS_AT = CRACKS_AT, OPEN_AT = OPEN_AT, WARP_AT = WARP_AT,
+	EMERGE_FROM = EMERGE_FROM, EMERGE_TO = EMERGE_TO, SNAP_AT = SNAP_AT,
+	SHIP_SCALE = SHIP_SCALE, BOW_OPEN_ANGLE = BOW_OPEN_ANGLE,
+}
 
 return FleetStrike

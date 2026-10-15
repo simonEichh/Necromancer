@@ -239,7 +239,7 @@ graveBtn.MouseButton1Click:Connect(function()
 	previewGrave = GRAVE_ORDER[index % #GRAVE_ORDER + 1]
 	graveBtn.Text = graveLabel()
 end)
-local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed)
+local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet", "Arrival" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed), Malak's pull (SovereignArrival)
 local previewAnim = 1
 local animBtn = makeButton(panel, "Anim: " .. ANIMS[previewAnim], Color3.fromRGB(230, 200, 255))
 animBtn.Size = UDim2.new(0.4, -8, 0, 28)
@@ -266,6 +266,12 @@ playBtn.MouseButton1Click:Connect(function()
 		StarSummon.play(randomResults(1, previewRarity), { graveType = previewGrave, onDone = function() panel.Visible = true end })
 	elseif anim == "Descent" then
 		playDescent()
+	elseif anim == "Arrival" then
+		panel.Visible = false
+		local results = { { unitType = "Malak", rarity = Units.Rarity.Malak or "Primordial", pity = 0, oneIn = Units.getBaseOneIn("Malak") } }
+		if not require(script.Parent.SovereignArrival).play(results, { graveType = previewGrave, onDone = function() panel.Visible = true end }) then
+			panel.Visible = true
+		end
 	elseif anim == "Fleet" then
 		panel.Visible = false
 		if not require(script.Parent.FleetStrike).play({ preview = true, onDone = function() panel.Visible = true end }) then

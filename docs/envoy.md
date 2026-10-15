@@ -156,3 +156,27 @@ cut to silence, the beam impact, the slow warp-out boom.
 - Rarity (Primordial suggested; Abyssal and Eldritch have no Signature yet).
 - The purchase: gems (decided). Per account (any Envoy can use it)?
 - Damage split between basic, drone, skill.
+
+## Pull cinematic: "The Envoy Arrives" (agreed with the user 2026-10-15; first draft built, see the end)
+
+Sovereign pulls only (Malak), always this one (no 50/50 with the star summon), ~26 s (the user: longer is better),
+Skip / Continue. Reuses the Fleet Strike's `skyTear`, `warpIn` and the Absolution; keep everything within ~300 studs of
+the camera (low graphics draw distance). Beats: 1. bait (the grave rises, shakes, freezes; silence) 2. a thin red
+targeting laser from the sky, a red reticle locks onto the grave (`target_lock`) 3. the sky tears over the plot (low
+camera behind the necromancer, looking up; tear_rumble, portal_hum) 4. only the front third of the Absolution slides
+out of the portal, overhead 5. the bow halves open (`BowL` / `BowR`) and a **drop pod** falls from the slit (black
+chrome, silver edges, cold-blue seam, his silhouette style; vapour trail, long lens tracking it down) 6. it slams into
+the grave: the grave bursts, a cold-blue rune shockwave rolls out 7. the pod's petals fold open like his coat blades,
+Malak floats out in his idle hover, the drone unfolds, the hologram flickers on; hero shot, Sovereign name plate; he
+says **"High Command sends its regards. The Envoy has arrived."** (to record; same subtitle style) 8. the ship pulls
+back into the portal, portal_snap, the usual absorb. New module `SovereignArrival` next to `SignatureDescent`, a
+Sovereign branch in `GraveRolling`, a DEV panel button. Order: pod model (for approval) -> cinematic -> voice / sound.
+
+**First draft (2026-10-15, untested by the user):** `src/client/Modules/SovereignArrival.lua` (~36 s + absorb, timeline
+constants at the top), routed in `GraveRolling` for any pull that contains a Sovereign (`Units.isSovereign`, Malak has
+`sovereign = true`), DEV panel `Anim: Arrival`. It reuses `FleetStrike.sky` (the tear and the warp-in, on FleetStrike's
+own clock: `tearClock` / `warpClock` map onto it; `warpIn` takes `ctx.spinT` / `ctx.windowRun` so the held ship's
+rings keep turning and its windows are lit). The bow tip hangs `BOW_UP` 55 above the grave, `BOW_OUT` 18 beyond it,
+nose at the necromancer, 38% of the ship out of the portal. The drop pod is built in code (`buildPod`: base ring with
+thruster ports, six petals with violet lining, proud silver edges, cold seam, diamond emblem, a glowing crown). Voice:
+`voice_arrival` (`sounds/malak/voice_arrival.ogg`, 5.97 s, asset 139893314350646, second phrase at 3.89 s).

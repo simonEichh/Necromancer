@@ -47,6 +47,7 @@ Sfx.Sounds = {
 	voice_call = { id = "rbxassetid://137755688226874", volume = 1 }, -- high_command_passage.ogg
 	voice_verdict = { id = "rbxassetid://98769145369327", volume = 1 }, -- corrected: the former opening clip
 	voice_defiance = { id = "rbxassetid://105269459367929", volume = 1 }, -- the final standing shot
+	voice_arrival = { id = "rbxassetid://139893314350646", volume = 1 }, -- his pull (SovereignArrival): "High Command sends its regards. The Envoy has arrived."
 	rune_click = { id = "rbxassetid://129592415819508", volume = 0.35 },
 	rune_confirm = { id = "rbxassetid://80333702320714", volume = 0.7 },
 	drone_transform = { id = "rbxassetid://71750103238347", volume = 0.12 },

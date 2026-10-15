@@ -317,6 +317,8 @@ local UNITS = {
 	-- once, a red laser cuts diagonally out of the sky onto the wall, then a shell from a cannon far above hits it.
 	-- One slow, heavy hit every 6.5 s; the damage lands with the shell (hitDelay must match OrbitalStrike.IMPACT_AT).
 	Malak = {
+		sovereign = true, -- (his own pull cinematic: client SovereignArrival)
+		title = "The Envoy", -- (shown after his name in SovereignArrival)
 		color = BrickColor.new("Really black"),
 		size = Vector3.new(2.2, 4, 2.2),
 		damage = 552500, -- 85K DPS (placeholder)
@@ -471,6 +473,12 @@ local function isSignature(unitType)
 	return def ~= nil and def.special ~= nil
 end
 
+-- Sovereign units (a class above Signature, docs/envoy.md): their own gate finisher and their own pull cinematic
+local function isSovereign(unitType)
+	local def = UNITS[unitType]
+	return def ~= nil and def.sovereign == true
+end
+
 -- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
 local RENAMED = {
 	Goblin = "HollowArcher",
@@ -481,6 +489,7 @@ return {
 	Stats = UNITS,
 	RENAMED = RENAMED,
 	isSignature = isSignature,
+	isSovereign = isSovereign,
 	SIGNATURE_COLOR = SIGNATURE_COLOR,
 	Pools = RARITY_UNITS,
 	Rarity = UNIT_RARITY,
