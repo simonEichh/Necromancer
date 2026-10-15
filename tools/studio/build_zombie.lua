@@ -1,12 +1,17 @@
--- Builds the low-poly rigged Zombie into ServerStorage.Models.Zombie.
--- Run in Studio's command bar / via the Studio MCP execute_luau (Edit mode).
--- The old Creator Store model is kept as Zombie_Old until the new one is approved.
+-- Builds the rigged Zombie into ServerStorage.Models.Zombie.
+-- v2 (2026-10-15), the first unit in the shadow-army art direction (Design.md): a raised corpse turned to shadow.
+-- A lopsided brute: the right arm grotesquely swollen into a huge club of fused flesh with obsidian shards growing out
+-- of it, the left arm withered to bone; a bloated, hunched body with a hump; a small head sunk low and forward with a
+-- crooked, hanging jaw. Black / obsidian body; the shadow light (violet) burns in the eyes, the mouth and a core seen
+-- through a tear in the chest; its accent, what it was in life, is the rot: sickly green glowing through the cracks and
+-- the stitched belly. Rags of a burial suit and a snapped suspender. Shadow smoke pools at its feet and wisps off it.
+-- Run in Studio's command bar / via the Studio MCP execute_luau (Edit mode), then run publish_unit_models.lua.
 --
--- Same rig conventions as build_skelly.lua (see src/client/Modules/UnitAnimator.lua):
---   * front = -Z, character's right = +X, feet on y = 0, root part = HumanoidRootPart at y = 2.2
---   * Motor6Ds named Root/Waist/Neck/Jaw/LShoulder/RShoulder/LElbow/RElbow/LHip/RHip/LKnee/RKnee
+-- Rig conventions (see src/client/Modules/UnitAnimator.lua):
+--   * front = -Z, character's right = +X, feet on y = 0, root part = HumanoidRootPart at y = 2.4
+--   * Motor6Ds Root/Waist/Neck/Jaw/LShoulder/RShoulder/LElbow/RElbow/LHip/RHip/LKnee/RKnee, identity rest
+--   * the big club arm is the RIGHT arm (the generic swing animates it)
 --   * attributes: Rig = "Procedural", RootHeight, Height
--- A hulking, hunched zombie: rotten green skin, torn shirt and trousers, bare ribs and bandaged fists.
 local ServerStorage = game:GetService("ServerStorage")
 local models = ServerStorage.Models
 
@@ -17,29 +22,37 @@ elseif old then
 	old:Destroy()
 end
 
-local SKIN = Color3.fromRGB(122, 156, 96)
-local SKIN_DARK = Color3.fromRGB(88, 116, 70)
-local SHIRT = Color3.fromRGB(96, 80, 66)
-local SHIRT_DARK = Color3.fromRGB(70, 58, 50)
-local PANTS = Color3.fromRGB(58, 62, 84)
-local BANDAGE = Color3.fromRGB(206, 196, 168)
-local EYE = Color3.fromRGB(255, 230, 90)
-local WOUND = Color3.fromRGB(120, 36, 40)
-local TEETH = Color3.fromRGB(226, 218, 190)
+local VOID = Color3.fromRGB(14, 13, 19) -- the body
+local OBSIDIAN = Color3.fromRGB(30, 28, 40) -- plates, shards, a second black
+local RIM = Color3.fromRGB(48, 44, 62) -- the lightest black, for edges that must read
+local RAG = Color3.fromRGB(24, 21, 28)
+local VIOLET = Color3.fromRGB(96, 40, 210) -- shadow light (neon brightens it a lot)
+local VIOLET_HOT = Color3.fromRGB(150, 95, 255)
+local ROT = Color3.fromRGB(70, 150, 25) -- the accent: rot glowing through the cracks
+
+local SMOOTH = Enum.Material.SmoothPlastic
+local NEON = Enum.Material.Neon
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+local SPARK_TEXTURE = "rbxasset://textures/particles/sparkles_main.dds"
 
 local model = Instance.new("Model")
 model.Name = "Zombie"
 
-local function part(name, size, pos, color, material)
+local function part(name, size, at, color, material, shape)
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
-	p.CFrame = CFrame.new(pos)
+	p.CFrame = typeof(at) == "CFrame" and at or CFrame.new(at)
 	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
+	p.Material = material or SMOOTH
+	if shape then
+		p.Shape = shape
+	end
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
 	p.Massless = true
 	p.Anchored = false
 	p.Parent = model
@@ -65,73 +78,269 @@ local function weld(p0, p1)
 	return w
 end
 
+local function deco(to, name, size, at, color, material, shape)
+	local p = part(name, size, at, color, material, shape)
+	weld(to, p)
+	return p
+end
+
+-- a part stretched between two points (w x h cross-section), welded to `to`
+local function bar(name, a, b, w, h, color, to, material)
+	local up = math.abs((b - a).Unit.Y) > 0.95 and Vector3.xAxis or Vector3.yAxis
+	local p = part(name, Vector3.new(w, h or w, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b, up), color, material)
+	weld(to, p)
+	return p
+end
+
+-- a jagged glowing crack: a few short neon bars zig-zagging from a to b, a hair proud of the surface
+local function crack(to, a, b, color, segments, jag)
+	local prev = a
+	for i = 1, segments do
+		local f = i / segments
+		local nextP = a:Lerp(b, f)
+		if i < segments then
+			nextP += Vector3.new((i % 2 == 0 and 1 or -1) * jag, 0, (i % 2 == 0 and -1 or 1) * jag * 0.5)
+		end
+		bar("Crack", prev, nextP, 0.06, 0.06, color, to, NEON)
+		prev = nextP
+	end
+end
+
+local function light(parentPart, color, range, brightness)
+	local l = Instance.new("PointLight")
+	l.Color = color
+	l.Range = range
+	l.Brightness = brightness
+	l.Shadows = false
+	l.Parent = parentPart
+	return l
+end
+
 -- ── Core ──────────────────────────────────────────────────────
-local root = part("HumanoidRootPart", Vector3.new(1.4, 0.4, 0.9), Vector3.new(0, 2.2, 0), PANTS)
+local root = part("HumanoidRootPart", Vector3.new(1.6, 0.4, 1.0), Vector3.new(0, 2.4, 0), VOID)
 root.Transparency = 1
 model.PrimaryPart = root
 
-local pelvis = part("Pelvis", Vector3.new(1.5, 0.45, 0.95), Vector3.new(0, 2.2, 0), PANTS)
-motor("Root", root, pelvis, Vector3.new(0, 2.2, 0))
-
-local torso = part("Torso", Vector3.new(1.8, 1.4, 1.0), Vector3.new(0, 3.1, 0), SHIRT)
-motor("Waist", pelvis, torso, Vector3.new(0, 2.4, 0))
-
--- torn shirt: ragged hem, a rotten patch on the chest and bare ribs peeking through
-weld(torso, part("ShirtHem", Vector3.new(1.86, 0.2, 1.06), Vector3.new(0, 2.5, 0), SHIRT_DARK))
-weld(torso, part("ChestPatch", Vector3.new(0.7, 0.55, 0.06), Vector3.new(-0.4, 3.3, -0.51), SKIN_DARK))
-weld(torso, part("ChestWound", Vector3.new(0.3, 0.2, 0.07), Vector3.new(-0.45, 3.35, -0.52), WOUND))
-for i, y in ipairs({ 3.0, 2.78 }) do
-	weld(torso, part("Rib" .. i, Vector3.new(0.6, 0.08, 0.07), Vector3.new(0.4, y, -0.51), TEETH))
-end
-weld(torso, part("Shoulders", Vector3.new(2.0, 0.3, 1.05), Vector3.new(0, 3.65, 0), SHIRT_DARK))
-
--- ── Head ──────────────────────────────────────────────────────
-local head = part("Head", Vector3.new(1.2, 1.1, 1.1), Vector3.new(0, 4.4, -0.05), SKIN)
-motor("Neck", torso, head, Vector3.new(0, 3.8, 0))
-weld(head, part("Brow", Vector3.new(1.24, 0.18, 0.2), Vector3.new(0, 4.62, -0.55), SKIN_DARK))
-weld(head, part("EyeL", Vector3.new(0.26, 0.2, 0.1), Vector3.new(-0.3, 4.48, -0.58), EYE, Enum.Material.Neon))
-weld(head, part("EyeR", Vector3.new(0.2, 0.2, 0.1), Vector3.new(0.3, 4.48, -0.58), EYE, Enum.Material.Neon))
-weld(head, part("Nose", Vector3.new(0.2, 0.3, 0.12), Vector3.new(0, 4.3, -0.6), SKIN_DARK))
-weld(head, part("HeadPatch", Vector3.new(0.5, 0.35, 0.06), Vector3.new(0.45, 4.8, 0.2), WOUND))
-local jaw = part("Jaw", Vector3.new(1.0, 0.3, 0.9), Vector3.new(0, 3.98, -0.1), SKIN_DARK)
-motor("Jaw", head, jaw, Vector3.new(0, 4.05, 0.3))
-for _, x in ipairs({ -0.3, 0, 0.3 }) do
-	weld(jaw, part("Tooth", Vector3.new(0.14, 0.14, 0.06), Vector3.new(x, 4.12, -0.52), TEETH))
+local pelvis = part("Pelvis", Vector3.new(1.4, 0.55, 1.0), Vector3.new(0, 2.25, 0), VOID)
+motor("Root", root, pelvis, Vector3.new(0, 2.4, 0))
+-- burial-suit trousers hanging in tatters over the hips
+deco(pelvis, "Trousers", Vector3.new(1.48, 0.4, 1.06), Vector3.new(0, 2.15, 0), RAG, Enum.Material.Fabric)
+for i, s in ipairs({ { -0.5, 0.45, -0.52 }, { 0.15, 0.6, -0.52 }, { 0.55, 0.38, 0.52 }, { -0.25, 0.5, 0.52 } }) do
+	local x, h, z = s[1], s[2], s[3]
+	deco(pelvis, "Tatter" .. i, Vector3.new(0.3, h, 0.04), CFrame.new(x, 1.95 - h / 2, z) * CFrame.Angles(0, 0, (i % 2 == 0) and 0.12 or -0.1), RAG, Enum.Material.Fabric)
 end
 
--- ── Arms (character's right = +X) ─────────────────────────────
-local function arm(side, x)
-	local upper = part(side .. "UpperArm", Vector3.new(0.55, 0.95, 0.55), Vector3.new(x, 3.075, 0), SHIRT)
-	motor(side .. "Shoulder", torso, upper, Vector3.new(x, 3.6, 0))
-	local fore = part(side .. "Forearm", Vector3.new(0.5, 0.9, 0.5), Vector3.new(x, 2.15, 0), SKIN)
-	motor(side .. "Elbow", upper, fore, Vector3.new(x, 2.6, 0))
-	local fist = part(side .. "Fist", Vector3.new(0.62, 0.55, 0.62), Vector3.new(x, 1.5, 0), SKIN_DARK)
-	weld(fore, fist)
-	weld(fore, part(side .. "Bandage", Vector3.new(0.56, 0.22, 0.56), Vector3.new(x, 1.85, 0), BANDAGE))
+-- ── Body: bloated belly, a broad hunched chest, a hump, the right side swollen ──
+local torso = part("Torso", Vector3.new(1.75, 1.25, 1.35), Vector3.new(0, 3.05, -0.12), VOID)
+motor("Waist", pelvis, torso, Vector3.new(0, 2.5, 0))
+deco(torso, "Chest", Vector3.new(1.95, 0.95, 1.2), CFrame.new(0.15, 3.8, 0.02) * CFrame.Angles(-0.22, 0, -0.08), VOID)
+deco(torso, "Hump", Vector3.new(1.35, 0.75, 0.85), CFrame.new(0.2, 4.2, 0.45) * CFrame.Angles(-0.4, 0, -0.1), OBSIDIAN)
+deco(torso, "RightMass", Vector3.new(1.05, 0.95, 1.15), CFrame.new(0.95, 4.02, 0.02) * CFrame.Angles(0, 0, -0.25), VOID)
+deco(torso, "LeftShoulder", Vector3.new(0.55, 0.45, 0.6), CFrame.new(-0.82, 3.82, 0.02) * CFrame.Angles(0, 0, 0.3), OBSIDIAN)
+-- obsidian plates grown over the back and the swollen shoulder
+for i, s in ipairs({ { 0.1, 4.55, 0.55, -0.6 }, { 0.55, 4.45, 0.4, -0.5 }, { -0.3, 4.35, 0.62, -0.7 }, { 1.05, 4.5, 0.05, -0.2 } }) do
+	deco(torso, "Plate" .. i, Vector3.new(0.5, 0.18, 0.6), CFrame.new(s[1], s[2], s[3]) * CFrame.Angles(s[4], 0.2 * i, 0.15), RIM)
 end
-arm("L", -1.2)
-arm("R", 1.2)
+-- shards breaking out along the spine
+for i, s in ipairs({ { 0.05, 4.62, 0.75, 0.35 }, { 0.35, 4.5, 0.82, 0.45 }, { -0.25, 4.3, 0.85, 0.4 } }) do
+	deco(torso, "SpineShard" .. i, Vector3.new(0.14, 0.6 - i * 0.08, 0.14), CFrame.new(s[1], s[2], s[3]) * CFrame.Angles(s[4] + 0.5, 0, 0), OBSIDIAN)
+end
 
--- ── Legs ──────────────────────────────────────────────────────
-local function leg(side, x)
-	local upper = part(side .. "UpperLeg", Vector3.new(0.6, 0.9, 0.6), Vector3.new(x, 1.55, 0), PANTS)
-	motor(side .. "Hip", pelvis, upper, Vector3.new(x, 2.0, 0))
-	local lower = part(side .. "LowerLeg", Vector3.new(0.52, 0.9, 0.52), Vector3.new(x, 0.65, 0), PANTS)
-	motor(side .. "Knee", upper, lower, Vector3.new(x, 1.1, 0))
-	weld(lower, part("Foot" .. side, Vector3.new(0.7, 0.3, 1.0), Vector3.new(x, 0.15, -0.15), SKIN_DARK))
+-- the stitched belly: a rot-green seam held shut by black stitches
+local seamTop, seamBottom = Vector3.new(-0.15, 3.45, -0.8), Vector3.new(0.05, 2.55, -0.8)
+bar("BellySeam", seamTop, seamBottom, 0.08, 0.08, ROT, torso, NEON)
+for i = 0, 4 do
+	local p = seamTop:Lerp(seamBottom, (i + 0.5) / 5)
+	deco(torso, "Stitch", Vector3.new(0.3, 0.05, 0.05), CFrame.new(p + Vector3.new(0, 0, -0.02)) * CFrame.Angles(0, 0, 0.5), VOID)
 end
-leg("L", -0.5)
-leg("R", 0.5)
--- one trouser leg is torn off at the knee
-weld(model.LLowerLeg,part("TornCuff", Vector3.new(0.58, 0.14, 0.58), Vector3.new(-0.5, 1.0, 0), BANDAGE))
+crack(torso, Vector3.new(0.6, 3.3, -0.79), Vector3.new(0.85, 2.7, -0.7), ROT, 3, 0.07)
+crack(torso, Vector3.new(-0.88, 3.5, -0.3), Vector3.new(-0.89, 2.8, -0.1), ROT, 3, 0.05)
+
+-- a tear in the chest: dark ribs over the violet shadow core
+deco(torso, "ChestTear", Vector3.new(0.7, 0.55, 0.08), CFrame.new(-0.3, 3.72, -0.62) * CFrame.Angles(-0.22, 0, 0.1), Color3.fromRGB(4, 3, 8))
+local core = deco(torso, "Core", Vector3.new(0.5, 0.36, 0.06), CFrame.new(-0.3, 3.72, -0.6) * CFrame.Angles(-0.22, 0, 0.1), VIOLET, NEON)
+for i = 0, 2 do
+	deco(torso, "Rib", Vector3.new(0.78, 0.07, 0.07), CFrame.new(-0.3, 3.86 - i * 0.15, -0.68 + i * 0.03) * CFrame.Angles(-0.22, 0, 0.1), OBSIDIAN)
+end
+light(core, VIOLET, 6, 1.4)
+
+-- the snapped suspender of the burial suit: over the left shoulder, the other strap hanging loose
+bar("Suspender", Vector3.new(-0.55, 4.05, -0.6), Vector3.new(-0.4, 2.5, -0.74), 0.1, 0.04, RAG, torso, Enum.Material.Fabric)
+bar("SuspenderBroken", Vector3.new(0.5, 2.55, -0.74), Vector3.new(0.62, 1.95, -0.62), 0.1, 0.04, RAG, torso, Enum.Material.Fabric)
+
+-- ── Head: small for the body, sunk low and forward, the jaw hanging crooked ──
+local head = part("Head", Vector3.new(0.8, 0.72, 0.8), Vector3.new(-0.12, 4.38, -0.68), VOID)
+motor("Neck", torso, head, Vector3.new(-0.08, 4.2, -0.35))
+deco(head, "Brow", Vector3.new(0.86, 0.16, 0.24), CFrame.new(-0.12, 4.56, -1.02) * CFrame.Angles(0, 0, -0.08), OBSIDIAN)
+deco(head, "Skullcap", Vector3.new(0.7, 0.18, 0.66), Vector3.new(-0.14, 4.8, -0.64), OBSIDIAN)
+-- the eyes: lopsided, the left one bigger; the shadow light burns in both
+local eyeL = deco(head, "Eye", Vector3.new(0.2, 0.13, 0.06), CFrame.new(-0.32, 4.42, -1.08) * CFrame.Angles(0, 0, -0.15), VIOLET_HOT, NEON)
+deco(head, "Eye", Vector3.new(0.13, 0.08, 0.06), CFrame.new(0.06, 4.45, -1.08) * CFrame.Angles(0, 0, 0.2), VIOLET_HOT, NEON)
+light(eyeL, VIOLET, 3.5, 1.2)
+crack(head, Vector3.new(0.12, 4.88, -0.9), Vector3.new(0.25, 4.5, -1.07), ROT, 2, 0.04)
+
+local jaw = part("Jaw", Vector3.new(0.66, 0.2, 0.62), CFrame.new(-0.18, 3.98, -0.8) * CFrame.Angles(0.15, 0, 0.22), OBSIDIAN)
+motor("Jaw", head, jaw, Vector3.new(-0.12, 4.15, -0.5))
+-- the mouth glows from inside, jagged teeth in front of it
+deco(jaw, "MouthGlow", Vector3.new(0.5, 0.06, 0.4), CFrame.new(-0.16, 4.1, -0.86) * CFrame.Angles(0.15, 0, 0.22), VIOLET, NEON)
+for i = 0, 4 do
+	deco(jaw, "Tooth", Vector3.new(0.07, 0.16, 0.07), CFrame.new(-0.36 + i * 0.1, 4.15 + i * 0.022, -1.08) * CFrame.Angles(0, 0, 0.22 + (i % 2) * 0.2), RIM)
+end
+
+-- ── Right arm: the club ──────────────────────────────────────
+local rUpper = part("RUpperArm", Vector3.new(0.9, 1.25, 0.95), CFrame.new(1.42, 3.3, 0) * CFrame.Angles(0, 0, 0.08), VOID)
+motor("RShoulder", torso, rUpper, Vector3.new(1.2, 3.95, 0))
+deco(rUpper, "ElbowMass", Vector3.new(0.95, 0.6, 0.95), Vector3.new(1.5, 2.65, 0.05), OBSIDIAN)
+local rFore = part("RForearm", Vector3.new(1.2, 1.4, 1.15), CFrame.new(1.55, 1.95, -0.05) * CFrame.Angles(0, 0, -0.04), VOID)
+motor("RElbow", rUpper, rFore, Vector3.new(1.5, 2.65, 0))
+-- the fused fist: a knuckled mass of flesh and obsidian
+deco(rFore, "Fist", Vector3.new(1.35, 0.75, 1.3), Vector3.new(1.58, 1.05, -0.08), VOID)
+for i = 0, 3 do
+	deco(rFore, "Knuckle", Vector3.new(0.3, 0.3, 0.32), Vector3.new(1.1 + i * 0.31, 0.95, -0.7), OBSIDIAN)
+end
+-- obsidian shards growing out of the outside and the back of the arm
+for i, s in ipairs({
+	{ Vector3.new(2.08, 2.2, 0.0), CFrame.Angles(0, 0, -1.1), 0.75 },
+	{ Vector3.new(2.1, 1.6, 0.25), CFrame.Angles(0.3, 0, -1.2), 0.6 },
+	{ Vector3.new(1.75, 2.3, 0.6), CFrame.Angles(1.1, 0, -0.3), 0.7 },
+	{ Vector3.new(1.95, 3.6, 0.3), CFrame.Angles(0.5, 0, -0.9), 0.55 },
+	{ Vector3.new(1.6, 1.3, 0.62), CFrame.Angles(1.2, 0, 0.1), 0.5 },
+}) do
+	local to = (s[1].Y > 2.65) and rUpper or rFore
+	deco(to, "Shard" .. i, Vector3.new(0.16, s[3], 0.16), CFrame.new(s[1]) * s[2], OBSIDIAN)
+	deco(to, "ShardTip" .. i, Vector3.new(0.1, 0.12, 0.1), CFrame.new(s[1]) * s[2] * CFrame.new(0, s[3] / 2, 0), RIM)
+end
+-- rot cracks running down the club
+crack(rFore, Vector3.new(1.0, 2.5, -0.5), Vector3.new(1.1, 1.3, -0.62), ROT, 4, 0.08)
+crack(rFore, Vector3.new(2.13, 2.45, -0.3), Vector3.new(2.2, 1.35, -0.2), ROT, 3, 0.06)
+crack(rUpper, Vector3.new(1.4, 3.85, -0.48), Vector3.new(1.55, 2.95, -0.48), ROT, 3, 0.06)
+
+-- ── Left arm: withered to bone ────────────────────────────────
+local lUpper = part("LUpperArm", Vector3.new(0.26, 0.95, 0.26), Vector3.new(-0.95, 3.2, 0), VOID)
+motor("LShoulder", torso, lUpper, Vector3.new(-0.95, 3.68, 0))
+deco(lUpper, "ElbowKnob", Vector3.new(0.3, 0.26, 0.3), Vector3.new(-0.95, 2.72, 0.02), OBSIDIAN)
+local lFore = part("LForearm", Vector3.new(0.2, 0.92, 0.2), Vector3.new(-0.97, 2.25, -0.02), VOID)
+motor("LElbow", lUpper, lFore, Vector3.new(-0.95, 2.72, 0))
+deco(lFore, "LHand", Vector3.new(0.26, 0.22, 0.24), Vector3.new(-0.98, 1.7, -0.04), OBSIDIAN)
+for i, z in ipairs({ -0.08, 0, 0.08 }) do
+	bar("Finger", Vector3.new(-0.98, 1.6, z - 0.04), Vector3.new(-1.0 - 0.02 * i, 1.3, z - 0.14), 0.05, 0.05, OBSIDIAN, lFore)
+end
+
+-- ── Legs: short and thick, the right one heavier ──────────────
+local function leg(side, x, thick)
+	local upper = part(side .. "UpperLeg", Vector3.new(0.62 * thick, 0.95, 0.62 * thick), Vector3.new(x, 1.6, 0), VOID)
+	motor(side .. "Hip", pelvis, upper, Vector3.new(x, 2.05, 0))
+	deco(upper, "Knee", Vector3.new(0.5 * thick, 0.3, 0.45), Vector3.new(x, 1.14, -0.12), OBSIDIAN)
+	local lower = part(side .. "LowerLeg", Vector3.new(0.52 * thick, 0.95, 0.52 * thick), Vector3.new(x, 0.62, 0), VOID)
+	motor(side .. "Knee", upper, lower, Vector3.new(x, 1.12, 0))
+	deco(lower, "Foot" .. side, Vector3.new(0.62 * thick, 0.24, 0.95), Vector3.new(x, 0.12, -0.18), OBSIDIAN)
+	deco(lower, "Rag", Vector3.new(0.58 * thick, 0.35, 0.58 * thick), Vector3.new(x, 0.95, 0), RAG, Enum.Material.Fabric)
+	return lower
+end
+leg("L", -0.48, 1.0)
+local rLower = leg("R", 0.5, 1.2)
+crack(rLower, Vector3.new(0.82, 0.95, -0.2), Vector3.new(0.84, 0.35, -0.25), ROT, 2, 0.05)
+
+-- ── Shadow smoke ──────────────────────────────────────────────
+-- 1. a pool of black smoke at its feet (an invisible slab on the root, so it follows the body but not the limbs)
+local pool = part("SmokePool", Vector3.new(2.6, 0.1, 2.0), Vector3.new(0.2, 0.15, 0), VOID)
+pool.Transparency = 1
+weld(root, pool)
+local poolSmoke = Instance.new("ParticleEmitter")
+poolSmoke.Name = "ShadowPool"
+poolSmoke.Texture = SMOKE_TEXTURE
+poolSmoke.Color = ColorSequence.new(Color3.fromRGB(14, 8, 26), Color3.fromRGB(46, 22, 84))
+poolSmoke.LightInfluence = 0 -- (unlit: it keeps its own dark violet instead of vanishing into the dark scene)
+poolSmoke.LightEmission = 0
+poolSmoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.0), NumberSequenceKeypoint.new(0.5, 2.0), NumberSequenceKeypoint.new(1, 2.7) })
+poolSmoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.3), NumberSequenceKeypoint.new(0.7, 0.55), NumberSequenceKeypoint.new(1, 1) })
+poolSmoke.Lifetime = NumberRange.new(1.6, 2.4)
+poolSmoke.Rate = 10
+poolSmoke.Speed = NumberRange.new(0.1, 0.4)
+poolSmoke.Acceleration = Vector3.new(0, 0.3, 0)
+poolSmoke.Drag = 1
+poolSmoke.Rotation = NumberRange.new(0, 360)
+poolSmoke.RotSpeed = NumberRange.new(-25, 25)
+poolSmoke.EmissionDirection = Enum.NormalId.Top
+poolSmoke.Parent = pool
+-- a faint violet glow inside the pool
+local poolGlow = Instance.new("ParticleEmitter")
+poolGlow.Name = "ShadowPoolGlow"
+poolGlow.Texture = SMOKE_TEXTURE
+poolGlow.Color = ColorSequence.new(Color3.fromRGB(110, 50, 230))
+poolGlow.LightEmission = 1
+poolGlow.LightInfluence = 0
+poolGlow.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 1.9) })
+poolGlow.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.72), NumberSequenceKeypoint.new(1, 1) })
+poolGlow.Lifetime = NumberRange.new(1.2, 1.8)
+poolGlow.Rate = 5
+poolGlow.Speed = NumberRange.new(0.2, 0.5)
+poolGlow.Rotation = NumberRange.new(0, 360)
+poolGlow.EmissionDirection = Enum.NormalId.Top
+poolGlow.Parent = pool
+
+-- 2. dark vapour wisping off the body and the club (rises, drifts back as it walks)
+local function wisps(to, name, size, at, rate)
+	local src = deco(to, name, size, at, VOID)
+	src.Transparency = 1
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "ShadowWisps"
+	e.Texture = SMOKE_TEXTURE
+	e.Color = ColorSequence.new(Color3.fromRGB(18, 10, 32), Color3.fromRGB(72, 36, 130))
+	e.LightInfluence = 0
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1.1) })
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.25, 0.4), NumberSequenceKeypoint.new(1, 1) })
+	e.Lifetime = NumberRange.new(0.9, 1.5)
+	e.Rate = rate
+	e.Speed = NumberRange.new(0.4, 1.0)
+	e.Acceleration = Vector3.new(0, 1.6, 0)
+	e.Drag = 1.5
+	e.Rotation = NumberRange.new(0, 360)
+	e.RotSpeed = NumberRange.new(-40, 40)
+	e.SpreadAngle = Vector2.new(30, 30)
+	e.EmissionDirection = Enum.NormalId.Top
+	e.Parent = src
+	return e
+end
+wisps(torso, "WispsBack", Vector3.new(1.2, 0.3, 0.6), Vector3.new(0.2, 4.5, 0.45), 4)
+wisps(rFore, "WispsClub", Vector3.new(1.0, 0.8, 0.9), Vector3.new(1.58, 1.6, -0.05), 3)
+
+-- 3. rot motes: a few green embers drifting up from the club's cracks
+local motesSrc = deco(rFore, "RotMotes", Vector3.new(1.1, 1.2, 1.1), Vector3.new(1.55, 1.9, -0.05), VOID)
+motesSrc.Transparency = 1
+local motes = Instance.new("ParticleEmitter")
+motes.Name = "RotMotes"
+motes.Texture = SPARK_TEXTURE
+motes.Color = ColorSequence.new(ROT)
+motes.LightEmission = 1
+motes.LightInfluence = 0
+motes.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.12), NumberSequenceKeypoint.new(1, 0) })
+motes.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+motes.Lifetime = NumberRange.new(0.8, 1.4)
+motes.Rate = 3
+motes.Speed = NumberRange.new(0.3, 0.8)
+motes.Acceleration = Vector3.new(0, 1.2, 0)
+motes.SpreadAngle = Vector2.new(60, 60)
+motes.EmissionDirection = Enum.NormalId.Top
+motes.Parent = motesSrc
+
+-- the shadow's edge: a faint violet outline so the black body reads against a dark scene
+local outline = Instance.new("Highlight")
+outline.Name = "ShadowOutline"
+outline.FillTransparency = 1
+outline.OutlineColor = Color3.fromRGB(150, 95, 255)
+outline.OutlineTransparency = 0.55
+outline.DepthMode = Enum.HighlightDepthMode.Occluded
+outline.Parent = model
 
 model:SetAttribute("Rig", "Procedural")
-model:SetAttribute("RootHeight", 2.2)
+model:SetAttribute("RootHeight", 2.4)
 model:SetAttribute("Height", 5.0)
 model.Parent = models
 
-local count = 0
+local parts, joints = 0, 0
 for _, d in ipairs(model:GetDescendants()) do
-	if d:IsA("Motor6D") then count += 1 end
+	if d:IsA("BasePart") then parts += 1 end
+	if d:IsA("Motor6D") then joints += 1 end
 end
-return "Zombie built: " .. #model:GetChildren() .. " parts, " .. count .. " joints"
+return "Zombie built: " .. parts .. " parts, " .. joints .. " joints"
