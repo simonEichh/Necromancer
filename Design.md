@@ -21,6 +21,33 @@ Pillars (every feature should serve at least one):
 
 What we are NOT making: a building tycoon (no droppers/conveyors), a menu-and-math idle game.
 
+### Unit art direction: the shadow army (decided 2026-10-15)
+
+From now on the units get a **Solo Leveling vibe** (the manhwa/anime: the Shadow Monarch's army). Mood board:
+https://claude.ai/artifact/YBQLTTpL4rZUNC1A4FHLd3 (private to the user). The units are soldiers of a shadow army
+raised by the necromancer: a power fantasy told with darkness and light. Rules:
+- **Black first:** black / obsidian bodies with a strong, readable silhouette (horns, plumes, capes, claws, plates);
+  detail lives in the shape, not in surface colour.
+- **Lit from inside:** the only bright parts are small, intense lights where the shadow burns through: eyes, mouth,
+  chest core, seams between plates, weapon edges. Shadow-mana violet (~#8B4DFF, hot core ~#C7A6FF).
+- **Made of shadow:** dark violet vapour trails off limbs and capes, pools at the feet; units rise out of the ground in
+  smoke.
+- **Sharp and armored:** angular, lean, menacing proportions; never round or cute.
+- **Power escalates by rank:** higher rarities get more armor, size, glow, a cape, presence (later; the user's rule of
+  no per-rarity treatment until the top rarities are settled still holds).
+- **Stillness, then violence:** a held anticipation, then an explosive, almost instant strike with a flash and debris,
+  then calm (fits the momentum rule).
+- Inspiration only: no names, characters or exact designs from Solo Leveling. The graveyard / gothic world stays.
+- Decided 2026-10-15: every unit gets rebuilt in this style, the Zombie first (a lopsided brute, the first test).
+  Violet is the shared identity, plus **one accent per unit = a trace of what it was in life** (Zombie: rot green
+  glowing through its cracks; Skelly: bone white; Ghoul: its yellow eyes), like a knight whose armor turned black
+  but kept its red plume. The blue System-style UI frames come later, not now.
+- **Origin (agreed):** the graves hold the dead; digging one is the raising. The necromancer's command is **RISE**:
+  the grave cracks, black smoke pours out, a shape rises and its eyes ignite violet. The reveal's fake-out becomes
+  "the soul resists" (the smoke collapses, the grave shakes, then it gives in). Owned units live in the necromancer's
+  shadow; placing one = it rises from the shadow at its grave; ascending = the army sinks back into the shadow.
+  Later idea: the Codex shows what a unit was before it was raised.
+
 ## 2. Genres in short
 
 | | Tycoon | Incremental / Simulator | Rolling / gacha |
