@@ -187,6 +187,7 @@ AscendPanel = require(Modules.AscendPanel)
 require(Modules.SellPanel)
 require(Modules.ForgePanel)
 require(Modules.GemShopPanel) -- the Gem Shop (Shop tile, right) and the Remote Forge tile (left)
+require(Modules.SettingsPanel) -- the Settings tile (top right) and panel: sound volumes, saved
 require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
 require(Modules.AltarFx) -- the Soul Altar's braziers burn as high as the realm upgrade levels
 require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 (none from 10: the shadow form)

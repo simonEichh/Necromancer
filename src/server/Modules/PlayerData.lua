@@ -53,6 +53,7 @@ function PlayerData.create(player, saved)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
 		remoteForge = false, -- bought the Remote Forge (Gem Shop): the Forge works anywhere
 		fleetStrike = false, -- bought Malak's Fleet Strike finisher (Gem Shop / Codex)
+		settings = { master = 1, effects = 1, music = 1 }, -- the Settings panel: volumes 0..1 (saved)
 		saved = saved, -- raw saved data, for modules that restore their own state
 		syncQueued = false,
 		dirty = false,
@@ -68,6 +69,14 @@ function PlayerData.create(player, saved)
 		profile.wispLevel = math.floor(clampNumber(saved.wispLevel, 0, 0))
 		profile.remoteForge = saved.remoteForge == true
 		profile.fleetStrike = saved.fleetStrike == true
+		if type(saved.settings) == "table" then
+			for key in pairs(profile.settings) do
+				local v = saved.settings[key]
+				if type(v) == "number" and v == v then
+					profile.settings[key] = math.clamp(v, 0, 1)
+				end
+			end
+		end
 
 		if type(saved.ownedGraves) == "table" then
 			for key in pairs(profile.ownedGraves) do
@@ -267,6 +276,7 @@ function PlayerData.snapshot(profile)
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
+		settings = profile.settings,
 		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}
 end
@@ -569,5 +579,21 @@ function PlayerData.setGateCleared(player, cleared)
 		PlayerData.changed(player)
 	end
 end
+
+-- the Settings panel: the client sends its volumes when a slider is let go; only known keys, numbers 0..1, saved
+-- with the profile (no DataSync back: the client already shows them)
+Remotes.SaveSettings.OnServerEvent:Connect(function(player, settings)
+	local profile = PlayerData.get(player)
+	if not profile or type(settings) ~= "table" then
+		return
+	end
+	for key in pairs(profile.settings) do
+		local v = settings[key]
+		if type(v) == "number" and v == v then
+			profile.settings[key] = math.clamp(v, 0, 1)
+		end
+	end
+	profile.dirty = true
+end)
 
 return PlayerData

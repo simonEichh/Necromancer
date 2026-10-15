@@ -13,7 +13,8 @@ local EVENTS = {
 	"DevGiveGold",
 	"DevFastSpecials",
 	"DevFleetStrike", -- (on) Studio: start / stop a Fleet Strike finisher on your plot (FleetStrike.lua previews it)
-	"DevGateLow", -- Studio: break walls up to the gate and set it to 21% HP (to test the Fleet Strike trigger)
+	"DevGateLow", -- Studio: break walls up to the gate and set it just above 20% HP (to test the Fleet Strike trigger)
+	"SaveSettings", -- ({ master, effects, music } volumes 0..1): the Settings panel (PlayerData)
 	"FleetStrike", -- server -> all clients ({ owner, startAt, malak, gate }): Malak's finisher starts (client FleetStrike)
 	"DismantleAll",
 	"DismantleAllResult",
