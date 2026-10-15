@@ -11,6 +11,7 @@ local Rolling = require(script.Parent.Rolling)
 local Army = require(script.Parent.Army)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local Economy = require(game:GetService("ReplicatedStorage").Shared.Economy)
+local Units = require(game:GetService("ReplicatedStorage").Shared.Units)
 
 local STORE_NAME = "PlayerData_v1"
 local SAVE_VERSION = 1
@@ -78,6 +79,32 @@ local function collect(player, profile)
 	}
 end
 
+-- Units that were replaced or renamed (Units.RENAMED, e.g. the Goblin became the Hollow Archer): rewrites the old keys
+-- in a loaded save (inventory, units on graves, the Codex) before PlayerData reads it.
+local function migrateUnitNames(saved)
+	if type(saved) ~= "table" then
+		return
+	end
+	for _, listName in ipairs({ "inventory", "placed" }) do
+		local list = saved[listName]
+		if type(list) == "table" then
+			for _, entry in pairs(list) do
+				if type(entry) == "table" and Units.RENAMED[entry.unitType] then
+					entry.unitType = Units.RENAMED[entry.unitType]
+				end
+			end
+		end
+	end
+	if type(saved.codex) == "table" then
+		for oldKey, newKey in pairs(Units.RENAMED) do
+			if type(saved.codex[oldKey]) == "number" then
+				saved.codex[newKey] = (tonumber(saved.codex[newKey]) or 0) + saved.codex[oldKey]
+				saved.codex[oldKey] = nil
+			end
+		end
+	end
+end
+
 local Persistence = {}
 
 -- Creates the player's authoritative data (from DataStore when possible) and restores per-system state.
@@ -90,6 +117,9 @@ function Persistence.load(player)
 		return nil
 	end
 
+	if ok then
+		migrateUnitNames(saved)
+	end
 	local profile = PlayerData.create(player, ok and saved or nil)
 	if not ok then
 		profile.loadFailed = true

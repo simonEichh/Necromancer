@@ -71,7 +71,7 @@ Plots point in different directions, so **never use world X/Z for lane math**. E
 - Not saved: luck buff timer, shop stock rotation, current wall layer/progress, `gateCleared` (break the gate again after rejoining before ascending).
 - Towers (Last Lantern) keep their firing spot while the front advances, so their beam gets very long late in a run; an idea is to let them re-rise closer every few walls.
 - The Sigilwright stands at a fixed post and never marches; `INFINITE_RANGE_POST_FWD` is a constant in `Army.lua`.
-- `regenReduction` and `PlagueDoctor.poison` are defined but unused; Goblin poison is hardcoded by unit name.
+- `regenReduction` is defined but unused. (The poison mechanic was removed with the Goblin on 2026-10-15.)
 
 ## Conventions
 

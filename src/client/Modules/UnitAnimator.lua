@@ -217,6 +217,46 @@ local SLAM = {
 	{ 1.8, table.unpack(SLAM_READY) },
 }
 
+-- Two-bone IK for an arm whose rest pose hangs straight down (-Y) from the shoulder, with an elbow that bends towards
+-- -Z on +X (the procedural rigs). Positions are in the parent's build space (the torso before any animation): the
+-- shoulder joint, the wrist target and a pole direction the elbow should point to. Returns the shoulder's Transform
+-- and the elbow angle (out of reach = straight arm towards the target).
+local function armIK(shoulder, target, upperLen, lowerLen, pole)
+	local toTarget = target - shoulder
+	local dist = math.clamp(toTarget.Magnitude, 0.05, upperLen + lowerLen - 0.001)
+	local d = toTarget.Magnitude > 1e-4 and toTarget.Unit or Vector3.new(0, -1, 0)
+	local a = math.acos(math.clamp((upperLen * upperLen + dist * dist - lowerLen * lowerLen) / (2 * upperLen * dist), -1, 1))
+	local bend = math.pi - math.acos(math.clamp((upperLen * upperLen + lowerLen * lowerLen - dist * dist) / (2 * upperLen * lowerLen), -1, 1))
+	local poleDir = pole - d * pole:Dot(d)
+	if poleDir.Magnitude < 1e-3 then
+		poleDir = Vector3.new(0, 0, 1) - d * d.Z
+	end
+	poleDir = poleDir.Unit
+	local upper = (d * math.cos(a) + poleDir * math.sin(a)).Unit
+	local elbow = shoulder + upper * upperLen
+	local fore = (shoulder + d * dist) - elbow
+	local bendDir = fore - upper * fore:Dot(upper)
+	bendDir = bendDir.Magnitude > 1e-4 and bendDir.Unit or -poleDir
+	-- the shoulder turns the arm's local -Y onto the upper arm and its local -Z onto the bend direction
+	local yAxis, zAxis = -upper, -bendDir
+	return CFrame.fromMatrix(Vector3.zero, yAxis:Cross(zAxis), yAxis, zAxis), bend
+end
+
+-- The Hollow Archer (AttackStyle "Bow", build_hollowarcher.lua; these numbers must match the build): shoulders, arm
+-- lengths, the hand centre's drop below the wrist, the bow's brace (string 0.34 behind the grip) and its full draw.
+-- The bow hand (GRIP, in the model's space) is held out so the arrow line passes the right cheek; the string hand is always derived from the string's nock point
+-- (grip + brace + draw), so the hand and the string stay together. RELEASE = Units.HollowArcher.releaseAt.
+local ARCHER = {
+	lShoulder = Vector3.new(-0.6, 3.85, 0), rShoulder = Vector3.new(0.6, 3.85, 0), upper = 0.85, lower = 0.85,
+	handDrop = 0.12, brace = 0.34, drawLen = 1.05,
+	GRIP = Vector3.new(0.5, 3.95, -1.62), -- (the arrow line runs past the right cheek: the anchor point)
+	RELEASE = 0.55, -- (a fraction of the attack cycle, which lasts AttackCD; Units releaseAt = RELEASE x attackCD)
+	QUIVER = Vector3.new(0.34, 4.35, 0.5), -- (in the torso's space: the top of the quiver over the right shoulder)
+}
+
+local ArrowFx = require(script.Parent.ArrowFx)
+local Units = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Units"))
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -309,7 +349,7 @@ local function animate(model, rig, dt, now)
 				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 			end
 		end
-	elseif u and style ~= "Strike" and style ~= "Pounce" and style ~= "Slam" then
+	elseif u and style ~= "Strike" and style ~= "Pounce" and style ~= "Slam" and style ~= "Bow" then
 		local shoulder, elbow, lean, mouth = attackPose(u)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
@@ -477,6 +517,164 @@ local function animate(model, rig, dt, now)
 		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
 		local jitter = rattle * 0.015 * (1 - fw)
 		set(rig, "Root", CFrame.new((sm("lat", lat) + jitter) * scale, bob + float + rise + sm("lift", lift) * scale, sm("fwd", fwd) * scale))
+	end
+
+	-- AttackStyle "Bow" (the Hollow Archer, build_hollowarcher.lua): both arms are placed with armIK from hand targets.
+	--   walk / idle: the bow hangs at its side; idle, the hooded head turns slowly, watching the distance;
+	--   fight, one attack = one continuous cycle with ONE draw (times below for a 1 s cycle; it is stretched to AttackCD): the arrow is already on the string; it draws
+	--     (0-0.4, easing out as the bow gets heavy, the eyes brighten), holds at full draw with the string trembling (to
+	--     RELEASE 0.55) and looses: the string snaps back and vibrates, the bow arm kicks, the draw hand's follow-through
+	--     flies back past the ear on to the quiver in one motion (0.55-0.7), takes an arrow (to 0.8) and brings it to the
+	--     string (0.8-1.0), ready for the next draw. (The quiver trip is part of the follow-through: at the START of the
+	--     attack it read as a second draw.) At the release ArrowFx flies the arrow from the nock to AimPos (the server's
+	--     damage lands when it arrives).
+	--   The string is the model's two Beams through the Nock attachment, moved back as it draws; the nocked arrow is a
+	--   client-only part under the model.
+	if style == "Bow" then
+		local A = ARCHER
+		local ab = rig.bow
+		if not ab then
+			ab = { fight = 0, eyes = {} }
+			rig.bow = ab
+		end
+		if not ab.lHand or not ab.lHand.Parent then
+			ab.lHand = model:FindFirstChild("LHand", true)
+			ab.nock = ab.lHand and ab.lHand:FindFirstChild("Nock")
+			table.clear(ab.eyes)
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and d.Name == "Eye" then
+					table.insert(ab.eyes, d)
+				end
+			end
+		end
+		if not ab.nocked then
+			local arrow = Instance.new("Part")
+			arrow.Name = "NockedArrow"
+			arrow.Size = Vector3.new(0.07, 0.07, 1.9) * scale
+			arrow.Color = model:GetAttribute("Form") == "Shadow" and Color3.fromRGB(30, 26, 40) or Color3.fromRGB(214, 204, 176)
+			arrow.Material = Enum.Material.SmoothPlastic
+			arrow.Anchored = true
+			arrow.CanCollide, arrow.CanQuery, arrow.CanTouch, arrow.CastShadow = false, false, false, false
+			arrow.Transparency = 1
+			arrow.Parent = model
+			ab.nocked = arrow
+		end
+		local function sm01(x)
+			x = clamp01(x)
+			return x * x * (3 - 2 * x)
+		end
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+		local cd = model:GetAttribute("AttackCD") or 1
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.2
+		ab.fight += ((fighting and 1 or 0) - ab.fight) * clamp01(dt * (fighting and 6 or 2))
+		local fw = ab.fight * ab.fight * (3 - 2 * ab.fight) * (1 - w)
+
+		-- the attack cycle: the draw hand's target, the string's draw (0..1), the arrow on the string, eye flare, bow kick
+		local function nockAt(d)
+			return A.GRIP + Vector3.new(0, 0, A.brace + d * A.drawLen)
+		end
+		local HOLD = Vector3.new(0.04, 0.02, 0.06) -- (the hand centre is a little behind the fingers on the string)
+		local REST = nockAt(0) + HOLD
+		-- like a real archer it turns side-on to shoot (the chest turns right, the left shoulder towards the wall), which
+		-- lets the draw elbow point out to the right; the fight targets are meant in the model's space (aimed straight at
+		-- the wall), so they are turned back into the twisted torso's space
+		local twist = -0.55 * fw
+		local WAIST = Vector3.new(0, 2.72, 0)
+		local untwist = CFrame.new(WAIST) * CFrame.Angles(0, -twist, 0) * CFrame.new(-WAIST)
+		-- (the cycle is written for 1 s and stretched to the unit's AttackCD, so a slower archer draws slower)
+		local a = math.min(since / cd, 1.0)
+		local hand, draw, shown, flare, kick, grow = REST, 0, true, 0, 0, 1
+		if a < 0.4 then
+			local f = a / 0.4
+			draw = 1 - (1 - f) * (1 - f)
+			hand = nockAt(draw) + HOLD
+			flare = f * 0.5
+		elseif a < A.RELEASE then
+			draw = 1 + math.sin(now * 60) * 0.012
+			hand = nockAt(draw) + HOLD
+			flare = 1
+		else
+			local r = a - A.RELEASE
+			draw = math.sin(r * 70) * math.exp(-r * 18) * 0.08
+			kick = math.sin(r * 25) * math.exp(-r * 10)
+			flare = math.max(0, 1 - r / 0.15)
+			shown = a >= 0.93 -- (the new arrow arrives on the string with the hand)
+			-- the follow-through flies back past the ear and on to the quiver in one motion (a curve through the ear point,
+			-- fast out of the release, slowing into the quiver), a moment there to take an arrow, then forward to the string.
+			-- (the quiver sits on the torso: its point is turned into the model's space like the other targets)
+			local full = nockAt(1) + HOLD
+			local ear = full + Vector3.new(0.25, 0.15, 0.3)
+			local quiver = untwist:Inverse() * A.QUIVER
+			if a < 0.7 then
+				local e = 1 - (1 - (a - A.RELEASE) / (0.7 - A.RELEASE)) ^ 2
+				hand = full:Lerp(ear, e):Lerp(ear:Lerp(quiver, e), e)
+			elseif a < 0.8 then
+				hand = quiver + Vector3.new(0, math.sin((a - 0.7) / 0.1 * math.pi) * 0.06, 0)
+			else
+				hand = quiver:Lerp(REST, sm01((a - 0.8) / 0.2))
+			end
+		end
+
+		-- loose the arrow once per attack
+		if rig.lastShot and since >= A.RELEASE * cd and ab.firedShot ~= rig.lastShot then
+			ab.firedShot = rig.lastShot
+			local aim = model:GetAttribute("AimPos")
+			local def = Units.Stats[model.Name]
+			if ab.lHand and typeof(aim) == "Vector3" and def and def.arrowSpeed then
+				local from = ab.lHand.CFrame:PointToWorldSpace(Vector3.new(0, 0, (A.brace + A.drawLen) * scale))
+				ArrowFx.fire(model, from, aim, def.arrowSpeed)
+			end
+		end
+
+		-- hand targets: the bow hand out at chin height (fight) or hanging at the side (walk / idle)
+		local lFight = untwist * (A.GRIP + Vector3.new(0, A.handDrop, 0) + Vector3.new(0, -0.05, -0.06) * kick)
+		hand = untwist * hand
+		local lRest = Vector3.new(-0.62, 2.15, -0.05 - s * 0.25 * w)
+		local rRest = Vector3.new(0.62, 2.15, s * 0.3 * w)
+		local lTarget = lRest:Lerp(lFight, fw)
+		local rTarget = rRest:Lerp(hand, fw)
+		local lPole = Vector3.new(0, 0, 1):Lerp(Vector3.new(-1, -0.4, 0.2), fw)
+		local rPole = Vector3.new(0, 0, 1):Lerp(Vector3.new(1, -0.1, 0.6), fw) -- (the draw elbow out to the right, about shoulder height)
+		local bowRot = CFrame.Angles(0, 0, 0.08):Lerp(CFrame.Angles(0, -twist, 0) * CFrame.Angles(-0.05 * kick, 0, -0.12), fw)
+		local lCF, lBend = armIK(A.lShoulder, lTarget, A.upper, A.lower, lPole)
+		local rCF, rBend = armIK(A.rShoulder, rTarget, A.upper, A.lower, rPole)
+		set(rig, "LShoulder", lCF)
+		set(rig, "LElbow", ANGLES(lBend, 0, 0))
+		set(rig, "LWrist", (lCF * ANGLES(lBend, 0, 0)):Inverse() * bowRot)
+		set(rig, "RShoulder", rCF)
+		set(rig, "RElbow", ANGLES(rBend, 0, 0))
+
+		-- body: a planted stance while shooting, a slow look into the distance when idle
+		set(rig, "Waist", ANGLES(mix(waistPitch, -0.04 + kick * 0.05, fw), twist, mix(waistRoll, 0, fw)))
+		set(rig, "Neck", ANGLES(mix(-0.04 * w, 0.03, fw), mix(math.sin(t * 0.35) * 0.4 * (1 - w), 0, fw) - twist, 0)) -- (the head stays on the wall)
+		if fw > 0.001 then
+			set(rig, "LHip", ANGLES(mix(s * 0.75 * w, 0.15, fw), 0, 0))
+			set(rig, "RHip", ANGLES(mix(-s * 0.75 * w, -0.12, fw), 0, 0))
+			set(rig, "LKnee", ANGLES(mix(-math.max(0, -c) * 0.9 * w, -0.1, fw), 0, 0))
+			set(rig, "RKnee", ANGLES(mix(-math.max(0, c) * 0.9 * w, -0.08, fw), 0, 0))
+		end
+
+		-- the string, the nocked arrow and the eyes
+		local pull = (A.brace + draw * A.drawLen * fw) * scale
+		if ab.nock then
+			ab.nock.Position = Vector3.new(0, 0, pull)
+		end
+		if ab.lHand and shown and fw > 0.3 then
+			local cf = ab.lHand.CFrame
+			local nockW = cf:PointToWorldSpace(Vector3.new(0, 0, pull))
+			local fwdW = cf:VectorToWorldSpace(Vector3.new(0, 0, -1))
+			local centre = nockW + fwdW * 0.95 * scale
+			ab.nocked.CFrame = CFrame.lookAt(centre, centre + fwdW)
+			ab.nocked.Transparency = 1 - grow -- (the next arrow forms on the string)
+		else
+			ab.nocked.Transparency = 1
+		end
+		for _, eye in ipairs(ab.eyes) do
+			eye.Transparency = 0.2 - 0.2 * flare * fw
+		end
 	end
 
 	-- AttackStyle "Slam" (the Zombie, build_zombie.lua): a lopsided brute; the huge club is the right arm. Layers, mixed

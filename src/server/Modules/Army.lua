@@ -1,7 +1,6 @@
 -- Unit spawning, placement on grave slots, recall, and the per-frame unit AI.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
-local TweenService = game:GetService("TweenService")
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local Remotes = require(script.Parent.Remotes)
@@ -506,34 +505,6 @@ local function payHitGold(plotState, now)
 	end
 end
 
-local function shootArrow(fromPos, targetPos, damage, plotState, u)
-	local arrowStart = fromPos + Vector3.new(0, 0.5, 0)
-	local arrow = Instance.new("Part")
-	arrow.Size = Vector3.new(0.2, 0.2, 1.5)
-	arrow.BrickColor = BrickColor.new("Bright green")
-	arrow.Material = Enum.Material.Neon
-	arrow.CastShadow = false
-	arrow.CanCollide = false
-	arrow.Anchored = true
-	arrow.CFrame = CFrame.lookAt(arrowStart, targetPos)
-	arrow.Parent = workspace
-	local travelTime = (targetPos - arrowStart).Magnitude / 60
-	TweenService:Create(
-		arrow,
-		TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
-		{ CFrame = CFrame.lookAt(targetPos, targetPos + (targetPos - arrowStart).Unit) }
-	):Play()
-	task.delay(travelTime, function()
-		if arrow and arrow.Parent then arrow:Destroy() end
-		if not plotState.wall then return end -- the gate already fell
-		plotState.wallHP = math.max(0, plotState.wallHP - damage)
-		earnHitGold(plotState, u, damage)
-		updateWallGui(plotState)
-		sendWallHit(plotState, targetPos, damage, true)
-		if plotState.wallHP <= 0 then breakWall(plotState) end
-	end)
-end
-
 -- Tells the client how to animate a procedural rig (no-op for other models).
 local function setState(u, state)
 	if u.model and u.state ~= state then
@@ -956,13 +927,6 @@ local function update(now, dt)
 				u.bv.Velocity = Vector3.new(0, 0, 0)
 				u.bg.CFrame = CFrame.lookAt(pos, pos + forward)
 
-				if u.block.Name == "Goblin" then
-					local poison = UNITS.Goblin.poison or 1
-					plotState.wallHP = math.max(0, plotState.wallHP - poison * dt)
-					updateWallGui(plotState)
-					if plotState.wallHP <= 0 then breakWall(plotState) end
-				end
-
 				if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
 				setState(u, "idle")
 				local attackStyle = u.model and u.model:GetAttribute("AttackStyle")
@@ -1002,43 +966,42 @@ local function update(now, dt)
 					end
 					if u.attackTrack then u.attackTrack:Play() end
 					local fromPos = u.block.Position
-					local face = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
-					local targetPos = Vector3.new(face.X, fromPos.Y + 0.5, face.Z)
-					if u.block.Name == "Goblin" then
-						shootArrow(fromPos, targetPos, u.def.damage, plotState, u)
+					-- on the wall face right in front of this unit, around chest height, with a little jitter
+					local unitHeight = u.model and (u.model:GetAttribute("Height") or 5) * u.model:GetScale()
+						or u.def.size.Y * 1.6
+					-- (a unit def's hitHeight, in studs above the floor, overrides it: e.g. the crawling Ghoul leaps and rakes high,
+					-- above the wall's plinth)
+					local hitY = u.def.hitHeight and u.def.hitHeight * (0.95 + math.random() * 0.1)
+						or unitHeight * (0.5 + math.random() * 0.2)
+					-- (from where the unit really stands, not its slot: a fast unit stops up to ~2 studs off it; units with their own
+					-- hit effect scatter less, so the cut lines up with the claws / blade)
+					local standLat = PlotFrame.toLocal(plotState, fromPos)
+					local jitter = u.def.hitFx and 0.6 or 2.4
+					local impactPos = PlotFrame.toWorld(plotState, standLat + (math.random() - 0.5) * jitter, plotState.wallFaceFwd)
+						+ Vector3.new(0, hitY, 0)
+					-- (a unit with a special deals only the rest of its damage with basic attacks)
+					local damage = u.def.damage * (u.def.special and (1 - u.def.special.share) or 1)
+					local function hit()
+						if not plotState.wall then return end -- the gate already fell
+						plotState.wallHP = math.max(0, plotState.wallHP - damage)
+						earnHitGold(plotState, u, damage)
+						updateWallGui(plotState)
+						sendWallHit(plotState, impactPos, damage, u.def.transparent,
+							u.def.hitFx and (u.shadowForm and u.def.hitFx .. "Shadow" or u.def.hitFx))
+						if plotState.wallHP <= 0 then breakWall(plotState) end
+					end
+					-- a delayed hit: the attack animation shoots something first (Hush's finger beam, the Hollow Archer's arrow): the
+					-- client aims it at AimPos and the damage lands when it arrives. An archer's delay is its release time plus the
+					-- arrow's flight (arrowSpeed studs/s from where it stands)
+					local delay = u.def.hitDelay
+					if u.def.arrowSpeed then
+						delay = (u.def.releaseAt or 0) + (impactPos - fromPos).Magnitude / u.def.arrowSpeed
+					end
+					if delay then
+						if u.model then u.model:SetAttribute("AimPos", impactPos) end
+						task.delay(delay, hit)
 					else
-						-- on the wall face right in front of this unit, around chest height, with a little jitter
-						local unitHeight = u.model and (u.model:GetAttribute("Height") or 5) * u.model:GetScale()
-							or u.def.size.Y * 1.6
-						-- (a unit def's hitHeight, in studs above the floor, overrides it: e.g. the crawling Ghoul leaps and
-						-- rakes high, above the wall's plinth)
-						local hitY = u.def.hitHeight and u.def.hitHeight * (0.95 + math.random() * 0.1)
-							or unitHeight * (0.5 + math.random() * 0.2)
-						-- (from where the unit really stands, not its slot: a fast unit stops up to ~2 studs off it; units
-						-- with their own hit effect scatter less, so the cut lines up with the claws / blade)
-						local standLat = PlotFrame.toLocal(plotState, fromPos)
-						local jitter = u.def.hitFx and 0.6 or 2.4
-						local impactPos = PlotFrame.toWorld(plotState, standLat + (math.random() - 0.5) * jitter, plotState.wallFaceFwd)
-							+ Vector3.new(0, hitY, 0)
-						-- (a unit with a special deals only the rest of its damage with basic attacks)
-						local damage = u.def.damage * (u.def.special and (1 - u.def.special.share) or 1)
-						local function hit()
-							if not plotState.wall then return end -- the gate already fell
-							plotState.wallHP = math.max(0, plotState.wallHP - damage)
-							earnHitGold(plotState, u, damage)
-							updateWallGui(plotState)
-							sendWallHit(plotState, impactPos, damage, u.def.transparent,
-								u.def.hitFx and (u.shadowForm and u.def.hitFx .. "Shadow" or u.def.hitFx))
-							if plotState.wallHP <= 0 then breakWall(plotState) end
-						end
-						if u.def.hitDelay then
-							-- the attack animation shoots something first (e.g. Hush's finger beam): the client aims it at AimPos
-							-- and the damage lands when it arrives
-							if u.model then u.model:SetAttribute("AimPos", impactPos) end
-							task.delay(u.def.hitDelay, hit)
-						else
-							hit()
-						end
+						hit()
 					end
 				end
 			else

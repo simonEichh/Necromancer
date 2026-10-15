@@ -46,14 +46,20 @@ local UNITS = {
 		attackCD = 0.8,
 		transparent = true,
 	},
-	Goblin = {
-		color = BrickColor.new("Bright green"),
-		size = Vector3.new(1.8, 1.8, 1.8),
-		damage = 35,
-		speed = 16,
+	-- a dead archer keeping his post (replaced the Goblin on 2026-10-15; old saves are renamed, see RENAMED below).
+	-- Its arrow is a real projectile: released `releaseAt` s into the attack (UnitAnimator "Bow"), it flies at
+	-- `arrowSpeed` studs/s (client ArrowFx draws it); the server lands the damage when it arrives.
+	HollowArcher = {
+		color = BrickColor.new("Dark green"),
+		size = Vector3.new(2, 2, 2),
+		damage = 52.5, -- (DPS 35: a slow, heavy shot)
+		speed = 14,
 		attackRange = 30,
-		attackCD = 1.0,
-		poison = 3,
+		attackCD = 1.5,
+		releaseAt = 0.825, -- (= 0.55 of the attack cycle, UnitAnimator ARCHER.RELEASE x attackCD)
+		arrowSpeed = 140,
+		hitFx = "Arrow",
+		hitHeight = 3.5, -- (studs above the floor: it shoots level from its chin)
 	},
 	Wraith = {
 		color = BrickColor.new("Light stone grey"),
@@ -88,7 +94,6 @@ local UNITS = {
 		speed = 10,
 		attackRange = 20,
 		attackCD = 0.8,
-		poison = 5,
 	},
 	ShadowHound = {
 		color = BrickColor.new("Reddish brown"),
@@ -310,7 +315,7 @@ local RARITY_UNITS = {
 	},
 	Uncommon = {
 		{ unit = "Ghost", weight = 4 },
-		{ unit = "Goblin", weight = 3 },
+		{ unit = "HollowArcher", weight = 3 },
 		{ unit = "Wraith", weight = 2 },
 		{ unit = "CryptBat", weight = 1 },
 	},
@@ -367,7 +372,7 @@ local UNIT_EMOJIS = {
 	Ghoul = "",
 	-- Uncommon
 	Ghost = "",
-	Goblin = "",
+	HollowArcher = "",
 	Wraith = "",
 	CryptBat = "",
 	-- Rare
@@ -436,8 +441,14 @@ local function isSignature(unitType)
 	return def ~= nil and def.special ~= nil
 end
 
+-- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
+local RENAMED = {
+	Goblin = "HollowArcher",
+}
+
 return {
 	Stats = UNITS,
+	RENAMED = RENAMED,
 	isSignature = isSignature,
 	SIGNATURE_COLOR = SIGNATURE_COLOR,
 	Pools = RARITY_UNITS,

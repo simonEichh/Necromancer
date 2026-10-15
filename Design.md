@@ -50,6 +50,9 @@ raised by the necromancer: a power fantasy told with darkness and light. Rules:
   the Skelly (shadow: black bones and skull, only the teeth bone white, violet-edged blade) and the Ghoul (shadow: black, its
   yellow eyes kept, violet claws, low smoke). Every shadow form has the ethereal layer (ForceField shimmer, dark flames,
   a faint violet tint); the forms differ by silhouette, accent and their own extras (blade smear, crawling smoke).
+- **Uncommon roster (agreed 2026-10-15):** Hollow Archer (built, replaced the Goblin; the poison mechanic is gone),
+  Crypt Spider (to replace the Ghost: a skeletal spider, venom spit / leg stab), Wraith reworked (a floating shroud
+  lashing chains), Crypt Bat reworked (a dive and a screech ring). Each gets a base and a shadow form.
 - **Origin (agreed):** the graves hold the dead; digging one is the raising. The necromancer's command is **RISE**:
   the grave cracks, black smoke pours out, a shape rises and its eyes ignite violet. The reveal's fake-out becomes
   "the soul resists" (the smoke collapses, the grave shakes, then it gives in). Owned units live in the necromancer's
