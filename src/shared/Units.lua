@@ -311,6 +311,22 @@ local UNITS = {
 			hits = { { at = 9.36, share = 0.12 }, { at = 9.96, share = 0.12 }, { at = 10.41, share = 0.12 },
 				{ at = 10.76, share = 0.12 }, { at = 11.36, share = 0.52 } } },
 	},
+	-- Malak, the Envoy: the first Sovereign (docs/envoy.md). WORK IN PROGRESS: weight 0 in the pool, so he can only be
+	-- spawned from the DEV panel; placeholder numbers. Basic attack, the orbital tag (model AttackStyle "OrbitalTag",
+	-- client OrbitalStrike.lua): while he fights his hologram pad opens into a big hologram in front of him; he taps it
+	-- once, a red laser cuts diagonally out of the sky onto the wall, then a shell from a cannon far above hits it.
+	-- One slow, heavy hit every 6.5 s; the damage lands with the shell (hitDelay must match OrbitalStrike.IMPACT_AT).
+	Malak = {
+		color = BrickColor.new("Really black"),
+		size = Vector3.new(2.2, 4, 2.2),
+		damage = 552500, -- 85K DPS (placeholder)
+		speed = 10,
+		attackRange = 32, -- stands 60 studs from the wall (Army.standDistance), twice as far as range 20 put him
+		attackCD = 6.5,
+		hitDelay = 3.9,
+		hitFx = "Orbital", -- (OrbitalStrike.lua draws the impact; HitEffects draws nothing)
+		hitHeight = 4,
+	},
 }
 
 -- Which units belong to which rarity, each with a relative weight
@@ -362,6 +378,7 @@ local RARITY_UNITS = {
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
 		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
+		{ unit = "Malak", weight = 0 }, -- (work in progress: never rolled yet)
 	},
 }
 
@@ -412,6 +429,7 @@ local UNIT_EMOJIS = {
 	-- Primordial
 	LastLantern = "",
 	Sigilwright = "",
+	Malak = "",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)

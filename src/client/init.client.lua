@@ -192,6 +192,7 @@ require(Modules.AltarFx) -- the Soul Altar's braziers burn as high as the realm 
 require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 (none from 10: the shadow form)
 require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
 require(Modules.FingerBeam) -- the finger-beam attack (Hush): magic circle at the fingertip, beam to the wall
+require(Modules.OrbitalStrike) -- the orbital tag (Malak): red targeting laser from the sky, shell, impact
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
 require(Modules.KnellFx) -- Knell's soul tolls and the colossal spectral bell
 require(Modules.UpgradesPanel) -- realm upgrades + permanent luck / coin (the Upgrades tile, the upgrade stall)

@@ -185,6 +185,7 @@ local function spawnUnit(unitType, customPos, plotState, level)
 			modelClone:SetAttribute("AttackCD", def.attackCD)
 			modelClone:SetAttribute("Speed", def.speed)
 			modelClone:SetAttribute("Level", level or 0) -- (auras at level milestones read this)
+			modelClone:SetAttribute("OwnerId", plotState and plotState.ownerId or "") -- (client effects meant only for the owner, e.g. camera shake)
 			if def.static then
 				-- the client lifts the model out of the ground over RiseTime seconds (see UnitAnimator)
 				modelClone:SetAttribute("RiseStart", workspace:GetServerTimeNow())

@@ -1670,6 +1670,153 @@ local function animate(model, rig, dt, now)
 		end
 	end
 
+	-- "Envoy" pose (Malak, build_malak.lua): the rig is BUILT in his nonchalant pose (left hand behind the back, right
+	-- forearm forward with the palm up under the hologram), so the arms only drift. He never steps: he hovers on a slow
+	-- double bob, leans into his glide and banks into turns, the legs dangle and trail, and the eleven coat blades plus
+	-- the tabard (joints Coat..., attribute CoatAngle) swing on springs driven by the glide, the turns and the bob, with a
+	-- slow wave running round the coat. Every ~11 s he glances down at the hologram (lifting it a little); the hologram
+	-- pulses and now and then flickers.
+	if model:GetAttribute("Pose") == "Envoy" then
+		local ddt = math.min(dt, 1 / 30)
+		-- glide (slower than the walk blend, so leaning in and settling has weight) and turn rate from the model's yaw
+		rig.glide = (rig.glide or 0) + ((state == "walk" and 1 or 0) - (rig.glide or 0)) * clamp01(dt * 2.5)
+		local glide = rig.glide
+		local look = model:GetPivot().LookVector
+		local yaw = math.atan2(-look.X, -look.Z)
+		local dyaw = rig.envYaw and ((yaw - rig.envYaw + math.pi) % (2 * math.pi) - math.pi) or 0
+		rig.envYaw = yaw
+		rig.turn = (rig.turn or 0) + ((dt > 0 and dyaw / dt or 0) - (rig.turn or 0)) * clamp01(dt * 4)
+		local turn = math.clamp(rig.turn, -3, 3)
+
+		local function window(p, a, b, edge) -- 0..1 inside [a, b] with eased edges
+			if p <= a or p >= b then
+				return 0
+			end
+			local x = math.min((p - a) / edge, (b - p) / edge, 1)
+			return x * x * (3 - 2 * x)
+		end
+
+		-- hover: a slow bob with a smaller second wave on top, so it never looks like a metronome
+		local amp = (model:GetAttribute("Float") or 0) * scale
+		local hover = amp * (math.sin(t * 1.3) + 0.35 * math.sin(t * 2.9 + 1))
+		local hoverVel = math.cos(t * 1.3)
+		set(rig, "Root", CFrame.new(0, hover + rise, 0)
+			* ANGLES(-0.1 * glide, math.sin(t * 0.35) * 0.04, turn * 0.06 + math.sin(t * 0.5) * 0.015))
+		-- the orbital tag (AttackStyle "OrbitalTag"; OrbitalStrike.lua draws the big hologram, the targeting on it, the line to
+		-- the wall, the laser and the shell). While he fights (not walking, attacked within the last BOARD_HOLD s) the small
+		-- pad on his palm is hidden: OrbitalStrike opens it into a big hologram in front of him, and his right hand rests
+		-- empty and relaxed. On every attack he looks at the big hologram while the targeting runs by itself; then he
+		-- lazily raises his arm (over ~1.3 s, a soft spring so it floats up), and the moment the gunship fires (TAP_AT) he
+		-- presses the hologram once with his index finger (hand turned over, a small poke), and lets the arm sink back
+		-- slowly; when the shell lands he tips his head up a touch, mildly checking. (BOARD_HOLD, TAP_AT and the impact
+		-- time must match OrbitalStrike.lua.)
+		local focus, check, tapTarget, press = 0, 0, 0, 0
+		local fighting = false
+		if style == "OrbitalTag" and rig.lastShot then
+			local st = now - rig.lastShot
+			local function ease(a, b)
+				local x = clamp01((st - a) / (b - a))
+				return x * x * (3 - 2 * x)
+			end
+			fighting = state ~= "walk" and st < 7.5 -- (attackCD 6.5 + 1)
+			focus = ease(0.05, 0.8) * (1 - ease(4.3, 5.0))
+			check = ease(3.9, 4.1) * (1 - ease(4.3, 4.8))
+			tapTarget = ease(1.75, 3.0) * (1 - ease(3.4, 4.6))
+			press = ease(2.95, 3.05) * (1 - ease(3.1, 3.35)) -- (the poke itself, TAP_AT = 3.05)
+		end
+		rig.boardOpen = (rig.boardOpen or 0) + ((fighting and 1 or 0) - (rig.boardOpen or 0)) * clamp01(dt * 4)
+		local open = rig.boardOpen
+		rig.tapv = (rig.tapv or 0) + ((tapTarget - (rig.tap or 0)) * 40 - (rig.tapv or 0) * 9) * ddt
+		rig.tap = math.clamp((rig.tap or 0) + rig.tapv * ddt, -0.05, 1.08)
+		local tap = math.clamp(rig.tap, 0, 1.08)
+
+		set(rig, "Waist", ANGLES(breathe * 0.6 - 0.04 * glide, math.sin(t * 0.35 + 0.5) * -0.03 + tap * 0.08, 0))
+
+		-- the glance down at the small pad (every ~11 s, not while gliding or while the big hologram is open); during an
+		-- attack he looks ahead and a little down at the big hologram instead
+		local glance = window((t / 11) % 1, 0.55, 0.8, 0.06) * (1 - glide) * (1 - open)
+		local read = focus * open
+		set(rig, "Neck", ANGLES(-0.04 - glance * 0.32 - read * 0.14 + check * 0.12 + math.sin(t * 0.7) * 0.02,
+			-glance * 0.35 - read * 0.08 + math.sin(t * 0.3) * 0.05, glance * 0.08))
+
+		-- right arm: palm up under the small pad; with the big hologram open the empty hand sinks and turns inward,
+		-- relaxed; the tap reaches out with the hand turned over so the straight index finger leads
+		local idleS = ANGLES(glance * 0.1 + math.sin(t * 0.9) * 0.025 - glide * 0.05, 0, 0)
+		local idleE = ANGLES(glance * 0.12 + math.sin(t * 0.9 - 0.6) * 0.03, 0, 0)
+		local idleW = ANGLES(0, 0, math.sin(t * 0.6) * 0.05)
+		local restS = ANGLES(-0.12 + math.sin(t * 0.9) * 0.02, 0, 0)
+		local restE = ANGLES(-0.35 + math.sin(t * 0.9 - 0.6) * 0.03, 0, 0)
+		local restW = ANGLES(0, 0, -1.4)
+		local tapS = ANGLES(1.42 + press * 0.07, 0.06, 0)
+		local tapE = ANGLES(-1.12 - press * 0.12, 0, 0)
+		local tapW = ANGLES(0.15, 0, -2.5)
+		set(rig, "RShoulder", idleS:Lerp(restS, open):Lerp(tapS, tap))
+		set(rig, "RElbow", idleE:Lerp(restE, open):Lerp(tapE, tap))
+		set(rig, "RWrist", idleW:Lerp(restW, open):Lerp(tapW, tap))
+		set(rig, "LShoulder", ANGLES(breathe * 0.3, 0, 0))
+		set(rig, "LElbow", CFrame.new())
+
+		-- legs dangle (one knee a little more bent), trail back while gliding and lag the bob
+		local lag = math.sin(t * 1.3 - 0.9) * 0.05
+		set(rig, "RHip", ANGLES(0.06 - 0.32 * glide + lag, 0, -0.03))
+		set(rig, "LHip", ANGLES(0.02 - 0.28 * glide + lag * 0.8, 0, 0.03))
+		set(rig, "RKnee", ANGLES(-0.1 - 0.22 * glide - lag * 0.6, 0, 0))
+		set(rig, "LKnee", ANGLES(-0.22 - 0.25 * glide - lag * 0.5, 0, 0))
+
+		-- the coat blades on springs (negative X = the blade's bottom swings outward)
+		if not rig.coatList or #rig.coatList < 12 then
+			rig.coatList = {}
+			for name, joint in pairs(rig.joints) do
+				if name:sub(1, 4) == "Coat" then
+					table.insert(rig.coatList, { name = name, a = math.rad(joint:GetAttribute("CoatAngle") or 0), x = 0, v = 0 })
+				end
+			end
+		end
+		for _, c in ipairs(rig.coatList) do
+			local a = c.a
+			local trail = glide * 0.45 * math.max(0, -math.cos(a) * 0.9 + 0.3) -- the back blades stream out behind him
+			local press = glide * 0.08 * math.max(0, math.cos(a)) -- the front ones are pressed back against the legs
+			local target = -trail + press
+				- turn * math.sin(a) * 0.08 -- swing out on the outside of a turn
+				+ math.sin(t * 0.8 - a * 1.5) * 0.045 + math.sin(t * 1.9 + a * 3) * 0.015 -- a slow wave round the coat
+				+ hoverVel * 0.035 -- lagging the bob
+			c.v += ((target - c.x) * 40 - c.v * 6) * ddt
+			c.x = math.clamp(c.x + c.v * ddt, -0.9, 0.25)
+			set(rig, c.name, ANGLES(c.x, 0, 0))
+		end
+
+		-- the hologram: a soft pulse on the pane, and every few seconds a short flicker of the whole panel
+		if not rig.holo or (#rig.holo == 0 and math.random() < 0.02) then
+			rig.holo = {}
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and d.Name:sub(1, 4) == "Holo" then
+					table.insert(rig.holo, { part = d, base = d.Transparency })
+					if d.Name == "HoloPanel" then
+						rig.holoPane = rig.holo[#rig.holo]
+					end
+				end
+			end
+			rig.holoNext = now + 3 + math.random() * 5
+		end
+		if now >= rig.holoNext then
+			rig.holoFlickerEnd = now + 0.22
+			rig.holoNext = now + 4 + math.random() * 6
+		end
+		-- (hidden while the big hologram is open: the small pad has become it)
+		local hide = clamp01(open * 1.5)
+		local flicker = rig.holoFlickerEnd ~= nil and now < rig.holoFlickerEnd and focus == 0 -- (steady while he works)
+		if flicker or hide > 0 or rig.holoDirty then
+			for _, h in ipairs(rig.holo) do
+				local tr = h.base + ((flicker and math.random() < 0.5) and 0.6 or 0)
+				h.part.Transparency = math.min(1, tr + (1 - tr) * hide)
+			end
+			rig.holoDirty = flicker or hide > 0
+		end
+		if rig.holoPane and not rig.holoDirty then
+			rig.holoPane.part.Transparency = rig.holoPane.base + math.sin(t * 2.5) * 0.04
+		end
+	end
+
 	-- wings (bats and other fliers): LWing/RWing flap up and down around Z; they flap faster while moving
 	if (rig.joints.LWing or rig.joints.RWing) and model:GetAttribute("Pose") ~= "Bat" then -- (the Crypt Bat flies in its own block)
 		local flap = math.sin(t * (9 + 5 * w)) * 0.55 + 0.15
