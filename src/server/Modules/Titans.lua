@@ -22,6 +22,10 @@ local Titans = {}
 local RING_INNER = 392 -- inner face of the outer wall (build_ring.lua R_IN): the hands model's origin
 local RING_OUTER = 404 -- outer face of the outer wall (build_ring.lua R_IN + THICK)
 local WALL_TOP_Y = -1.7 + 70 -- top of the outer wall
+-- the hands sit this much higher and further back than the wall's inner top edge, so the palms rest ON the parapet
+-- (the realm wall's coping stones, build_wall_cemetery.lua) and the fingers curl over its edge into the stone; at the
+-- edge itself the palms hung 6 studs below the top and 3 in front of the wall, in mid-air
+local HANDS_RAISE, HANDS_BACK = 8.5, 5
 local LATERAL = -66 -- studs beside the lane axis (clear of the 125-high gate tower), on the side of his weaving hand
 local TURN = math.rad(12) -- turned a little towards the lane
 local ENTER_TIME = 8.8 -- the "Enter" climb (its timeline in TitanAnimator; keep in sync)
@@ -56,7 +60,7 @@ function Titans.spawn(plotState)
 	local isHands = template:GetAttribute("Kind") == "Hands"
 	if isHands then
 		-- the hands: origin on the outer wall's inner top edge on the lane's axis, facing the arena
-		local origin = laneDir * RING_INNER + Vector3.new(0, WALL_TOP_Y, 0)
+		local origin = laneDir * (RING_INNER + HANDS_BACK) + Vector3.new(0, WALL_TOP_Y + HANDS_RAISE, 0)
 		titan:PivotTo(CFrame.lookAt(origin, origin - laneDir))
 	end
 	-- the model knows how far in front of his feet the wall's outer face is and how high its top is (WallBack, WallTop);
