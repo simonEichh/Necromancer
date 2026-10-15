@@ -789,6 +789,181 @@ RunService:BindToRenderStep("OrbitalStrikeShake", Enum.RenderPriority.Camera.Val
 		* CFrame.Angles(math.sin(t * 0.9) * k * 0.02, 0, math.sin(t * 1.1 + 2) * k * 0.03)
 end)
 
+-- ====================================================================
+-- The drone's volley (model attributes DroneShot = server time it starts, DroneAim; Army.fireCompanion deals the damage
+-- at Units.Malak.companion.hitAt = DRONE_IMPACT). Timed on the synced server clock, like UnitAnimator's ring spread:
+--   0 .. 0.9         the rings drift apart into a triangle in front of the drone (UnitAnimator)
+--   DRONE_CHARGE     a cold spark gathers in the middle of each ring, flickering, growing
+--   DRONE_FIRE       the three rings fire one after the other (DRONE_STAGGER apart): thin cold bolts that start slow
+--                    and accelerate, converging on one spot on the wall
+--   DRONE_IMPACT     where they meet: a cold flash, a ring over the wall face, sparks, a short light
+-- ====================================================================
+local DRONE_CHARGE = 0.9
+local DRONE_FIRE = 1.6
+local DRONE_STAGGER = 0.06
+local DRONE_FLIGHT = 0.33
+local DRONE_IMPACT = 2.05 -- (= Units.Malak.companion.hitAt; the last bolt arrives just before)
+local DRONE_COLD = Color3.fromRGB(150, 175, 255)
+local DRONE_CORE = Color3.fromRGB(235, 242, 255)
+
+local function droneSpark(hinge, shotAt, fireAt)
+	local spark = newPart(Vector3.one * 0.1, DRONE_CORE, 1, Enum.PartType.Ball)
+	local halo = newPart(Vector3.one * 0.3, DRONE_COLD, 1, Enum.PartType.Ball)
+	local light = Instance.new("PointLight")
+	light.Color = DRONE_COLD
+	light.Range = 5
+	light.Brightness = 0
+	light.Shadows = false
+	light.Parent = spark
+	return function()
+		local st = workspace:GetServerTimeNow() - shotAt
+		if st >= fireAt + 0.08 or not hinge.Parent then
+			spark:Destroy()
+			halo:Destroy()
+			return false
+		end
+		if st < DRONE_CHARGE then
+			return true
+		end
+		local g = smooth((st - DRONE_CHARGE) / (fireAt - DRONE_CHARGE))
+		local flick = 0.85 + math.random() * 0.15
+		local pos = hinge.Position
+		spark.CFrame, halo.CFrame = CFrame.new(pos), CFrame.new(pos)
+		spark.Size = Vector3.one * (0.1 + 0.3 * g) * flick
+		halo.Size = Vector3.one * (0.3 + 0.7 * g) * flick
+		spark.Transparency = 0.1
+		halo.Transparency = 0.75 - 0.25 * g
+		light.Brightness = 1.5 * g
+		return true
+	end
+end
+
+local function droneBolt(hinge, aim, shotAt, fireAt)
+	local head = newPart(Vector3.new(0.12, 0.12, 1.6), DRONE_CORE, 1)
+	local sheath = newPart(Vector3.new(0.32, 0.32, 2.4), DRONE_COLD, 1)
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 0.1, 0.8)
+	a0.Parent = head
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -0.1, 0.8)
+	a1.Parent = head
+	local trail = Instance.new("Trail")
+	trail.Attachment0, trail.Attachment1 = a0, a1
+	trail.Color = ColorSequence.new(DRONE_CORE, DRONE_COLD)
+	trail.LightEmission = 1
+	trail.Lifetime = 0.18
+	trail.Transparency = NumberSequence.new(0.1, 1)
+	trail.FaceCamera = true
+	trail.Enabled = false
+	trail.Parent = head
+	local from
+	return function()
+		local st = workspace:GetServerTimeNow() - shotAt
+		if st >= fireAt + DRONE_FLIGHT or not hinge.Parent then
+			head:Destroy()
+			sheath:Destroy()
+			return false
+		end
+		if st < fireAt then
+			return true
+		end
+		if not from then
+			from = hinge.Position
+			head.CFrame = CFrame.lookAt(from, aim)
+			trail.Enabled = true
+		end
+		local f = ((st - fireAt) / DRONE_FLIGHT) ^ 1.6 -- (starts slow, accelerates hard)
+		local pos = from:Lerp(aim, f)
+		local cf = CFrame.lookAt(pos, aim)
+		head.CFrame = cf
+		sheath.CFrame = cf * CFrame.new(0, 0, 0.5)
+		head.Transparency = 0
+		sheath.Transparency = 0.55 + math.random() * 0.15
+		return true
+	end
+end
+
+local function droneImpact(aim, normal)
+	local pos = aim + normal * 0.4
+	local face = CFrame.lookAt(pos, pos + normal)
+	local flash = newPart(Vector3.one, DRONE_CORE, 0, Enum.PartType.Ball)
+	flash.CFrame = CFrame.new(pos)
+	local light = Instance.new("PointLight")
+	light.Color = DRONE_COLD
+	light.Range = 14
+	light.Brightness = 3
+	light.Shadows = false
+	light.Parent = flash
+	local ring = {}
+	for k = 0, 15 do
+		table.insert(ring, { part = newPart(Vector3.new(0.4, 0.12, 0.06), DRONE_COLD, 1), a = k / 16 * math.pi * 2 })
+	end
+	local emitterPart = newPart(Vector3.one * 0.4, DRONE_CORE, 1)
+	emitterPart.CFrame = face
+	local sparks = Instance.new("ParticleEmitter")
+	sparks.Texture = SPARK_TEXTURE
+	sparks.Color = ColorSequence.new(DRONE_CORE, DRONE_COLD)
+	sparks.LightEmission = 1
+	sparks.Size = NumberSequence.new(0.25, 0)
+	sparks.Lifetime = NumberRange.new(0.3, 0.6)
+	sparks.Speed = NumberRange.new(14, 26)
+	sparks.SpreadAngle = Vector2.new(70, 70)
+	sparks.Acceleration = Vector3.new(0, -30, 0)
+	sparks.Drag = 2
+	sparks.EmissionDirection = Enum.NormalId.Front
+	sparks.Enabled = false
+	sparks.Parent = emitterPart
+	sparks:Emit(24)
+	Debris:AddItem(emitterPart, 1.5)
+	local t0 = os.clock()
+	return function(now)
+		local st = now - t0
+		if st >= 0.6 then
+			flash:Destroy()
+			for _, r in ipairs(ring) do r.part:Destroy() end
+			return false
+		end
+		local f = st / 0.25
+		flash.Size = Vector3.one * (0.6 + 2.6 * math.min(1, st / 0.05))
+		flash.Transparency = math.min(1, f)
+		light.Brightness = 3 * math.max(0, 1 - st / 0.4)
+		local rf = st / 0.4
+		for _, r in ipairs(ring) do
+			if rf < 1 then
+				local radius = 0.4 + 3 * smooth(rf)
+				r.part.Size = Vector3.new(2 * radius * math.sin(math.pi / 16) * 0.85, 0.14 * (1 - rf) + 0.03, 0.06)
+				r.part.CFrame = face * CFrame.Angles(0, 0, r.a) * CFrame.new(radius, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
+				r.part.Transparency = rf
+			else
+				r.part.Transparency = 1
+			end
+		end
+		return true
+	end
+end
+
+local function onDroneShot(model)
+	local shotAt = model:GetAttribute("DroneShot")
+	local aim = model:GetAttribute("DroneAim")
+	local root = model.PrimaryPart
+	if not shotAt or not aim or not root then return end
+	local camera = workspace.CurrentCamera
+	if camera and (root.Position - camera.CFrame.Position).Magnitude > MAX_DISTANCE then return end
+	local normal = wallNormal(aim, root.Position)
+	for i = 1, 3 do
+		local hinge = model:FindFirstChild("DroneRingHinge" .. i, true)
+		if hinge then
+			local fireAt = DRONE_FIRE + (i - 1) * DRONE_STAGGER
+			table.insert(active, droneSpark(hinge, shotAt, fireAt))
+			table.insert(active, droneBolt(hinge, aim, shotAt, fireAt))
+		end
+	end
+	local wait = DRONE_FIRE + 2 * DRONE_STAGGER + DRONE_FLIGHT - (workspace:GetServerTimeNow() - shotAt)
+	task.delay(math.max(0, wait), function()
+		table.insert(active, droneImpact(aim, normal))
+	end)
+end
+
 -- ============================================================
 -- Watching the units
 -- ============================================================
@@ -827,6 +1002,9 @@ local watched = {}
 local function watch(model)
 	if watched[model] then return end
 	watched[model] = true
+	model:GetAttributeChangedSignal("DroneShot"):Connect(function()
+		onDroneShot(model)
+	end)
 	model:GetAttributeChangedSignal("AttackCount"):Connect(function()
 		if model:GetAttribute("AttackStyle") == "OrbitalTag" then
 			onAttack(model)

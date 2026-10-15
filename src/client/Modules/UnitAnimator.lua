@@ -287,6 +287,14 @@ local ArrowFx = require(script.Parent.ArrowFx)
 local VenomFx = require(script.Parent.VenomFx)
 local Units = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Units"))
 
+-- Malak's drone volley: where its three rings drift to (in the drone's frame, studs at scale 1): a triangle in front of
+-- it, turned towards the wall, the big C-ring (3) on the outer side so nothing swings into him
+local DRONE_RING_SPREAD = {
+	Vector3.new(-0.4, 1.15, -1.0),
+	Vector3.new(0.65, -0.55, -1.0),
+	Vector3.new(-1.45, -0.55, -1.0),
+}
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -1755,6 +1763,50 @@ local function animate(model, rig, dt, now)
 		set(rig, "RWrist", idleW:Lerp(restW, open):Lerp(tapW, tap))
 		set(rig, "LShoulder", ANGLES(breathe * 0.3, 0, 0))
 		set(rig, "LElbow", CFrame.new())
+
+		-- the drone (joint Drone, from the root): floats on its own slower, rounder bob, drifts a little, and lags behind
+		-- his moves on a soft spring (trails back while he glides, swings out in turns); its rings turn on Spin joints
+		local dTarget = Vector3.new(-math.abs(turn) * 0.25, 0, 0.7 * glide) -- (only ever swings OUT, away from him)
+		rig.dPos = rig.dPos or Vector3.zero
+		rig.dVel = rig.dVel or Vector3.zero
+		rig.dVel += ((dTarget - rig.dPos) * 18 - rig.dVel * 5) * ddt
+		rig.dPos += rig.dVel * ddt
+		local dBob = Vector3.new(math.sin(t * 0.9) * 0.08, math.sin(t * 1.6 + 0.7) * 0.18, math.cos(t * 0.7) * 0.06)
+		-- the drone's volley (model attribute DroneShot = server time it starts; OrbitalStrike.lua draws the sparks, bolts
+		-- and impact): it squares up to the wall, its three rings drift apart into a triangle in front of it and spin up
+		-- while they charge, fire, and snap back together round the core (springs, so they overshoot a little)
+		local vol = 0
+		local droneShot = model:GetAttribute("DroneShot")
+		if droneShot then
+			local vt = workspace:GetServerTimeNow() - droneShot
+			if vt >= 0 and vt < 3.2 then
+				local function vease(a, b)
+					local x = clamp01((vt - a) / (b - a))
+					return x * x * (3 - 2 * x)
+				end
+				vol = vease(0, 0.9) * (1 - vease(2.1, 2.45))
+			end
+		end
+		local dYaw = math.sin(t * 0.4) * 0.3 * (1 - math.min(1, vol * 2))
+		set(rig, "Drone", CFrame.new((rig.dPos + dBob * (1 - vol * 0.6)) * scale)
+			* ANGLES(math.sin(t * 0.5) * 0.08 * (1 - vol), dYaw, rig.dVel.X * -0.08))
+		rig.dRings = rig.dRings or {}
+		for i, offset in ipairs(DRONE_RING_SPREAD) do
+			local joint = rig.joints["SpinDrone" .. i]
+			if joint then
+				local r = rig.dRings[i]
+				if not r then
+					r = { x = 0, v = 0, ang = 0, speed = joint:GetAttribute("SpinSpeed") or 1 }
+					rig.dRings[i] = r
+				end
+				r.v += ((vol - r.x) * 55 - r.v * 7) * ddt
+				r.x += r.v * ddt
+				r.ang += r.speed * (1 + 4 * vol) * dt
+				-- the offset is in the drone's frame; the joint's Transform works in its own (tilted) frame
+				local move = joint.C0.Rotation:Inverse() * (offset * r.x * scale)
+				joint.Transform = CFrame.new(move) * ANGLES(0, r.ang, 0)
+			end
+		end
 
 		-- legs dangle (one knee a little more bent), trail back while gliding and lag the bob
 		local lag = math.sin(t * 1.3 - 0.9) * 0.05

@@ -844,6 +844,31 @@ local function settleBarrages(plotState, now)
 	end
 end
 
+-- A companion's volley (unit def `companion`, e.g. Malak's drone): its own slow attack on its own clock while the unit
+-- fights, dealing `share` of the unit's damage (its basic attacks deal the rest, so DPS stays damage / attackCD). The
+-- client draws it from the model attributes DroneAim and DroneShot (server time the volley starts); the damage lands
+-- `hitAt` seconds later on the wall that was being fought (nothing if that wall broke meanwhile).
+local function fireCompanion(u, plotState)
+	local c = u.def.companion
+	local wallAtStart = plotState.wall
+	local standLat = PlotFrame.toLocal(plotState, u.block.Position)
+	local aim = PlotFrame.toWorld(plotState, standLat + (math.random() - 0.5) * 4, plotState.wallFaceFwd)
+		+ Vector3.new(0, (c.hitHeight or 6) * (0.9 + math.random() * 0.2), 0)
+	local damage = (u.def.damage / u.def.attackCD) * c.share * c.period
+	if u.model then
+		u.model:SetAttribute("DroneAim", aim)
+		u.model:SetAttribute("DroneShot", workspace:GetServerTimeNow()) -- (last: a client that sees it also sees the aim)
+	end
+	task.delay(c.hitAt, function()
+		if plotState.wall ~= wallAtStart or not plotState.wall then return end
+		plotState.wallHP = math.max(0, plotState.wallHP - damage)
+		earnHitGold(plotState, u, damage)
+		updateWallGui(plotState)
+		sendWallHit(plotState, aim, damage, u.def.transparent, "Orbital") -- (the client draws its own impact)
+		if plotState.wallHP <= 0 then breakWall(plotState) end
+	end)
+end
+
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
 local function update(now, dt)
 	local serverNow = workspace:GetServerTimeNow()
@@ -937,6 +962,14 @@ local function update(now, dt)
 				if u.def.special and not u.specialReady then
 					initSpecial(u, now)
 				end
+				-- a companion (Malak's drone) fires its own slow volley on its own clock while the unit fights
+				if u.def.companion and plotState.wall then
+					u.companionNext = u.companionNext or (now + u.def.companion.firstDelay)
+					if now >= u.companionNext then
+						u.companionNext = now + u.def.companion.period
+						fireCompanion(u, plotState)
+					end
+				end
 				if attackStyle == "StaffCast" or attackStyle == "SigilCast" then
 					-- staff casters fire a continuous barrage instead of one attack per cooldown (see startBarrage);
 					-- a caster with a special (the Sigilwright's Verdict) stops the barrage while it plays
@@ -985,6 +1018,7 @@ local function update(now, dt)
 						+ Vector3.new(0, hitY, 0)
 					-- (a unit with a special deals only the rest of its damage with basic attacks)
 					local damage = u.def.damage * (u.def.special and (1 - u.def.special.share) or 1)
+						* (u.def.companion and (1 - u.def.companion.share) or 1) -- (and a companion's share)
 					local function hit()
 						if not plotState.wall then return end -- the gate already fell
 						plotState.wallHP = math.max(0, plotState.wallHP - damage)

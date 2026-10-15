@@ -623,6 +623,112 @@ do
 	haze.Parent = pelvis
 end
 
+-- ====================================================================
+-- The drone: a floating armillary beside his left shoulder (after the concept art). A glowing core in a small cage,
+-- three nested chrome rings that turn on their own tilted axes (joints SpinDrone..., attribute SpinSpeed: UnitAnimator
+-- turns every Spin... joint around its own Y), a broken outer C-ring with pointed ends, a spike above and below the
+-- core with small fins. It hangs on its own joint from the root (Drone), so UnitAnimator can float it with its own
+-- bob and let it lag behind his moves. (Later: it attacks on its own, and transforms into the transmitter for the
+-- Fleet Strike: the rings lock together and a spire extends.)
+-- ====================================================================
+local DRONE_POS = Vector3.new(-2.45, 6.95, 0.45) -- (clear of the collar and the left pauldron)
+local droneRoot = part("DroneRoot", Vector3.new(0.2, 0.2, 0.2), DRONE_POS, CHROME)
+droneRoot.Transparency = 1
+motor("Drone", root, droneRoot, DRONE_POS)
+
+-- the core: a white-hot centre, a soft blue halo, a light, and a small cage of four thin silver hoops round it
+local droneCore = deco(droneRoot, "DroneCore", Vector3.one * 0.3, DRONE_POS, GLOW_CORE, NEON, Enum.PartType.Ball)
+local droneHalo = deco(droneRoot, "DroneHalo", Vector3.one * 0.5, DRONE_POS, GLOW, NEON, Enum.PartType.Ball)
+droneHalo.Transparency = 0.65
+light(droneCore, 7, 1.6)
+
+-- a ring of n segments round the local Y axis of `frame`, welded to `to`; w = radial width, h = height
+local function ringSegments(to, name, frame, r, n, w, h, color, material, gapFrom, gapTo)
+	for k = 0, n - 1 do
+		local a = (k + 0.5) / n * math.pi * 2
+		local skip = gapFrom and a > gapFrom and a < gapTo
+		if not skip then
+			local seg = 2 * r * math.sin(math.pi / n) * 1.04
+			deco(to, name, Vector3.new(w, h, seg),
+				frame * CFrame.Angles(0, -a, 0) * CFrame.new(r, 0, 0), color, material)
+		end
+	end
+end
+
+-- a spinning ring: an invisible hinge on a Spin joint whose frame is tilted, so the ring turns in its own plane
+local function droneRing(index, tilt, speed)
+	local frame = CFrame.new(DRONE_POS) * tilt
+	local hinge = part("DroneRingHinge" .. index, Vector3.new(0.1, 0.1, 0.1), frame, CHROME)
+	hinge.Transparency = 1
+	local m = Instance.new("Motor6D")
+	m.Name = "SpinDrone" .. index
+	m.Part0 = droneRoot
+	m.Part1 = hinge
+	m.C0 = droneRoot.CFrame:Inverse() * frame
+	m.C1 = CFrame.new()
+	m:SetAttribute("SpinSpeed", speed)
+	m.Parent = hinge
+	return hinge, frame
+end
+
+-- the cage: four thin hoops at 45 degrees to each other, fixed round the core
+for i = 0, 3 do
+	local frame = CFrame.new(DRONE_POS) * CFrame.Angles(0, i * math.pi / 4, math.pi / 2)
+	ringSegments(droneRoot, "DroneCage", frame, 0.27, 12, 0.025, 0.025, SILVER_DARK)
+end
+
+-- ring 1: small, steeply tilted, chrome with a glowing inner line
+do
+	local hinge, frame = droneRing(1, CFrame.Angles(math.rad(62), 0, math.rad(15)), 1.7)
+	ringSegments(hinge, "DroneRing1", frame, 0.46, 22, 0.06, 0.1, CHROME_LIGHT)
+	ringSegments(hinge, "DroneRing1Glow", frame, 0.425, 22, 0.02, 0.04, GLOW, NEON)
+end
+-- ring 2: wider, tilted the other way, silver edged, three glowing nodes on it
+do
+	local hinge, frame = droneRing(2, CFrame.Angles(math.rad(-20), 0, math.rad(-38)), -1.1)
+	ringSegments(hinge, "DroneRing2", frame, 0.62, 28, 0.07, 0.12, CHROME)
+	ringSegments(hinge, "DroneRing2Edge", frame, 0.62, 28, 0.08, 0.025, SILVER)
+	for k = 0, 2 do
+		local a = k / 3 * math.pi * 2
+		local at = frame * CFrame.Angles(0, -a, 0) * CFrame.new(0.62, 0, 0)
+		deco(hinge, "DroneNode", Vector3.new(0.12, 0.16, 0.12), at, SILVER)
+		glow(hinge, "DroneNodeGlow", Vector3.new(0.06, 0.08, 0.13), at * CFrame.new(0.03, 0, 0))
+	end
+end
+-- ring 3: the broken outer C-ring, nearly upright, turning slowly; pointed ends at the gap
+do
+	local hinge, frame = droneRing(3, CFrame.Angles(math.rad(78), 0, math.rad(-8)), 0.45)
+	local R = 0.82
+	local gapFrom, gapTo = math.rad(300), math.rad(350)
+	ringSegments(hinge, "DroneRing3", frame, R, 32, 0.08, 0.14, CHROME, nil, gapFrom, gapTo)
+	ringSegments(hinge, "DroneRing3Glow", frame, R + 0.045, 32, 0.02, 0.05, GLOW, NEON, gapFrom, gapTo)
+	for _, a in ipairs({ gapFrom, gapTo }) do
+		local dir = (a == gapFrom) and 1 or -1
+		local at = frame * CFrame.Angles(0, -a, 0) * CFrame.new(R, 0, 0)
+		-- a pointed cap: a small diamond turned along the ring, a silver tip
+		deco(hinge, "DroneRing3Cap", Vector3.new(0.12, 0.12, 0.18), at * CFrame.Angles(math.rad(45), 0, 0), SILVER)
+		deco(hinge, "DroneRing3Tip", Vector3.new(0.05, 0.05, 0.16), at * CFrame.new(0, 0, dir * -0.14), SILVER)
+	end
+end
+
+-- the spikes: a long one above the core, a shorter one below, each a tapering chrome shaft with a silver point and a
+-- glowing collar, with four small fins round its base
+for _, s in ipairs({ { dir = 1, len = 0.85 }, { dir = -1, len = 0.6 } }) do
+	local d = s.dir
+	local base = DRONE_POS + Vector3.new(0, d * 0.3, 0)
+	local mid = DRONE_POS + Vector3.new(0, d * (0.3 + s.len * 0.55), 0)
+	local tip = DRONE_POS + Vector3.new(0, d * (0.3 + s.len), 0)
+	deco(droneRoot, "DroneSpike", Vector3.new(0.09, (mid - base).Magnitude, 0.09), CFrame.new((base + mid) / 2), CHROME_LIGHT)
+	deco(droneRoot, "DroneSpikeTop", Vector3.new(0.055, (tip - mid).Magnitude, 0.055), CFrame.new((mid + tip) / 2), SILVER)
+	deco(droneRoot, "DroneSpikePoint", Vector3.new(0.07, 0.07, 0.07), CFrame.new(tip) * CFrame.Angles(math.rad(45), 0, math.rad(45)), SILVER)
+	cyl(droneRoot, "DroneSpikeCollar", base + Vector3.new(0, d * 0.05, 0), Vector3.new(0, 1, 0), 0.04, 0.16, GLOW, NEON)
+	for k = 0, 3 do
+		local a = k * math.pi / 2 + math.pi / 4
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		bar(droneRoot, "DroneFin", base + out * 0.05, base + out * 0.2 + Vector3.new(0, d * 0.18, 0), 0.03, 0.06, SILVER_DARK)
+	end
+end
+
 model:SetAttribute("Rig", "Procedural")
 model:SetAttribute("RootHeight", HIP_Y)
 model:SetAttribute("Height", 7.1)

@@ -326,6 +326,10 @@ local UNITS = {
 		hitDelay = 3.9,
 		hitFx = "Orbital", -- (OrbitalStrike.lua draws the impact; HitEffects draws nothing)
 		hitHeight = 4,
+		-- his drone (Army.fireCompanion, client OrbitalStrike.lua "The drone's volley"): every `period` s while he
+		-- fights its three rings spread into a triangle, charge and fire three thin blue bolts that meet on the wall;
+		-- `share` of his damage, the shells deal the rest. hitAt must match the client's DRONE_* timings.
+		companion = { period = 4.5, share = 0.3, hitAt = 2.05, firstDelay = 2.0, hitHeight = 6 },
 	},
 }
 
