@@ -1,6 +1,8 @@
 -- The portal behind the gate (server: Modules/Portal; attributes on the gate tower folders OuterWall...GateTower<n>):
---   PortalOpen   the run's gate fell: the tower's sealed door (GateDoor) bursts outwards and falls flat, behind it
+--   PortalOpen   the plot has a run: the tower's sealed door (GateDoor) bursts outwards and falls flat, behind it
 --                an arched portal of swirling light appears
+--   Sealed       the run's gate still stands: the portal is dim and slow ("THE GATE STILL STANDS"); when it turns
+--                false (the gate fell) the portal wakes with a flare
 --   RealmDone / RealmSize / Remaining / Ready
 --                five rune stones in an arc above the door show the ascensions done in this realm (lit), the one the
 --                player can do now pulses; text: "THE WAY OPENS IN N ASCENSIONS" or "THE WAY IS OPEN" (Ready: the
@@ -196,6 +198,12 @@ local function register(tower)
 	tower:GetAttributeChangedSignal("PortalOpen"):Connect(function()
 		update(state, tower:GetAttribute("PortalOpen") == true)
 	end)
+	tower:GetAttributeChangedSignal("Sealed"):Connect(function()
+		if not tower:GetAttribute("Sealed") and state.folder then
+			state.wakeAt = os.clock()
+			state.sparks:Emit(80)
+		end
+	end)
 	tower:GetAttributeChangedSignal("RejectAt"):Connect(function()
 		state.rejectAt = os.clock()
 		if state.base then
@@ -228,19 +236,25 @@ RunService.RenderStepped:Connect(function()
 			local ready = tower:GetAttribute("Ready") == true
 			local done = tower:GetAttribute("RealmDone") or 0
 			local left = tower:GetAttribute("Remaining") or 0
+			local sealed = tower:GetAttribute("Sealed") == true
 			local flare = state.rejectAt and math.max(0, 1 - (now - state.rejectAt) / 0.8) or 0
-			-- the swirl turns, faster and golden when the way is open
+			local wake = state.wakeAt and math.max(0, 1 - (now - state.wakeAt) / 1.5) or 0
+			-- the swirl turns (slow and dim while sealed), faster and golden when the way is open
 			local c = state.centre
+			state.spin = (state.spin or 0) + (now - (state.lastNow or now)) * (sealed and 0.35 or ready and 1.8 or 1)
+			state.lastNow = now
 			for _, s in ipairs(state.swirl) do
-				local a = s.phase + now * s.speed * (ready and 1.8 or 1)
+				local a = s.phase + state.spin * s.speed
 				s.part.CFrame = c * CFrame.Angles(0, 0, a) * CFrame.new(0, s.radius, 0) * CFrame.Angles(0, 0, math.rad(70))
 				s.part.Color = ready and GOLD or SWIRL
+				s.part.Transparency = sealed and 0.65 or 0.25
 			end
+			state.sparks.Rate = sealed and 12 or 60
 			for _, p in ipairs(state.rim) do
 				p.Color = (ready and GOLD or RIM):Lerp(REJECT, flare)
 			end
 			state.light.Color = ready and GOLD or SWIRL
-			state.light.Brightness = 1.4 + math.sin(now * 2) * 0.3 + flare * 3
+			state.light.Brightness = (sealed and 0.6 or 1.4) + math.sin(now * 2) * 0.3 + flare * 3 + wake * 4
 			-- runes: lit = done in this realm; the one the player can do now pulses; all lit when the way is open
 			local pulse = 0.5 + 0.5 * math.sin(now * 4)
 			for k, r in ipairs(state.runes) do
@@ -256,7 +270,10 @@ RunService.RenderStepped:Connect(function()
 				r[1].Color = color
 				r[2].Color = color
 			end
-			if ready then
+			if sealed then
+				state.label.Text = "THE GATE STILL STANDS"
+				state.label.TextColor3 = BONE:Lerp(REJECT, flare)
+			elseif ready then
 				state.label.Text = "THE WAY IS OPEN"
 				state.label.TextColor3 = GOLD
 			else

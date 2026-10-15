@@ -203,6 +203,7 @@ initPlotForPlayer = function(player)
 		end
 	end
 	playerPlots[tostring(player.UserId)] = plotState
+	Portal.open(plotState, player, true) -- the run's portal stands sealed behind the gate
 	-- players join on the plaza, facing their plot (the titan climbs up when they first step onto it, see Titans)
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if hrp then
@@ -226,6 +227,7 @@ local function ascendPlayer(player)
 		end
 	end
 	resetWall(plotState)
+	Portal.open(plotState, player, true) -- (resetWall closed it: sealed again for the new run)
 	Army.setDamageMultiplier(plotState)
 	-- put the units back behind the graves (10 studs towards the plaza), in their own lanes
 	local graveSpot1 = plotState.plotModel:FindFirstChild("GraveSpot1")
