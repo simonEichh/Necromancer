@@ -1726,7 +1726,7 @@ local function animate(model, rig, dt, now)
 				local x = clamp01((st - a) / (b - a))
 				return x * x * (3 - 2 * x)
 			end
-			fighting = state ~= "walk" and st < 7.5 -- (attackCD 6.5 + 1)
+			fighting = state ~= "walk" and st < 7.5 and not model:GetAttribute("FleetStart") -- (attackCD 6.5 + 1)
 			focus = ease(0.05, 0.8) * (1 - ease(4.3, 5.0))
 			check = ease(3.9, 4.1) * (1 - ease(4.3, 4.8))
 			tapTarget = ease(1.75, 3.0) * (1 - ease(3.4, 4.6))
@@ -1854,8 +1854,9 @@ local function animate(model, rig, dt, now)
 			rig.holoFlickerEnd = now + 0.22
 			rig.holoNext = now + 4 + math.random() * 6
 		end
-		-- (hidden while the big hologram is open: the small pad has become it)
-		local hide = clamp01(open * 1.5)
+		-- (hidden while the big hologram is open: the small pad has become it; and for the whole Fleet Strike cutscene,
+		-- where the runes rise from the gauntlet instead)
+		local hide = model:GetAttribute("FleetStart") and 1 or clamp01(open * 1.5)
 		local flicker = rig.holoFlickerEnd ~= nil and now < rig.holoFlickerEnd and focus == 0 -- (steady while he works)
 		if flicker or hide > 0 or rig.holoDirty then
 			for _, h in ipairs(rig.holo) do
@@ -1866,6 +1867,76 @@ local function animate(model, rig, dt, now)
 		end
 		if rig.holoPane and not rig.holoDirty then
 			rig.holoPane.part.Transparency = rig.holoPane.base + math.sin(t * 2.5) * 0.04
+		end
+
+		-- ── Fleet Strike (FleetStrike.lua sets the CLIENT-ONLY model attribute FleetStart = os.clock() at its start;
+		-- its beat times are used here): his poses are blended over everything above, so he moves in and out of them
+		-- smoothly. 1.5 s: the right forearm lifts across his chest (the runes rise from the gauntlet, FleetStrike
+		-- draws them), the LEFT hand comes out from behind his back for the first time and types: taps, a drag, the
+		-- last rune pressed home; his head down on the runes. 6 s: he looks at his drone; its rings stop, swing into
+		-- one plane and stack, it rises a little and spins up into a transmitter (FleetStrike draws the spire, the
+		-- flare and the pulse at 9.0, he follows it up with his head). 11 s: the hands go back, he looks ahead and
+		-- watches the army run past.
+		local fleetStart = model:GetAttribute("FleetStart")
+		if fleetStart then
+			local ft = now - fleetStart
+			local function fe(a, b)
+				local x = clamp01((ft - a) / (b - a))
+				return x * x * (3 - 2 * x)
+			end
+			local function fromTo(a, b)
+				local axis = a:Cross(b)
+				if axis.Magnitude < 1e-4 then
+					return CFrame.new()
+				end
+				return CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(a:Dot(b), -1, 1)))
+			end
+			local function blend(name, target, w)
+				local joint = rig.joints[name]
+				if joint and w > 0.001 then
+					joint.Transform = joint.Transform:Lerp(target, math.min(1, w))
+				end
+			end
+			-- the gauntlet pose: directions of the upper arms / forearms in the model's frame (build_malak.lua rest
+			-- directions -> the pose's), turned into joint rotations
+			local work = fe(1.4, 2.7) * (1 - fe(11.1, 12.4))
+			if work > 0 then
+				local rs = fromTo(Vector3.new(0.16, -1, 0.02).Unit, Vector3.new(0.3, -0.85, -0.45).Unit)
+				local re = fromTo(Vector3.new(0.12, -0.18, -0.98).Unit, rs:Inverse() * Vector3.new(-0.85, 0.12, -0.5).Unit)
+				blend("RShoulder", rs, work)
+				blend("RElbow", re, work)
+				blend("RWrist", ANGLES(0, 0, 0.3), work)
+				-- the left hand: reaches over to the runes; taps (quick dips), one slow drag, the last rune pressed home
+				local tap = (ft < 5 and ft > 2.6) and math.max(0, math.sin(ft * 6.5)) ^ 6 * 0.22 or 0
+				local drag = (fe(3.3, 3.9) - fe(4.2, 4.8)) * 0.35
+				local press = fe(5.1, 5.3) * (1 - fe(5.45, 5.9)) * 0.3
+				-- (the panel floats ~0.55 above the forearm: the hand comes in from above and taps DOWN onto it)
+				local ls = fromTo(Vector3.new(-0.13, -0.94, 0.32).Unit, Vector3.new(0.4, -0.5, -0.77).Unit)
+				local le = fromTo(Vector3.new(0.65, -0.34, 0.34).Unit,
+					ls:Inverse() * Vector3.new(0.8, 0.32 - tap - press, -0.1 - drag).Unit)
+				local lw = fe(1.4, 2.7) * (1 - fe(10.8, 12.1)) -- (the left hand leaves first and goes back last)
+				blend("LShoulder", ls, lw)
+				blend("LElbow", le, lw)
+			end
+			-- the head: down on the runes, then up and left at the drone, then ahead, watching
+			local onRunes = fe(1.6, 2.6) * (1 - fe(5.9, 6.5))
+			local onDrone = fe(6.0, 6.8) * (1 - fe(10.7, 11.5))
+			local neck = ANGLES(-0.42 * onRunes + (0.28 + 0.3 * fe(9.0, 10.2)) * onDrone, -0.12 * onRunes + 0.75 * onDrone, 0)
+			blend("Neck", neck, math.max(onRunes, onDrone, fe(10.7, 11.5)))
+			-- the drone becomes the transmitter (and stays one until the end of the cutscene)
+			local xf = fe(6.1, 7.3)
+			if xf > 0 then
+				rig.fleetSpin = (rig.fleetSpin or 0) + dt * (0.6 + 9 * fe(7.3, 9.0))
+				for i = 1, 3 do
+					local joint = rig.joints["SpinDrone" .. i]
+					if joint then
+						local stack = Vector3.new(0, (i - 2) * 0.34, 0) * scale
+						local target = joint.C0.Rotation:Inverse() * CFrame.new(stack) * ANGLES(0, rig.fleetSpin * (i % 2 == 0 and -1 or 1), 0)
+						blend("SpinDrone" .. i, target, xf)
+					end
+				end
+				blend("Drone", CFrame.new((rig.dPos or Vector3.zero) * scale + Vector3.new(0, 1.3 * scale, 0)), xf)
+			end
 		end
 	end
 

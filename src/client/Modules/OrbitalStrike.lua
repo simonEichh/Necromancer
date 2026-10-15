@@ -270,6 +270,7 @@ local function updateBoard(b, now, dt)
 	local root = model.PrimaryPart
 	if not root then return end
 	local fighting = model:GetAttribute("State") ~= "walk" and (now - b.last) < BOARD_HOLD
+		and not model:GetAttribute("FleetStart") -- (closed during the Fleet Strike cutscene)
 	b.open += ((fighting and 1 or 0) - b.open) * math.clamp(dt * 4, 0, 1)
 	if b.open < 0.01 then
 		hideBoard(b)

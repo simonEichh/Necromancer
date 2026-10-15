@@ -12,6 +12,7 @@ local EVENTS = {
 	"DevGiveGems",
 	"DevGiveGold",
 	"DevFastSpecials",
+	"DevFleetStrike", -- (on) Studio: start / stop a Fleet Strike finisher on your plot (FleetStrike.lua previews it)
 	"DismantleAll",
 	"DismantleAllResult",
 	"DevSpawnUnit",

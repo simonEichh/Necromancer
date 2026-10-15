@@ -54,6 +54,21 @@ floating reliquary) is always beside him.
 
 ## Fleet Strike cutscene (second draft, about 45 s; skippable)
 
+**Build status (2026-10-15):** built in steps, each approved before the next (client `Modules/FleetStrike.lua`, played
+from the DEV panel: Anim: Fleet, Play; needs your Malak placed; now 52 s). Done: 1. the frame (camera / controls / UI
+taken over, letterbox, Skip, Studio beat caption). 2. Malak's beats (the left hand types on runes rising from the
+gauntlet, the drone stacks into a transmitter and fires a pulse up at 9.0 s, the army flees at 11 s: server
+`Army.startFinisher`, Studio remote `DevFleetStrike`; nameplates hidden, the big attack hologram and palm pad closed).
+3. the tear (darkening, vortex, rune ring, cracks, void) and the warp-in (the Absolution slides out LEFT to RIGHT as
+seen from Malak, far away and high: SKY_SIDE 650, SKY_HEIGHT 400, SKY_LEFT 150; ~9.5 s; hidden behind the portal plane;
+window lights run bow to stern; the reactor rings turn, the core pulses; haze thinned on screen). 4. scan (turrets turn
+to the gate, red scan fan + scan line, five reticles lock) and barrage from 38 s (main salvos, tracers, 12 missiles,
+fire and smoke on the gate, camera shake). The camera is ONE continuous path through keyframes (`KEYS`, monotone
+Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: 5. main cannon (bow
+opens, cannon swivels to the gate, rings spin up and lock), beam, the gate breaks. 6. ending, the ship lingers and warps
+out, the army returns. 7. gameplay (trigger at 20% gate HP, gems unlock, settings toggle, view for other players).
+8. sound.
+
 Trigger: the gate drops to 20% HP while Malak is placed and the finisher is unlocked. The gate holds there (no more
 damage) until the cutscene ends. Letterbox bars in, units stop attacking, music drops, the camera takes over (owner
 only; everyone else sees it play out in the sky over the plot, without the camera).

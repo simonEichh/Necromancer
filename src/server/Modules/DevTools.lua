@@ -89,6 +89,19 @@ end)
 -- Specials: fast (10 s charge, the default in Studio) or real (the units' own cooldowns); a workspace attribute the
 -- Army reads when a special starts charging, so units already charging keep their current charge
 -- ============================================================
+-- a Fleet Strike preview (client FleetStrike.lua): the plot's army holds, then flees, Malak stays put
+Remotes.DevFleetStrike.OnServerEvent:Connect(function(player, on)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local malak
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.unitType == "Malak" then
+			malak = u
+		end
+	end
+	Army.startFinisher(plotState, malak, 11, 52, on ~= false) -- (FleetStrike.lua: the army flees at 11 s, 52 s long)
+end)
+
 Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)
 	workspace:SetAttribute("DevFastSpecials", fast == true)
 end)

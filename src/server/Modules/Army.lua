@@ -298,7 +298,7 @@ local function spawnUnit(unitType, customPos, plotState, level)
 	dpsLbl.Font = Enum.Font.GothamBold
 
 	table.insert(plotState.activeUnits, {
-		block = block, bv = bv, bg = bg, def = def, baseDamage = baseDef.damage, level = level or 0, dpsLbl = dpsLbl,
+		block = block, bv = bv, bg = bg, def = def, unitType = unitType, baseDamage = baseDef.damage, level = level or 0, dpsLbl = dpsLbl,
 		lastAttack = 0, lateral = lateral,
 		id = nextUnitId, -- stable order inside a formation row (see layoutFormation)
 		walkTrack = walkTrack, attackTrack = attackTrack,
@@ -869,6 +869,22 @@ local function fireCompanion(u, plotState)
 	end)
 end
 
+-- Malak's Fleet Strike: where the fleeing army runs to (forward distance from the plot's centre: by the graves) and
+-- how much faster than their march they run
+local FINISHER_FLEE_FWD = 8
+local FINISHER_FLEE_SPEED = 1.7
+
+-- Starts (or, with on = false, ends) a finisher cutscene on the plot (see the `finisher` block in update). `unit` is the
+-- Sovereign's entry (he stays put); fleeAt / length in seconds from now.
+local function startFinisher(plotState, unit, fleeAt, length, on)
+	if on == false then
+		plotState.finisher = nil
+		return
+	end
+	local start = workspace:GetServerTimeNow()
+	plotState.finisher = { start = start, fleeAt = fleeAt, untilT = start + length, unit = unit }
+end
+
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
 local function update(now, dt)
 	local serverNow = workspace:GetServerTimeNow()
@@ -928,6 +944,36 @@ local function update(now, dt)
 					u.lastAttack = now -- the attack timer starts again after the stun
 					continue
 				end
+			end
+			-- a finisher cutscene (Malak's Fleet Strike; plotState.finisher = { start, fleeAt, untilT, unit }): nobody
+			-- attacks; from fleeAt the rest of the army turns and runs back towards the graves (and cowers there) while
+			-- the Sovereign stays where he is; when it ends they march back to the wall as usual
+			local fin = plotState.finisher
+			if fin and serverNow < fin.untilT then
+				if u.barrage and not u.barrage.endTime then stopBarrage(u) end
+				if u.beam and not u.beam.endTime then stopBeam(u) end
+				u.lastAttack = now
+				u.arrived = false
+				local fleeing = u ~= fin.unit and not u.def.static and serverNow >= fin.start + fin.fleeAt
+				local fleeTarget = fleeing and PlotFrame.toWorld(plotState, (u.slotLat or u.lateral) * 0.6, FINISHER_FLEE_FWD)
+				local away = fleeTarget and Vector3.new(fleeTarget.X - pos.X, 0, fleeTarget.Z - pos.Z)
+				if away and away.Magnitude > 3 then
+					local dir = away.Unit
+					local speed = u.def.speed * FINISHER_FLEE_SPEED
+					u.bv.Velocity = Vector3.new(dir.X * speed, 0, dir.Z * speed)
+					u.bg.CFrame = CFrame.new(pos, pos + dir)
+					if u.walkTrack and not u.walkTrack.IsPlaying then u.walkTrack:Play() end
+					setState(u, "walk")
+				else
+					u.bv.Velocity = Vector3.new(0, 0, 0)
+					if fleeing then
+						-- huddled by the graves, looking back at the wall
+						u.bg.CFrame = CFrame.lookAt(pos, pos + PlotFrame.forwardFlat(plotState))
+					end
+					if u.walkTrack and u.walkTrack.IsPlaying then u.walkTrack:Stop() end
+					setState(u, "idle")
+				end
+				continue
 			end
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
 			-- the unit's slot in the formation (falls back to the lane it was placed in until the first layout)
@@ -1073,6 +1119,7 @@ end)
 
 return {
 	recallUnitFromSlot = recallUnitFromSlot,
+	startFinisher = startFinisher, -- (plotState, unit entry, fleeAt, length, on) a finisher cutscene: see update
 	placeInSlot = placeInSlot,
 	spawnUnit = spawnUnit,
 	setDamageMultiplier = setDamageMultiplier,
