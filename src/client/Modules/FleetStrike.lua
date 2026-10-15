@@ -5,6 +5,10 @@
 --     returns false (and does nothing) when it cannot play: no Malak of yours in the world, or it is already running.
 --
 -- BUILT IN STEPS (each one approved before the next):
+-- Started by the SERVER for everyone (Army.checkFleetStrike: the gate at 20% HP, the owner bought it, a Malak on the
+-- plot; remote FleetStrike): every client plays the world part from the same server time; the owner's camera is taken
+-- over (Skip only gives it back), the other players see it in the sky and may press Watch. The DEV panel previews it
+-- (opts.preview: the army is held through DevFleetStrike, the gate is only hidden on this screen).
 --   1. the frame (done): camera / controls / UI taken over and restored like the other cinematics (SignatureDescent,
 --      StarSummon), letterbox bars, Skip, the timeline of beats and a placeholder camera shot for each beat; in Studio
 --      a caption names the beat that is playing, to judge the pacing before anything is built
@@ -14,10 +18,11 @@
 --   3. the sky tears, the portal, the warp-in (done)
 --   4. scan + barrage (done)
 --   5. the main cannon, the beam strikes the realm keeper and sweeps down onto the gate, the gate falls (done)
---   6. the ending (THIS): the drone unfolds, the ship lingers over the arena and leaves backwards through a portal      5. main cannon + beam + the gate breaks
+--   7. gameplay (done): the server trigger, the gate held and broken for real, the Gem Shop / Codex unlock, everyone sees it
+--   6. the ending (done): the drone unfolds, the ship lingers over the arena and leaves backwards through a portal      5. main cannon + beam + the gate breaks
 --   6. the ending, the ship lingers and warps out  7. gameplay (trigger at 20% gate HP, gems unlock, toggle)  8. sound
 -- Nothing here touches real gameplay yet: it is started from the DEV panel (Anim: Fleet, Play).
--- PACE must stay 1 while UnitAnimator reads the beat times off os.clock() (model attribute FleetStart).
+-- The timeline runs on the server's clock (workspace:GetServerTimeNow() - startAt), so every client is in step.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
@@ -34,7 +39,6 @@ FleetStrike.active = false
 -- Settings
 -- ============================================================
 local DURATION = 54
-local PACE = 1 -- the whole timeline plays at this speed (lower = slower)
 local BAR_HEIGHT = 0.1 -- the letterbox bars, as a fraction of the screen height each
 local BAR_TIME = 0.8
 -- Where the tear opens and the ship hangs: NOT over the player but diagonally away, high up, off to the side of the lane
@@ -1165,7 +1169,8 @@ local function finale(folder, ctx)
 			table.insert(exclude, m)
 		end
 		params.FilterDescendantsInstances = exclude
-		for _, p in ipairs(workspace:GetPartBoundsInBox(box, Vector3.new(36, 26, 12), params)) do
+		-- (preview: the gate is only hidden on this screen; for real the server breaks it at this very moment)
+		for _, p in ipairs(ctx.preview and workspace:GetPartBoundsInBox(box, Vector3.new(36, 26, 12), params) or {}) do
 			if p.Size.Magnitude < 80 and p.Position.Y > ctx.gate.Y - 3.2 and p.LocalTransparencyModifier < 1 then
 				table.insert(hiddenGate, p)
 				p.LocalTransparencyModifier = 1
@@ -1472,23 +1477,36 @@ function FleetStrike.play(opts)
 	if FleetStrike.active then
 		return false
 	end
-	local malak = findMalak()
-	if not malak then
-		warn("FleetStrike: no Malak of yours in the world")
-		return false
+	-- the server's start time (every client plays from it, so they all see the same moment); a preview starts now
+	local startAt = opts.startAt or workspace:GetServerTimeNow()
+	if workspace:GetServerTimeNow() - startAt >= DURATION - 1 then
+		return false -- (too late to join)
+	end
+	local malak = opts.malak
+	if not opts.malakCF then
+		malak = malak or findMalak()
+		if not malak then
+			warn("FleetStrike: no Malak of yours in the world")
+			return false
+		end
+	end
+	if malak and not malak.Parent then
+		malak = nil -- (streamed out on this client: the world part plays without his poses)
 	end
 	FleetStrike.active = true
 	local camera = workspace.CurrentCamera
+	local spectator = opts.spectator == true -- (another player's finisher: no camera take-over unless they Watch)
 
-	local M = malak:GetPivot()
+	local M = opts.malakCF or malak:GetPivot()
 	M = CFrame.lookAt(M.Position, M.Position + Vector3.new(M.LookVector.X, 0, M.LookVector.Z)) -- (level)
-	local gate = malak:GetAttribute("AimPos") or (M * CFrame.new(0, 4, -60)).Position
+	local gate = opts.gate or (malak and malak:GetAttribute("AimPos")) or (M * CFrame.new(0, 4, -60)).Position
 	local ctx = {
 		M = M,
 		gate = gate,
 		sky = M.Position:Lerp(Vector3.new(gate.X, M.Position.Y, gate.Z), SKY_ALONG) - M.RightVector * SKY_SIDE + Vector3.new(0, SKY_HEIGHT, 0),
-		drone = malak:FindFirstChild("DroneRoot", true),
+		drone = malak and malak:FindFirstChild("DroneRoot", true),
 		start = camera.CFrame,
+		preview = opts.preview == true,
 	}
 	-- the ship comes in from LEFT to RIGHT as seen from Malak: side-on, square to his line of sight, the nose only a
 	-- little down; the portal is behind it (to the left on screen). It does not point at the gate: its turrets and
@@ -1523,48 +1541,29 @@ function FleetStrike.play(opts)
 		end
 	end
 
-	-- ── Malak's beats: his poses (UnitAnimator), the effects, the army (server) ──
-	local scale = malak:GetScale()
+	-- ── The world part (every player): Malak's poses (UnitAnimator), the effects ──
 	local fxFolder = Instance.new("Folder")
 	fxFolder.Name = "FleetStrikeFx"
 	fxFolder.Parent = workspace
 	local tearUpdate, tearCleanup = skyTear(fxFolder, ctx.portal)
 	local warpUpdate, warpCleanup = warpIn(fxFolder, ctx.portal, ctx.shipCF, ctx)
 	local finaleUpdate, finaleCleanup, keeperRestore = finale(fxFolder, ctx)
-	local effects = { runePanel(fxFolder, malak, scale), transmitter(fxFolder, malak, scale), tearUpdate, warpUpdate,
-		barrage(fxFolder, ctx), finaleUpdate }
+	local effects = { tearUpdate, warpUpdate, barrage(fxFolder, ctx), finaleUpdate }
+	if malak then
+		local scale = malak:GetScale()
+		table.insert(effects, runePanel(fxFolder, malak, scale))
+		table.insert(effects, transmitter(fxFolder, malak, scale))
+		-- (client-only: drives his poses in UnitAnimator's Envoy block, on the same clock as the cutscene)
+		malak:SetAttribute("FleetStart", os.clock() - (workspace:GetServerTimeNow() - startAt))
+	end
 	local cleanups = { tearCleanup, warpCleanup, finaleCleanup }
-	malak:SetAttribute("FleetStart", os.clock()) -- (client-only: drives his poses in UnitAnimator's Envoy block)
-	local devRemote = RunService:IsStudio() and game:GetService("ReplicatedStorage"):FindFirstChild("DevFleetStrike")
+	-- (Studio preview: the server holds the army and lets it flee; the real finisher is started by the server itself)
+	local devRemote = ctx.preview and RunService:IsStudio() and game:GetService("ReplicatedStorage"):FindFirstChild("DevFleetStrike")
 	if devRemote then
-		devRemote:FireServer(true) -- (the army holds, then flees; the real trigger comes with the gameplay step)
-	end
-	-- every nameplate and bar in the world is hidden for the cutscene
-	local hiddenBoards = {}
-	for _, d in ipairs(workspace:GetDescendants()) do
-		if d:IsA("BillboardGui") and d.Enabled then
-			d.Enabled = false
-			table.insert(hiddenBoards, d)
-		end
+		devRemote:FireServer(true)
 	end
 
-	-- ── Take over camera, controls and the UI ────────────────
-	local saved = { cameraType = camera.CameraType, fov = camera.FieldOfView, guiEnabled = mainGui.Enabled }
-	local controls
-	pcall(function()
-		controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
-		controls:Disable()
-	end)
-	mainGui.Enabled = false
-	local hiddenGuis = {}
-	for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
-		if g:IsA("ScreenGui") and g.Enabled and g.Name ~= "Freecam" then
-			g.Enabled = false
-			table.insert(hiddenGuis, g)
-		end
-	end
-	camera.CameraType = Enum.CameraType.Scriptable
-
+	-- ── The camera take-over: the owner at once, other players when they press Watch ──
 	local ui = Instance.new("ScreenGui")
 	ui.Name = "FleetStrikeUI"
 	ui.ResetOnSpawn = false
@@ -1586,11 +1585,16 @@ function FleetStrike.play(opts)
 		text = "Skip", color = "stone", size = UDim2.fromOffset(120, 40),
 		position = UDim2.new(1, -24, 1, -20), anchor = Vector2.new(1, 1), zIndex = 8,
 	})
-	-- (Studio only) the beat that is playing, to judge the pacing while the beats are still placeholders
+	skipBtn.root.Visible = false
+	local watchBtn = Theme.stoneButton(ui, {
+		text = "Watch the Fleet Strike", color = "blue", size = UDim2.fromOffset(260, 44),
+		position = UDim2.new(0.5, 0, 0, 90), anchor = Vector2.new(0.5, 0), zIndex = 8,
+	})
+	watchBtn.root.Visible = false
+	-- (Studio only) the beat that is playing, to judge the pacing
 	local caption
 	if RunService:IsStudio() then
 		caption = Instance.new("TextLabel")
-		caption.AnchorPoint = Vector2.new(0, 0)
 		caption.Position = UDim2.new(0, 16, BAR_HEIGHT, 8)
 		caption.Size = UDim2.fromOffset(520, 26)
 		caption.BackgroundTransparency = 1
@@ -1600,46 +1604,52 @@ function FleetStrike.play(opts)
 		caption.TextColor3 = Color3.fromRGB(200, 205, 230)
 		caption.TextStrokeTransparency = 0.4
 		caption.ZIndex = 9
+		caption.Visible = false
 		caption.Parent = ui
 	end
 
-	-- ── Run ──────────────────────────────────────────────────
-	local T = 0
-	local done = false
-	local BIND = "FleetStrikeCamera"
-
-	local function finish()
-		if done then
+	local watching = false
+	local watchStart = 0
+	local saved, controls
+	local hiddenGuis, hiddenBoards = {}, {}
+	local function takeOver()
+		if watching then
 			return
 		end
-		done = true
-		RunService:UnbindFromRenderStep(BIND)
-		ui:Destroy()
-		-- once it is out of the portal the ship stays: it lingers over the arena, then leaves backwards (lingerShip);
-		-- the thin haze waits until it is gone and the keeper comes back after it
-		local ship = fxFolder:FindFirstChild("Absolution")
-		if ship and T >= EMERGE_TO then
-			for _, c in ipairs(cleanups) do
-				if c ~= tearCleanup and c ~= warpCleanup then
-					c()
-				end
+		watching = true
+		watchStart = workspace:GetServerTimeNow() - startAt
+		saved = { cameraType = camera.CameraType, fov = camera.FieldOfView, guiEnabled = mainGui.Enabled }
+		ctx.start = camera.CFrame
+		pcall(function()
+			controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
+			controls:Disable()
+		end)
+		mainGui.Enabled = false
+		for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+			if g:IsA("ScreenGui") and g.Enabled and g ~= ui and g.Name ~= "Freecam" then
+				g.Enabled = false
+				table.insert(hiddenGuis, g)
 			end
-			lingerShip(ship, { tearCleanup }, function()
-				keeperRestore(true)
-			end)
-		else
-			for _, c in ipairs(cleanups) do
-				c()
+		end
+		-- every nameplate and bar in the world is hidden while watching
+		for _, d in ipairs(workspace:GetDescendants()) do
+			if d:IsA("BillboardGui") and d.Enabled then
+				d.Enabled = false
+				table.insert(hiddenBoards, d)
 			end
-			keeperRestore(false)
 		end
-		fxFolder:Destroy()
-		if malak.Parent then
-			malak:SetAttribute("FleetStart", nil)
+		camera.CameraType = Enum.CameraType.Scriptable
+		watchBtn.root.Visible = false
+		skipBtn.root.Visible = true
+		if caption then
+			caption.Visible = true
 		end
-		if devRemote then
-			devRemote:FireServer(false)
+	end
+	local function giveBack()
+		if not watching then
+			return
 		end
+		watching = false
 		for _, b in ipairs(hiddenBoards) do
 			if b.Parent then
 				b.Enabled = true
@@ -1656,35 +1666,94 @@ function FleetStrike.play(opts)
 		if controls then
 			pcall(function() controls:Enable() end)
 		end
+	end
+	if spectator then
+		watchBtn.root.Visible = true
+		watchBtn.button.Activated:Connect(takeOver)
+	else
+		takeOver()
+	end
+
+	-- ── Run ──────────────────────────────────────────────────
+	local T = workspace:GetServerTimeNow() - startAt
+	local done = false
+	local BIND = "FleetStrikeCamera"
+
+	local function finish()
+		if done then
+			return
+		end
+		done = true
+		RunService:UnbindFromRenderStep(BIND)
+		giveBack()
+		ui:Destroy()
+		-- once it is out of the portal the ship stays: it lingers over the arena, then leaves backwards (lingerShip);
+		-- the thin haze waits until it is gone; (preview) the keeper comes back after it
+		local ship = fxFolder:FindFirstChild("Absolution")
+		if ship and T >= EMERGE_TO then
+			for _, c in ipairs(cleanups) do
+				if c ~= tearCleanup and c ~= warpCleanup then
+					c()
+				end
+			end
+			lingerShip(ship, { tearCleanup }, function()
+				if ctx.preview then
+					keeperRestore(true)
+				end
+			end)
+		else
+			for _, c in ipairs(cleanups) do
+				c()
+			end
+			if ctx.preview then
+				keeperRestore(false)
+			end
+		end
+		fxFolder:Destroy()
+		if malak and malak.Parent then
+			malak:SetAttribute("FleetStart", nil)
+		end
+		if devRemote then
+			devRemote:FireServer(false)
+		end
 		FleetStrike.active = false
 		if opts.onDone then
 			opts.onDone()
 		end
 	end
-	skipBtn.button.Activated:Connect(finish)
+	-- Skip only gives the camera back: the world part (the ship, the gate falling) still plays out for everyone
+	skipBtn.button.Activated:Connect(function()
+		giveBack()
+		skipBtn.root.Visible = false
+		if caption then
+			caption.Visible = false
+		end
+	end)
 
-	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, function(dt)
+	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, function()
 		if done then
 			return
 		end
-		T += dt * PACE
-		if T >= DURATION or not malak.Parent then
+		T = workspace:GetServerTimeNow() - startAt -- (the server's clock: every client sees the same moment)
+		if T >= DURATION then
 			finish()
+			return
+		end
+		for _, effect in ipairs(effects) do
+			effect(T)
+		end
+		if watchBtn.root.Visible and T >= 44 then
+			watchBtn.root.Visible = false -- (too late to start watching)
+		end
+		-- letterbox bars: in at the start (or when they start watching), out at the end
+		local h = watching and BAR_HEIGHT * smooth((T - watchStart) / BAR_TIME) * smooth((DURATION - T) / BAR_TIME) or 0
+		barTop.Size = UDim2.fromScale(1, h)
+		barBottom.Size = UDim2.fromScale(1, h)
+		if not watching then
 			return
 		end
 		if camera.CameraType ~= Enum.CameraType.Scriptable then
 			camera.CameraType = Enum.CameraType.Scriptable -- (something may have reset it; the default camera would take over)
-		end
-		-- which beat, and how far into it
-		local index = 1
-		for i, b in ipairs(BEATS) do
-			if T >= b.at then
-				index = i
-			end
-		end
-		local beat = BEATS[index]
-				for _, effect in ipairs(effects) do
-			effect(T)
 		end
 		local pos, look, fov = cameraAt(T, ctx)
 		camera.CFrame = CFrame.lookAt(pos, look)
@@ -1696,16 +1765,36 @@ function FleetStrike.play(opts)
 			camera.CFrame *= CFrame.new(math.sin(tt) * shake * 0.5, math.sin(tt * 1.3 + 1) * shake * 0.5, 0)
 				* CFrame.Angles(0, 0, math.sin(tt * 0.9) * shake * 0.01)
 		end
-		-- letterbox bars: in at the start, out at the end
-		local h = BAR_HEIGHT * smooth(T / BAR_TIME) * smooth((DURATION - T) / BAR_TIME)
-		barTop.Size = UDim2.fromScale(1, h)
-		barBottom.Size = UDim2.fromScale(1, h)
 		if caption then
+			local index = 1
+			for i, b in ipairs(BEATS) do
+				if T >= b.at then
+					index = i
+				end
+			end
 			caption.Position = UDim2.new(0, 16, h, 8)
-			caption.Text = string.format("%d / %d  %s   (%.1f s)", index, #BEATS, beat.name, T)
+			caption.Text = string.format("%d / %d  %s   (%.1f s)", index, #BEATS, BEATS[index].name, T)
 		end
 	end)
 	return true
+end
+
+-- the server starts a Fleet Strike for everyone (Army.checkFleetStrike): the owner watches it, the others see it in the
+-- sky and may Watch
+local fleetRemote = game:GetService("ReplicatedStorage"):WaitForChild("FleetStrike", 10)
+if fleetRemote then
+	fleetRemote.OnClientEvent:Connect(function(data)
+		if type(data) ~= "table" or not data.startAt then
+			return
+		end
+		FleetStrike.play({
+			startAt = data.startAt,
+			malak = data.malak,
+			malakCF = data.malakCF,
+			gate = data.gate,
+			spectator = data.owner ~= tostring(player.UserId),
+		})
+	end)
 end
 
 return FleetStrike

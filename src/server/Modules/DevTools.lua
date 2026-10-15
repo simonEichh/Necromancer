@@ -14,6 +14,7 @@ local Army = require(script.Parent.Army)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local PlotFrame = require(script.Parent.PlotFrame)
 local Units = require(ReplicatedStorage.Shared.Units)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 local UNITS = Units.Stats
 local spawned = {} -- [UserId] = how many dev units this player spawned (to spread them across the lane)
@@ -89,6 +90,24 @@ end)
 -- Specials: fast (10 s charge, the default in Studio) or real (the units' own cooldowns); a workspace attribute the
 -- Army reads when a special starts charging, so units already charging keep their current charge
 -- ============================================================
+-- the gate just above the Fleet Strike threshold: breaks the walls in front of it (loot and all) until the gate stands,
+-- then sets its HP a hair above Economy.FLEET_STRIKE_HP, so the next hit brings it under (Army.checkFleetStrike)
+local Walls = require(script.Parent.Walls)
+Remotes.DevGateLow.OnServerEvent:Connect(function(player)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local guard = 0
+	while plotState.wall and not Economy.isGate(plotState.wallLayer) and guard < 10 do
+		guard += 1
+		plotState.wallHP = 0
+		Walls.breakWall(plotState)
+	end
+	if plotState.wall and Economy.isGate(plotState.wallLayer) then
+		plotState.wallHP = plotState.WALL_MAX_HP * (Economy.FLEET_STRIKE_HP + 0.0001)
+		Walls.updateWallGui(plotState)
+	end
+end)
+
 -- a Fleet Strike preview (client FleetStrike.lua): the plot's army holds, then flees, Malak stays put
 Remotes.DevFleetStrike.OnServerEvent:Connect(function(player, on)
 	local plotState = PlotRegistry.getPlot(player)

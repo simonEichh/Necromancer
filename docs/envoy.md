@@ -75,7 +75,15 @@ or far parts may not be loaded. 6. (done) the ending: the drone's spire retracts
 turrets turn home, the rings idle), after ~16 s a portal tears open behind its stern and it drifts in backwards (no turn),
 the portal snaps shut; the haze returns after it; (preview) the keeper comes back out with his Return. Idea left for
 later: if the ship ever stays longer (into the next run), his basic attack's laser and shells should come from its
-turrets (now the gate is gone during the linger, so he does not attack). The cutscene is 54 s. The camera is ONE
+turrets (now the gate is gone during the linger, so he does not attack). 7. (done) gameplay: one-time unlock `fleetStrike` for 1000 gems (Economy.FLEET_STRIKE_PRICE; Gem Shop card + a
+button on Malak's Codex page; per account, saved). Server `Army.checkFleetStrike`: the gate at or under 20% HP
+(Economy.FLEET_STRIKE_HP), the owner owns it, a Malak (dev units count) on the plot -> once per gate the gate is HELD
+(Walls.breakWall refuses while `finisher.holdHP` and not `allowBreak`), the army is held / flees, the owner's streaming
+focus moves to the gate, remote FleetStrike tells EVERY client { owner, startAt, malak, gate, malakCF }; every client
+plays the world part on the server clock; the owner's camera is taken over (Skip only gives it back), others get a
+"Watch the Fleet Strike" button until 44 s; at 49.4 s the server breaks the gate for real (keeper's Defeat, loot,
+portal). No settings toggle yet (decided). DEV: "Gate to 20%" (DevGateLow) breaks the walls up to the gate and sets it
+just above the threshold. Next: 8. sound; the small camera fixes. The cutscene is 54 s. The camera is ONE
 continuous path through keyframes (`KEYS`, monotone
 Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: IDEA (user, 2026-10-15): the final
 shot also strikes the realm keeper (his hands + eyes behind the gate, `HandsAnimator`). He is NOT killed: he is the

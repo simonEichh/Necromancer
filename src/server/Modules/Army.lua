@@ -915,6 +915,9 @@ end
 
 local function startFinisher(plotState, unit, fleeAt, length, on)
 	if on == false then
+		if plotState.finisher and plotState.finisher.holdHP then
+			return -- (a real Fleet Strike is not stopped by the Studio preview's Skip)
+		end
 		plotState.finisher = nil
 		setFinisherFocus(plotState, false)
 		return
@@ -929,6 +932,63 @@ local function startFinisher(plotState, unit, fleeAt, length, on)
 			setFinisherFocus(plotState, false)
 		end
 	end)
+	return finisher
+end
+
+-- Malak's Fleet Strike (docs/envoy.md, client FleetStrike.lua): when the gate is down to Economy.FLEET_STRIKE_HP of its
+-- HP, the owner has unlocked it and a Malak fights on the plot, the gate is HELD there, every client plays the
+-- cutscene from the same server time (FleetStrike remote), and at FLEET_GATE_HIT s, when the beam reaches it, the gate
+-- breaks for real (the keeper's Defeat, the loot, the portal: Walls.breakWall). Once per gate.
+local FLEET_FLEE_AT = 11
+local FLEET_LENGTH = 54
+local FLEET_GATE_HIT = 49.4
+local function checkFleetStrike(plotState, serverNow)
+	local fin = plotState.finisher
+	if fin and fin.kind == "FleetStrike" then
+		if not fin.allowBreak then
+			plotState.wallHP = math.max(plotState.wallHP, fin.holdHP) -- (the gate holds)
+			if serverNow >= fin.start + FLEET_GATE_HIT and plotState.wall then
+				fin.allowBreak = true
+				plotState.wallHP = 0
+				updateWallGui(plotState)
+				breakWall(plotState)
+			end
+		end
+		return
+	end
+	local wall = plotState.wall
+	if not wall or not Economy.isGate(plotState.wallLayer) or plotState.fleetStrikeWall == wall then
+		return
+	end
+	local maxHP = plotState.WALL_MAX_HP or 0
+	if maxHP <= 0 or plotState.wallHP > maxHP * Economy.FLEET_STRIKE_HP then
+		return
+	end
+	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
+	local profile = owner and PlayerData.get(owner)
+	if not profile or not profile.fleetStrike then
+		return
+	end
+	local malak
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.unitType == "Malak" and u.model and u.block.Parent then
+			malak = u
+			break
+		end
+	end
+	if not malak then
+		return
+	end
+	plotState.fleetStrikeWall = wall -- (once per gate)
+	local started = startFinisher(plotState, malak, FLEET_FLEE_AT, FLEET_LENGTH)
+	started.kind = "FleetStrike"
+	started.holdHP = math.max(1, plotState.wallHP)
+	local gate = PlotFrame.toWorld(plotState, 0, plotState.wallFaceFwd) + Vector3.new(0, 4, 0)
+	Remotes.FleetStrike:FireAllClients({
+		owner = plotState.ownerId, startAt = started.start, malak = malak.model, gate = gate,
+		malakCF = malak.model:GetPivot(),
+	})
+	print("Fleet Strike on plot " .. tostring(plotState.plotIndex))
 end
 
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
@@ -936,6 +996,7 @@ local function update(now, dt)
 	local serverNow = workspace:GetServerTimeNow()
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
+		checkFleetStrike(plotState, serverNow)
 		if not plotState.wall or not plotState.wall.Parent then
 			-- the gate has fallen (or the lane is being rebuilt): nothing left to shoot, so everyone stands down
 			for _, u in ipairs(plotState.activeUnits) do

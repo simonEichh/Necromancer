@@ -268,7 +268,7 @@ playBtn.MouseButton1Click:Connect(function()
 		playDescent()
 	elseif anim == "Fleet" then
 		panel.Visible = false
-		if not require(script.Parent.FleetStrike).play({ onDone = function() panel.Visible = true end }) then
+		if not require(script.Parent.FleetStrike).play({ preview = true, onDone = function() panel.Visible = true end }) then
 			panel.Visible = true
 		end
 	else
@@ -298,7 +298,7 @@ goldX10.MouseButton1Click:Connect(function()
 end)
 -- specials: fast (10 s charge, to test them) or real (the units' own cooldowns and damage per special)
 local specialsBtn = makeButton(panel, "", Color3.fromRGB(255, 170, 190))
-specialsBtn.Size = UDim2.new(1, -16, 0, 28)
+specialsBtn.Size = UDim2.new(0.6, -8, 0, 28)
 specialsBtn.Position = UDim2.fromOffset(8, 202)
 local function paintSpecials()
 	local fast = workspace:GetAttribute("DevFastSpecials") ~= false
@@ -308,6 +308,14 @@ paintSpecials()
 workspace:GetAttributeChangedSignal("DevFastSpecials"):Connect(paintSpecials)
 specialsBtn.MouseButton1Click:Connect(function()
 	fastSpecialsEvent:FireServer(not (workspace:GetAttribute("DevFastSpecials") ~= false))
+end)
+-- the gate at 21% HP (breaks the walls before it): to test Malak's Fleet Strike trigger
+local gateLowBtn = makeButton(panel, "Gate to 20%", Color3.fromRGB(255, 190, 160))
+gateLowBtn.Size = UDim2.new(0.4, -8, 0, 28)
+gateLowBtn.Position = UDim2.new(0.6, 4, 0, 202)
+gateLowBtn.MouseButton1Click:Connect(function()
+	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevGateLow")
+	if r then r:FireServer() end
 end)
 
 local list = Instance.new("ScrollingFrame")

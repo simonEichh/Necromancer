@@ -146,7 +146,19 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 	local odds = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.38), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local dps = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.56), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local pulled = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.74), font = Enum.Font.GothamMedium, color = INK_DIM })
-	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, odds = odds, dps = dps, pulled = pulled }
+	-- (Malak only, once discovered) his Fleet Strike finisher: buy it here or see that it is owned
+	local fleet = Theme.stoneButton(f, {
+		text = "", color = "blue", size = UDim2.fromScale(0.5, 0.2),
+		position = UDim2.fromScale(0.97, 0.94), anchor = Vector2.new(1, 1), zIndex = 4,
+		onClick = function()
+			local remote = ReplicatedStorage:FindFirstChild("BuyGemItem")
+			if remote and not State.fleetStrike then
+				remote:FireServer("FleetStrike")
+			end
+		end,
+	})
+	fleet.root.Visible = false
+	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, odds = odds, dps = dps, pulled = pulled, fleet = fleet }
 end
 
 -- page turning, bookmarks, close
@@ -229,6 +241,12 @@ paint = function()
 			local def = Units.Stats[unitType]
 			entry.dps.Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
 			entry.pulled.Text = n and ("Pulled  " .. n .. "x") or "Not yet discovered"
+			entry.fleet.root.Visible = n ~= nil and unitType == "Malak"
+			if unitType == "Malak" then
+				local price = require(ReplicatedStorage.Shared.Economy).FLEET_STRIKE_PRICE
+				entry.fleet.label.Text = State.fleetStrike and "Fleet Strike: owned" or ("Fleet Strike  " .. price .. " Gems")
+				entry.fleet.root:SetAttribute("Disabled", State.fleetStrike == true or (State.gems or 0) < price)
+			end
 		end
 	end
 end

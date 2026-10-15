@@ -429,6 +429,12 @@ end
 
 local function breakWall(plotState)
 	if plotState.wallLayer > NUM_WALLS then return end -- the gate already fell (late arrows, last barrage hits)
+	-- a Fleet Strike holds the gate until its beam lands (Army.checkFleetStrike): late hits cannot break it before
+	local fin = plotState.finisher
+	if fin and fin.holdHP and not fin.allowBreak then
+		plotState.wallHP = math.max(plotState.wallHP, fin.holdHP)
+		return
+	end
 	local brokenLayer = plotState.wallLayer
 	local brokenFaceFwd = plotState.wallFaceFwd -- where the loot bursts out
 	payStageLoot(plotState, 3) -- the stages it went through too fast to pay

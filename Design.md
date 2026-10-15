@@ -298,6 +298,34 @@ exist yet, so items start as **cosmetics (look only)**; effects come with the sp
 | **Permanent upgrades for Souls** (earned at the gate) | 4 | 4 | 3 | 3 | **4** | Luck (small steps, potions keep value), starting gold, lower pity, faster auto roll, offline income. Old Luck / Coin levels refunded as Souls. |
 | **Keep Luck / Coin Boost as they are** | 2 | 2 | 5 | 4 | **2** | Fixed gold prices: maxed by ascension 6-7, then dead; competes with paid luck. |
 
+### Signature value: they never fall off (decided 2026-10-15)
+
+Problem: a chase Signature from a low rarity becomes useless later (raw damage is always outclassed by higher
+rarities) and gets sold. Decision:
+- **Specials deal a share of the ARMY's power, not a fixed number:** "X seconds of your whole army's DPS" (e.g. Knell's
+  toll = 15 s of army DPS). A Common Signature stays worth having in realm 9, yet it can never be faster than the
+  player's own strength (it is a multiplier of roughly +10-20% per Signature). NOT a share of the wall's max HP (that
+  would break pacing: stacked Signatures would fell any wall in a fixed time) and not of its current HP (too weak).
+- **A small passive aura per Signature,** percentage based (e.g. Knell: +8% attack speed while the bell tolls; Hush: wall
+  regeneration halved; Sigilwright: +10% damage to the gate).
+- **A cap:** only the strongest few Signatures placed on graves count (e.g. 3), so stacking ten cannot snowball.
+- Later, on top: a commander slot (one Signature whose aura leads the army), Mastery (below). Rebalance the existing
+  Signatures (Knell, Hush, Sigilwright, Malak's specials) with the economy simulator when we get to it.
+
+### Gacha direction (discussed 2026-10-15, not decided; the user liked these takes)
+
+From the user's "general ideas.txt" (switching to a star / banner system with few pulls):
+- **Keep frequent pulling** (pillars 1 and 2; the Roblox audience expects to roll often; a low-volume banner gacha
+  needs gear / stats depth to spend on between pulls, which is out of scope).
+- Borrow from banner games: a **featured unit** per grave or realm (rate-up, a clear chase), **hard pity** on the top
+  units (guaranteed after N pulls, maybe a 50/50 on the featured one). Rarity names stay (they carry the tone); stars
+  could be shown as display only.
+- Graves going obsolete is normal for the genre; give old graves a reason: **each grave tier has its own exclusive
+  Signature**.
+- **Mastery:** maxing a unit (Lv 10, the shadow form) leaves a small permanent account buff (stacks, fits the Codex).
+  If Forge success chances are lowered, failures should build progress (fragments towards a guaranteed success)
+  rather than simply removing the pity.
+
 ### Content / depth (already in the backlog)
 
 | Idea | Score | Notes |

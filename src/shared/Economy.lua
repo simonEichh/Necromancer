@@ -255,6 +255,10 @@ Economy.FORTUNE_BONUS = 0.25
 -- The Gem Shop (HUD Shop tile, usable anywhere; server GemShop): catalysts (above), Remote Forge (the Forge opens
 -- anywhere, one-time) and Soul Wisp speed levels.
 Economy.REMOTE_FORGE_PRICE = 250
+-- Malak's Fleet Strike (docs/envoy.md): a one-time Gem Shop unlock (per account: any Malak can use it); at this share of
+-- the gate's HP, with a Malak on the plot, the Absolution executes the gate (server Army.checkFleetStrike)
+Economy.FLEET_STRIKE_PRICE = 1000
+Economy.FLEET_STRIKE_HP = 0.2
 Economy.WISP_MAX_LEVEL = 5
 function Economy.wispLevelPrice(level) -- gems to go from `level` to level + 1: 40, 80, 160, 320, 640
 	return 40 * 2 ^ level

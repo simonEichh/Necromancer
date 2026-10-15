@@ -1,6 +1,7 @@
 -- The Gem Shop: everything gems buy, usable anywhere. A "Shop" tile on the right HUD column opens it (third tile, under
 -- Quests and Friends). Cards: the two Forge catalysts (BuyCatalyst), the Remote Forge (BuyGemItem "RemoteForge",
--- one-time) and the Soul Wisp speed levels (BuyGemItem "WispSpeed"). The server checks everything (UnitUpgrades,
+-- one-time), the Soul Wisp speed levels (BuyGemItem "WispSpeed") and Malak's Fleet Strike (BuyGemItem "FleetStrike",
+-- one-time; also sold on his Codex page). The server checks everything (UnitUpgrades,
 -- GemShop); this panel only sends the requests and paints what DataSync brings back.
 -- Also owns the "Forge" tile on the left HUD column that appears once the Remote Forge is bought.
 -- Planned: a "Get Gems" section with Robux gem packs (Developer Products).
@@ -25,7 +26,7 @@ local buyItemRemote = ReplicatedStorage:WaitForChild("BuyGemItem", 5)
 -- ============================================================
 -- Frame
 -- ============================================================
-local themed = Theme.panel(screenGui, { title = "Gem Shop", size = UDim2.fromOffset(600, 470), zIndex = Z })
+local themed = Theme.panel(screenGui, { title = "Gem Shop", size = UDim2.fromOffset(600, 562), zIndex = Z })
 local panel = themed.frame
 panel.Name = "GemShopPanel"
 panel.Visible = false
@@ -116,6 +117,13 @@ buyButton(wispCard, function()
 	end
 end)
 
+local fleetCard = card(#Economy.CATALYSTS + 3, "Fleet Strike", Theme.Image.Icon.Gems)
+buyButton(fleetCard, function()
+	if buyItemRemote then
+		buyItemRemote:FireServer("FleetStrike")
+	end
+end)
+
 local function paint()
 	local gems = State.gems or 0
 	gemsLbl.Text = tostring(gems)
@@ -153,6 +161,15 @@ local function paint()
 			level, Economy.WISP_MAX_LEVEL, Economy.wispSpeed(level), Economy.wispSpeed(level + 1))
 		wispCard.button.label.Text = price .. " Gems"
 		wispCard.button.root:SetAttribute("Disabled", gems < price)
+	end
+	if State.fleetStrike then
+		fleetCard.desc.Text = "Owned. With Malak on your plot, the Absolution executes the gate at 20%."
+		fleetCard.button.label.Text = "Owned"
+		fleetCard.button.root:SetAttribute("Disabled", true)
+	else
+		fleetCard.desc.Text = "Malak's finisher: with Malak on your plot, his warship the Absolution executes the gate at 20%. Everyone in the server sees it. One-time."
+		fleetCard.button.label.Text = Economy.FLEET_STRIKE_PRICE .. " Gems"
+		fleetCard.button.root:SetAttribute("Disabled", gems < Economy.FLEET_STRIKE_PRICE)
 	end
 end
 

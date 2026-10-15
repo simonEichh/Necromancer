@@ -72,6 +72,7 @@ local function collect(player, profile)
 		collector = profile.collector,
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
+		fleetStrike = profile.fleetStrike,
 		placed = placed,
 		pity = Rolling.exportPity(player),
 		wheelSpins = Wheel.getWheelData(player).spins,
