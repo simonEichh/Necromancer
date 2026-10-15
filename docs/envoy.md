@@ -1,4 +1,4 @@
-# The Envoy (working name): design draft
+# Malak, the Envoy: design draft
 
 Signature unit, designed with the user on 2026-10-15. Model built and liked by the user (2026-10-15):
 `tools/studio/build_malak.lua` -> `ServerStorage.Models.Malak` (512 parts, no shadow form yet). Idle done: model
@@ -14,9 +14,26 @@ finisher cutscene unlocked once for gems; one finisher per gate; a name style ab
 anything else in the game. Hard-edged armour plates, glowing seams, hologram UI, hover tech, a real warship with
 turrets and a main cannon. The warp portal can be a tech rift with rune accents.
 
-**The frigate: blade dreadnought** (chosen over the cathedral look): a long, narrow, layered dagger hull pointing at
-the gate, armour plates stacked in steps along its length; the prow splits open down the middle to reveal the main
-cannon.
+**The ship: The Absolution** (redesigned 2026-10-15; the dagger did not fit Malak). Built out of Malak's own visual
+language, scaled up to a warship: a long narrow central hull whose rear half flares into layered pointed blade fins like
+his coat skirt (glowing seam, silver edges, diamond emblem on each; they are the engines, glow pours out between them);
+a smooth faceless bow like his helmet with ONE long vertical slit of light (the main cannon opens out of it: the slit
+splits apart, the halves fold aside); a tall upswept armour crest behind the bow like his high collar (the bridge); a
+giant armillary amidships, two or three huge nested rings turning round a glowing core like his drone (they spin up and
+lock into alignment when the cannon charges); turrets set into chevron plates on the underside (his chest chevrons),
+missile bays in the fins. His palette: black chrome, silver, cold white-blue seams, a hint of violet; red only for the
+targeting lasers. Concept art: `Images/Concept/Unit/Die Absolution – gotisches Ringschlachtschiff.png` (side + underside view).
+
+**Model (built 2026-10-15, approved):** `tools/studio/build_absolution.lua` -> `ReplicatedStorage.ShipModels.Absolution`
+(place file only; ~420 studs chin to fin tips, 1795 parts, front = -Z, origin = the core, PrimaryPart `Root`). A heavy
+hull (it must read as a massive warship, not a bird: broad armour fins that flare only a little), belt armour with vents,
+~200 lit windows, a stepped bridge tower with Malak's slit in the command cab and sensor masts, the collar crest behind
+it, five triple-barrel main turrets (two forward, the big one superfiring; one aft and one below facing the stern),
+secondaries, point defence, the core in a cage, an engine block with five stepped thruster bells and two outrigger pods.
+Joints for the cutscene: `BowL` / `BowR` (the helmet halves fold open), `Cannon` (slides out of the slit), `RingA` /
+`RingB` / `RingC` (spin up, lock into line), `Turret1..26` (yaw) and `Turret<n>Guns` on the main turrets (elevation).
+To do in the cutscene: real exhaust (beams / particles) instead of the solid plume cylinders. Size idea: 300-400 studs
+long, ~150 studs over the plot.
 
 **General rule for every animation here:** build it slower than seems right first; it can be sped up later.
 
@@ -35,26 +52,32 @@ floating reliquary) is always beside him.
 | **Skill (charges, like other Signature specials): rail lance** | Pulls out a long rifle, charge-up lines draw in along the barrel, one tracer shot, delayed impact on the wall. |
 | **Ultimate: Fleet Strike** | Gate only. Unlocked by a purchase. When the gate drops to 20% HP while the Envoy is placed, it is executed by the frigate (the gate holds until the cutscene ends). |
 
-## Fleet Strike cutscene (first draft of the timing, about 38 s; skippable)
+## Fleet Strike cutscene (second draft, about 45 s; skippable)
 
-Letterbox bars in, units stop attacking, the camera takes over.
+Trigger: the gate drops to 20% HP while Malak is placed and the finisher is unlocked. The gate holds there (no more
+damage) until the cutscene ends. Letterbox bars in, units stop attacking, music drops, the camera takes over (owner
+only; everyone else sees it play out in the sky over the plot, without the camera).
 
 | Time | Beat |
 |---|---|
-| 0-4 s | **Nonchalant.** Close on the Envoy, completely relaxed, weight on one leg, other hand behind his back. Runes flicker up along his gauntlet as a small hologram panel; he taps, drags and rearranges them with one finger; the last rune clicks into place with a small confirm pulse. Barely moves his head. |
-| 4-7 s | **The drone transforms** into a sending device: plates unfold, an antenna ring extends, it turns skyward and sends a pulse up, transmission rings rising. |
-| 7-8.5 s | **Nothing happens.** A beat of silence. He lowers his arm. |
-| 8.5-14 s | **The sky tears.** The camera swipes up. Clouds swirl into a vortex, a huge portal ring of runes forms, cracks of light spread across the sky. Slow. |
-| 14-22 s | **Warp-in, slow and ominous.** The bow pushes out of the portal inch by inch so the scale reads, light streaks off the hull, the portal closes behind it, a shockwave rolls across the sky. Lights run down its spine. |
-| 22-27 s | **Scanning.** Camera under the hull looking up. A red scan fan sweeps the gate, reticles lock one by one (a sound each), every turret turns to the gate. |
-| 27-31 s | **Barrage.** Broadside: tracer streams, curving missiles, the gate shakes, smoke and fire build. |
-| 31-34 s | **Main cannon charges.** The prow opens, a huge charge pulls light and debris in. Half a second of silence. |
-| 34-37 s | **The beam.** White flash, slow-motion shockwave, the gate breaks apart. |
-| 37-39 s | Back to the Envoy, unbothered, closing his rune panel. Bars out, control back. |
+| 0-1.5 s | **The trigger.** Bars slide in, the army goes still, the music drops away. |
+| 1.5-6 s | **The left hand.** Close on Malak. For the first time his LEFT hand comes out from behind his back. Runes rise along his right gauntlet into a small panel; he types on it with the left hand, drags and rearranges runes, slowly, barely moving his head; the last rune clicks into place with a small confirm pulse. |
+| 6-9.5 s | **The drone transforms** into a transmitter: its rings stop, swing into one plane and stack, the spikes extend into a spire, the core flares; it turns skyward and sends a thin pulse straight up, transmission rings rising after it. |
+| 9.5-11 s | **Nothing happens; the army knows.** A wide shot: the rest of the army looks up at the pulse, then breaks and runs back past him towards the graves (some stumble, some glance back over their shoulders). Malak does not move; the left hand goes back behind his back and he watches. (Idea of the user, 2026-10-15. The units return to the wall after the cutscene; server side a short \"flee\" order back to the graves.) |
+| 11-17 s | **The sky tears.** The camera swipes up, slowly. The sky darkens, the clouds swirl into a vortex over the lane, a huge portal ring of runes etches itself into the sky, cracks of light spread from it. |
+| 17-26 s | **The warp-in, slow and ominous.** The faceless bow pushes out first, its slit glowing like his helmet, inch by inch so the scale reads; then the collar crest; then the giant armillary, turning; last the coat fins, unfolding behind it as it clears the portal, engine glow pouring out between them. The portal snaps shut, a shockwave rolls through the clouds, lights run down the spine. |
+| 26-31 s | **Scanning.** Camera under the hull, looking up. A red scan fan sweeps out of the bow slit over the gate, reticles lock on one by one, the chevron turrets turn to the gate in sequence. |
+| 31-35 s | **Barrage.** The turrets open up (tracer streams), missiles curve in from the fin bays, the gate shakes, smoke and fire build. |
+| 35-39 s | **The main cannon.** The bow slit splits open, the halves fold aside, the cannon pushes out; the armillary rings spin up and lock into line with it; light and debris are pulled in. Half a second of silence. |
+| 39-42 s | **The beam.** White flash, slow-motion shockwave, the gate breaks apart. |
+| 42-45 s | Back to Malak, unbothered: the rune panel folds back into the gauntlet, the drone unfolds into its armillary. Bars out, control back. |
 
-**After the cutscene:** the frigate does NOT turn (it is too massive). It lingers over the plot for a while (visible to
-every player in the server, the after-wow moment), then a portal opens behind it and it drifts backwards into it very
-slowly, stern first, the bow last, and the portal collapses with a low boom.
+**After the cutscene:** the Absolution does NOT turn (it is too massive). It lingers over the plot for a while (~20 s,
+visible to every player in the server, the after-wow moment), then a portal opens behind it and it drifts backwards
+into it very slowly, stern first, the bow last, and the portal collapses with a low boom.
+
+**Continuity:** the red glint in the sky that his basic attack's laser and shells come from is the Absolution, out of
+sight; the finisher is the first time players see it.
 
 ## Sound (later, important)
 
@@ -66,5 +89,4 @@ cut to silence, the beam impact, the slow warp-out boom.
 
 - Rarity (Primordial suggested; Abyssal and Eldritch have no Signature yet).
 - The purchase: gems (decided). Per account (any Envoy can use it)?
-- The frigate's name.
 - Damage split between basic, drone, skill.
