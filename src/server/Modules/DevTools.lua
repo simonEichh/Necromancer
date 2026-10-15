@@ -99,7 +99,7 @@ Remotes.DevFleetStrike.OnServerEvent:Connect(function(player, on)
 			malak = u
 		end
 	end
-	Army.startFinisher(plotState, malak, 11, 52, on ~= false) -- (FleetStrike.lua: the army flees at 11 s, 52 s long)
+	Army.startFinisher(plotState, malak, 11, 54, on ~= false) -- (FleetStrike.lua: the army flees at 11 s, 54 s long)
 end)
 
 Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)

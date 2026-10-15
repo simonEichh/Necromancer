@@ -63,9 +63,15 @@ gauntlet, the drone stacks into a transmitter and fires a pulse up at 9.0 s, the
 seen from Malak, far away and high: SKY_SIDE 650, SKY_HEIGHT 400, SKY_LEFT 150; ~9.5 s; hidden behind the portal plane;
 window lights run bow to stern; the reactor rings turn, the core pulses; haze thinned on screen). 4. scan (turrets turn
 to the gate, red scan fan + scan line, five reticles lock) and barrage from 38 s (main salvos, tracers, 12 missiles,
-fire and smoke on the gate, camera shake). The camera is ONE continuous path through keyframes (`KEYS`, monotone
-Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: 5. main cannon (bow
-opens, cannon swivels to the gate, rings spin up and lock), beam, the gate breaks. IDEA (user, 2026-10-15): the final
+fire and smoke on the gate, camera shake). 5. (done) after the barrage the ship turns slowly
+until its nose (almost) points at the keeper (TURN_*), the helmet bow opens (BowL/BowR), the cannon slides out and
+swivels, the reactor rings spin up and lock coaxial, the charge is pulled into the muzzle; at 46 s the beam slams into
+the keeper's raised palms, at 47.6 s it drags down the outer wall (a cooling scar) onto the gate, at 49.4 s the gate
+falls (preview: hidden on this screen only, debris, dust, shake); the keeper's side is HandsAnimator's FleetStrike
+behaviour (set locally: SummonKind / SummonAt), driven back into his rifts, NOT killed. While a finisher runs the
+server moves the owner's streaming focus to the gate (Army setFinisherFocus: ReplicationFocus + RequestStreamAroundAsync),
+or far parts may not be loaded. The cutscene is 54 s. The camera is ONE continuous path through keyframes (`KEYS`, monotone
+Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: IDEA (user, 2026-10-15): the final
 shot also strikes the realm keeper (his hands + eyes behind the gate, `HandsAnimator`). He is NOT killed: he is the
 secret world boss, so he is wounded and DRIVEN BACK (his existing Defeat: dragged into the rifts reads as a retreat).
 He notices the ship during the scan (eyes turn red, hands tense), the barrage also hits his hands; the cannon aims at

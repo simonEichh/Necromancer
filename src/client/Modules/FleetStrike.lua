@@ -12,7 +12,8 @@
 --      and sends a pulse into the sky, the army flees (server: Army.startFinisher, started here in Studio through the
 --      DevFleetStrike remote), every nameplate is hidden and his big attack hologram closes
 --   3. the sky tears, the portal, the warp-in (done)
---   4. scan + barrage (THIS)      5. main cannon + beam + the gate breaks
+--   4. scan + barrage (done)
+--   5. the main cannon, the beam strikes the realm keeper and sweeps down onto the gate, the gate falls (THIS)      5. main cannon + beam + the gate breaks
 --   6. the ending, the ship lingers and warps out  7. gameplay (trigger at 20% gate HP, gems unlock, toggle)  8. sound
 -- Nothing here touches real gameplay yet: it is started from the DEV panel (Anim: Fleet, Play).
 -- PACE must stay 1 while UnitAnimator reads the beat times off os.clock() (model attribute FleetStart).
@@ -31,7 +32,7 @@ FleetStrike.active = false
 -- ============================================================
 -- Settings
 -- ============================================================
-local DURATION = 52
+local DURATION = 54
 local PACE = 1 -- the whole timeline plays at this speed (lower = slower)
 local BAR_HEIGHT = 0.1 -- the letterbox bars, as a fraction of the screen height each
 local BAR_TIME = 0.8
@@ -56,7 +57,8 @@ local BEATS = {
 	{ at = 36, name = "Barrage" },
 	{ at = 42, name = "The main cannon" },
 	{ at = 46, name = "The beam" },
-	{ at = 49, name = "Back to Malak" },
+	{ at = 49.4, name = "The gate falls" },
+	{ at = 51, name = "Back to Malak" },
 }
 
 local function smooth(x)
@@ -147,12 +149,19 @@ local KEYS = {
 	-- back and wide before the barrage (38): the ship and the gate both in frame, then a slow drift through the fire
 	{ t = 37.8, pos = function(c) return wide(c, 0) end, look = wideLook, fov = 76 },
 	{ t = 42.0, pos = function(c) return wide(c, 8) end, look = wideLook, fov = 78 },
-	-- (placeholders for steps 5 and 6) the main cannon: a long lens on the ship from behind him; the beam: on the gate;
-	-- back to Malak
-	{ t = 45.0, pos = function(c) return behind(c, 16, 4.5) end, look = function(c) return c.sky end, fov = 36 },
-	{ t = 47.5, pos = function(c) return c.gate - c.M.LookVector * 36 - c.M.RightVector * 16 + Vector3.new(0, 8, 0) end, look = function(c) return c.gate + Vector3.new(0, 6, 0) end, fov = 66 },
-	{ t = 50.0, pos = function(c) return (c.M * CFrame.new(1.8, 2.2, -6.5)).Position end, look = function(c) return (c.M * CFrame.new(0, 2.4, 0)).Position end, fov = 70 },
-	{ t = 52.0, pos = function(c) return (c.M * CFrame.new(1.8, 2.2, -6)).Position end, look = function(c) return (c.M * CFrame.new(0, 2.4, 0)).Position end, fov = 70 },
+	-- the main cannon: a long lens on the bow as it opens and the cannon comes out
+	-- (the ship has turned its nose round towards the keeper and the camera: the opened bow and the cannon head-on)
+	{ t = 44.0, pos = function(c) return behind(c, 16, 4.5) end, look = function(c) return c.bow end, fov = 30 },
+	{ t = 45.4, pos = function(c) return behind(c, 16, 4.5) end, look = function(c) return c.bow end, fov = 22 },
+	-- the beam: wide, from behind him, the ship on one side and the keeper on the other, the beam between them ...
+	{ t = 46.2, pos = function(c) return behind(c, 24, 9) end, look = function(c) return c.bow:Lerp(c.keeper, 0.5) end, fov = 76 },
+	{ t = 47.6, pos = function(c) return behind(c, 25, 9) end, look = function(c) return c.bow:Lerp(c.keeper, 0.62) end, fov = 76 },
+	-- ... following it down the outer wall onto the gate
+	{ t = 49.4, pos = function(c) return behind(c, 20, 6) end, look = function(c) return c.keeper:Lerp(c.gate + Vector3.new(0, 6, 0), 0.85) end, fov = 64 },
+	-- the gate falls; then over his shoulder, unbothered, at what is left of it
+	{ t = 50.8, pos = function(c) return behind(c, 17, 5) end, look = function(c) return c.gate + Vector3.new(0, 4, 0) end, fov = 58 },
+	{ t = 52.4, pos = function(c) return (c.M * CFrame.new(-3.5, 2.6, 7.5)).Position end, look = function(c) return (c.M * CFrame.new(0, 2, -30)).Position end, fov = 62 },
+	{ t = 54.0, pos = function(c) return (c.M * CFrame.new(-3, 2.6, 6.2)).Position end, look = function(c) return (c.M * CFrame.new(0, 2, -30)).Position end, fov = 60 },
 }
 
 -- the camera at time T: cubic Hermite through the keys with MONOTONE tangents, per component (Fritsch-Carlson): it
@@ -588,7 +597,13 @@ end
 -- The warp-in: the Absolution slides out of the portal, bow first, slowly, decelerating; every part still behind the
 -- portal's plane is hidden (LocalTransparencyModifier), so it really comes out of it. After the snap its window
 -- lights come on from bow to stern.
-local function warpIn(folder, portal, shipFinal)
+-- After the barrage the ship turns, slowly and heavily, until its nose points (almost) at the keeper: so the beam
+-- leaves the bow instead of crossing the hull, and the player looks into the opened bow and the cannon.
+local TURN_FROM, TURN_TO = 41.6, 44.4
+local TURN_SHARE = 0.9 -- (of the way; the cannon's swivel does the rest)
+local TURN_MAX_PITCH = math.rad(25) -- (the nose dips at most this much)
+
+local function warpIn(folder, portal, shipFinal, ctx)
 	local template = game:GetService("ReplicatedStorage"):FindFirstChild("ShipModels")
 	template = template and template:FindFirstChild("Absolution")
 	if not template then
@@ -637,7 +652,17 @@ local function warpIn(folder, portal, shipFinal)
 		end
 		local u = math.clamp((T - EMERGE_FROM) / (EMERGE_TO - EMERGE_FROM), 0, 1)
 		local s = u < 0.15 and (u / 0.15) ^ 2 * 0.075 or 0.075 + (1 - (1 - (u - 0.15) / 0.85) ^ 1.5) * 0.925 -- (eases in, keeps coming slowly, settles gently)
-		ship:PivotTo(startCF + axis * travel * s)
+		local cf = startCF + axis * travel * s
+		local turn = smooth((T - TURN_FROM) / (TURN_TO - TURN_FROM))
+		if turn > 0 and ctx.keeper then
+			local to = ctx.keeper - cf.Position
+			local flat = Vector3.new(to.X, 0, to.Z)
+			local pitch = math.min(math.atan2(-to.Y, flat.Magnitude), TURN_MAX_PITCH)
+			local dir = flat.Unit * math.cos(pitch) - Vector3.new(0, math.sin(pitch), 0)
+			cf = cf:Lerp(CFrame.lookAt(cf.Position, cf.Position + dir), turn * TURN_SHARE)
+		end
+		ship:PivotTo(cf)
+		ctx.bow = (cf * CFrame.new(0, 0, -215)).Position -- (the camera follows the bow round)
 		for _, r in ipairs(rings) do
 			r.joint.Transform = CFrame.Angles(0, T * r.speed, 0)
 		end
@@ -992,6 +1017,359 @@ local function barrage(folder, ctx)
 end
 
 -- ============================================================
+-- Step 5: the main cannon (42 .. 46), the beam (46 .. 49.4), the gate falls (49.4)
+-- The keeper's side of it is HandsAnimator's FleetStrike behaviour (set locally here at the start).
+-- ============================================================
+local BOW_OPEN_FROM, BOW_OPEN_TO = 42.2, 43.8 -- the helmet bow's halves swing aside
+local CANNON_OUT_FROM, CANNON_OUT_TO = 43.4, 44.8 -- the cannon slides out and swivels onto the keeper
+local RINGS_SPIN_FROM, RINGS_LOCK_AT = 42.4, 45.0 -- the reactor rings spin up, then lock coaxial with the hull
+local CHARGE_FROM = 44.4 -- light and debris pulled into the muzzle
+local FIRE_AT = 46.0 -- the beam: into the keeper's raised hands and eyes ...
+local SWEEP_FROM = 47.6 -- ... then dragged down the outer wall ...
+local SWEEP_MID = 48.6
+local GATE_HIT = 49.4 -- ... onto the gate, which falls
+local BEAM_OFF = 50.3
+local BOW_OPEN_ANGLE = 0.62
+local CANNON_SLIDE = 30
+local WHITE = Color3.fromRGB(255, 255, 255)
+
+local function finale(folder, ctx)
+	local active = {}
+	local ship, rings, bowL, bowR, cannonJ, muzzle, core, coreHalo
+	local keeper, eyes = nil, {}
+	local saved -- (the keeper's attributes before the cutscene: restored at the end)
+	local hiddenGate = {}
+	local gateDone = false
+	local scorches = {}
+	local lastScorch
+
+	-- the keeper of this lane: the RealmHands model nearest the gate
+	local best
+	for _, m in ipairs(game:GetService("CollectionService"):GetTagged("RealmHands")) do
+		local d = (m:GetPivot().Position - ctx.gate).Magnitude
+		if not best or d < best then
+			best, keeper = d, m
+		end
+	end
+	if keeper then
+		saved = { kind = keeper:GetAttribute("SummonKind"), at = keeper:GetAttribute("SummonAt") }
+		keeper:SetAttribute("SummonKind", "FleetStrike")
+		keeper:SetAttribute("SummonAt", workspace:GetServerTimeNow()) -- (the cutscene starts now: its times are his)
+		for _, d in ipairs(keeper:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Eye" then
+				table.insert(eyes, d)
+			end
+		end
+	end
+	local function eyesPos()
+		if #eyes == 0 then
+			return keeper and keeper:GetPivot().Position + Vector3.new(0, 60, 0) or ctx.gate + Vector3.new(0, 80, 0)
+		end
+		local sum = Vector3.zero
+		for _, e in ipairs(eyes) do
+			sum += e.Position
+		end
+		return sum / #eyes
+	end
+	-- where the beam strikes first: his raised palms (between his two hands, which he holds up as a shield in front
+	-- of his eyes), a little towards his eyes
+	local wrists = {}
+	if keeper then
+		for _, name in ipairs({ "LWrist", "RWrist" }) do
+			local j = keeper:FindFirstChild(name, true)
+			if j and j:IsA("Motor6D") and j.Part1 then
+				table.insert(wrists, j.Part1)
+			end
+		end
+	end
+	local function keeperTarget()
+		if #wrists == 2 then
+			local palms = (wrists[1].Position + wrists[2].Position) / 2
+			return palms:Lerp(eyesPos(), 0.15)
+		end
+		return eyesPos() - ctx.M.LookVector * 10
+	end
+
+	local function findShip()
+		ship = folder:FindFirstChild("Absolution")
+		if not ship then return end
+		rings = {}
+		for _, name in ipairs({ "RingA", "RingB", "RingC" }) do
+			local j = ship:FindFirstChild(name, true)
+			if j and j:IsA("Motor6D") then
+				table.insert(rings, { joint = j, angle = 0, speed = 0 })
+			end
+		end
+		bowL = ship:FindFirstChild("BowL", true)
+		bowR = ship:FindFirstChild("BowR", true)
+		cannonJ = ship:FindFirstChild("Cannon", true)
+		muzzle = ship:FindFirstChild("CannonCore", true)
+		core = ship:FindFirstChild("Core", true)
+		coreHalo = ship:FindFirstChild("CoreHalo", true)
+	end
+
+	-- the charge at the muzzle: a swelling white-blue ball, light and motes pulled in from all round
+	local charge = newPart(folder, Vector3.one, WHITE, 1, Enum.PartType.Ball)
+	local chargeHalo = newPart(folder, Vector3.one, GLOW, 1, Enum.PartType.Ball)
+	local chargeLight = Instance.new("PointLight")
+	chargeLight.Color = GLOW
+	chargeLight.Range = 60
+	chargeLight.Brightness = 0
+	chargeLight.Shadows = false
+	chargeLight.Parent = charge
+	local pull = Instance.new("ParticleEmitter")
+	pull.Texture = SPARK
+	pull.Color = ColorSequence.new(GLOW_CORE, GLOW)
+	pull.LightEmission = 1
+	pull.Size = NumberSequence.new(1.6, 0.2)
+	pull.Lifetime = NumberRange.new(0.5, 0.8)
+	pull.Speed = NumberRange.new(40, 60)
+	pull.Shape = Enum.ParticleEmitterShape.Sphere
+	pull.ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward
+	pull.Rate = 0
+	pull.Parent = charge
+	-- the beam: a white core in a cold blue sheath, a flare at the muzzle, a burning spot where it strikes
+	local beamCore = newPart(folder, Vector3.new(4, 4, 1), WHITE, 1)
+	local beamSheath = newPart(folder, Vector3.new(10, 10, 1), GLOW, 1)
+	local beamOuter = newPart(folder, Vector3.new(18, 18, 1), GLOW_DEEP, 1)
+	local strike = newPart(folder, Vector3.one, WHITE, 1, Enum.PartType.Ball)
+	local strikeLight = Instance.new("PointLight")
+	strikeLight.Color = GLOW
+	strikeLight.Range = 70
+	strikeLight.Brightness = 0
+	strikeLight.Shadows = false
+	strikeLight.Parent = strike
+	local strikeSparks = Instance.new("ParticleEmitter")
+	strikeSparks.Texture = SPARK
+	strikeSparks.Color = ColorSequence.new(WHITE, GLOW)
+	strikeSparks.LightEmission = 1
+	strikeSparks.Size = NumberSequence.new(1.2, 0)
+	strikeSparks.Lifetime = NumberRange.new(0.4, 0.9)
+	strikeSparks.Speed = NumberRange.new(40, 80)
+	strikeSparks.SpreadAngle = Vector2.new(180, 180)
+	strikeSparks.Acceleration = Vector3.new(0, -60, 0)
+	strikeSparks.Rate = 0
+	strikeSparks.Parent = strike
+
+	-- the gate falling (preview: hidden on this screen only; the real break comes with the gameplay step)
+	local function breakGate()
+		gateDone = true
+		local box = CFrame.lookAt(ctx.gate, ctx.gate + ctx.M.LookVector) * CFrame.new(0, 7, -4)
+		local params = OverlapParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local exclude = { folder }
+		local char = game:GetService("Players").LocalPlayer.Character
+		if char then table.insert(exclude, char) end
+		for _, m in ipairs(game:GetService("CollectionService"):GetTagged("ProceduralUnit")) do
+			table.insert(exclude, m)
+		end
+		params.FilterDescendantsInstances = exclude
+		for _, p in ipairs(workspace:GetPartBoundsInBox(box, Vector3.new(36, 26, 12), params)) do
+			if p.Size.Magnitude < 80 and p.Position.Y > ctx.gate.Y - 3.2 and p.LocalTransparencyModifier < 1 then
+				table.insert(hiddenGate, p)
+				p.LocalTransparencyModifier = 1
+			end
+		end
+		-- the blast and the stone thrown out of it
+		for k = 1, 4 do
+			blast(folder, active, ctx.gate + ctx.M.RightVector * ((k - 2.5) * 7) + Vector3.new(0, 4 + (k % 2) * 6, 0), 4.5, k % 2 == 0 and HOT or GLOW_CORE)
+		end
+		for k = 1, 34 do
+			local size = 1 + math.random() * 2.6
+			local p = newPart(folder, Vector3.new(size, size * (0.6 + math.random() * 0.6), size), Color3.fromRGB(96, 92, 100), 0)
+			p.Material = Enum.Material.Slate
+			local pos = ctx.gate + ctx.M.RightVector * ((math.random() - 0.5) * 30) + Vector3.new(0, math.random() * 16, 0)
+			local vel = -ctx.M.LookVector * (10 + math.random() * 30) + ctx.M.LookVector * (math.random() * 20)
+				+ ctx.M.RightVector * ((math.random() - 0.5) * 40) + Vector3.new(0, 18 + math.random() * 34, 0)
+			local spin = Vector3.new(math.random(), math.random(), math.random()) * 6
+			local t0, last = os.clock(), os.clock()
+			local floorY = ctx.gate.Y - 4
+			table.insert(active, function(now)
+				local st = now - t0
+				local dt = math.min(now - last, 1 / 20)
+				last = now
+				if st > 4 then
+					p:Destroy()
+					return false
+				end
+				vel += Vector3.new(0, -70, 0) * dt
+				pos += vel * dt
+				if pos.Y < floorY + size / 2 then
+					pos = Vector3.new(pos.X, floorY + size / 2, pos.Z)
+					vel = Vector3.new(vel.X * 0.5, math.abs(vel.Y) * 0.25, vel.Z * 0.5)
+				end
+				p.CFrame = CFrame.new(pos) * CFrame.Angles(spin.X * st, spin.Y * st, spin.Z * st)
+				p.Transparency = smooth((st - 3) / 1)
+				return true
+			end)
+		end
+		local dustPart = newPart(folder, Vector3.one, WHITE, 1)
+		dustPart.CFrame = CFrame.new(ctx.gate + Vector3.new(0, -2, 0))
+		local dust = Instance.new("ParticleEmitter")
+		dust.Texture = SMOKE
+		dust.Color = ColorSequence.new(Color3.fromRGB(110, 102, 98), Color3.fromRGB(70, 64, 62))
+		dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 6), NumberSequenceKeypoint.new(1, 18) })
+		dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+		dust.Lifetime = NumberRange.new(2, 3.2)
+		dust.Speed = NumberRange.new(20, 40)
+		dust.Drag = 2.5
+		dust.Shape = Enum.ParticleEmitterShape.Disc
+		dust.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
+		dust.EmissionDirection = Enum.NormalId.Top
+		dust.Rotation = NumberRange.new(0, 360)
+		dust.RotSpeed = NumberRange.new(-30, 30)
+		dust.Enabled = false
+		dust.Parent = dustPart
+		dust:Emit(60)
+	end
+
+	local lastT
+	ctx.finaleShake = 0
+	return function(T)
+		local now = os.clock()
+		local dt = lastT and math.max(0, T - lastT) or 0
+		lastT = T
+		if not ship then
+			if T < BOW_OPEN_FROM - 2 then return end
+			findShip()
+			if not ship then return end
+		end
+		local root = ship.PrimaryPart.CFrame
+		local function e(a, b)
+			return smooth((T - a) / (b - a))
+		end
+
+		-- the bow opens: the helmet's halves swing aside round their hinges at the back
+		local open = e(BOW_OPEN_FROM, BOW_OPEN_TO)
+		if bowL and bowR then
+			bowL.Transform = CFrame.Angles(0, BOW_OPEN_ANGLE * open, 0)
+			bowR.Transform = CFrame.Angles(0, -BOW_OPEN_ANGLE * open, 0)
+		end
+
+		-- the target the cannon tracks: the keeper, then the sweep down the outer wall onto the gate
+		local kTarget = keeperTarget()
+		local wallPoint = (keeper and keeper:GetPivot().Position or kTarget) - Vector3.new(0, 18, 0) - ctx.M.LookVector * 2
+		local gatePoint = ctx.gate + Vector3.new(0, 6, 0)
+		local target = kTarget
+		if T >= SWEEP_FROM then
+			local f1 = e(SWEEP_FROM, SWEEP_MID)
+			local f2 = math.clamp((T - SWEEP_MID) / (GATE_HIT - SWEEP_MID), 0, 1) ^ 1.4
+			target = kTarget:Lerp(wallPoint, f1):Lerp(gatePoint, f2)
+		end
+
+		-- the cannon: slides out of the opened bow, then swivels onto the target
+		if cannonJ then
+			local slide = e(CANNON_OUT_FROM, CANNON_OUT_TO)
+			local base = cannonJ.Part0.CFrame * cannonJ.C0
+			local localDir = base:VectorToObjectSpace((target - (base * CFrame.new(0, 0, -CANNON_SLIDE * slide)).Position).Unit)
+			local aim = CFrame.lookAt(Vector3.zero, localDir)
+			local swivel = e(CANNON_OUT_TO - 0.4, CANNON_OUT_TO + 0.8)
+			cannonJ.Transform = CFrame.new(0, 0, -CANNON_SLIDE * slide) * CFrame.new():Lerp(aim, swivel)
+		end
+
+		-- the reactor: the rings spin up faster and faster, then lock coaxial with the hull (a target of rings round
+		-- the core); the core flares with the charge
+		if rings and T >= RINGS_SPIN_FROM then
+			local lock = e(RINGS_LOCK_AT, RINGS_LOCK_AT + 0.6)
+			for i, r in ipairs(rings) do
+				r.speed = 0.3 + 7 * e(RINGS_SPIN_FROM, RINGS_LOCK_AT - 0.3)
+				r.angle += dt * r.speed * (i == 2 and -1 or 1) * (1 - lock)
+				local j = r.joint
+				local wantY = j.C0.Rotation:Inverse() * Vector3.new(0, 0, 1) -- (the hull's axis, in the ring's frame)
+				local axis = Vector3.new(0, 1, 0):Cross(wantY)
+				local align = axis.Magnitude > 1e-4 and CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(wantY.Y, -1, 1))) or CFrame.new()
+				j.Transform = CFrame.new():Lerp(align, lock) * CFrame.Angles(0, r.angle, 0)
+			end
+		end
+		if core and coreHalo and T >= CHARGE_FROM then
+			local flare = e(CHARGE_FROM, FIRE_AT) * (1 - e(BEAM_OFF, BEAM_OFF + 1))
+			coreHalo.Transparency = math.max(0.3, coreHalo.Transparency - 0.4 * flare)
+		end
+
+		-- the charge at the muzzle
+		local mz = muzzle and muzzle.Position or (root * CFrame.new(0, 0, -200)).Position
+		local ch = e(CHARGE_FROM, FIRE_AT)
+		local firing = T >= FIRE_AT and T < BEAM_OFF
+		if T >= CHARGE_FROM and T < BEAM_OFF then
+			local size = 4 + 14 * ch + (firing and 6 or 0)
+			charge.Size = Vector3.one * size
+			chargeHalo.Size = Vector3.one * size * 1.8
+			charge.CFrame, chargeHalo.CFrame = CFrame.new(mz), CFrame.new(mz)
+			charge.Transparency = 0.1
+			chargeHalo.Transparency = 0.6
+			chargeLight.Brightness = 2 + 6 * ch
+			pull.Rate = firing and 0 or 80 * ch
+		else
+			charge.Transparency, chargeHalo.Transparency = 1, 1
+			chargeLight.Brightness = 0
+			pull.Rate = 0
+		end
+
+		-- the beam
+		if firing then
+			local len = (target - mz).Magnitude
+			local cf = CFrame.lookAt(mz, target) * CFrame.new(0, 0, -len / 2)
+			local burst = 1 + 0.6 * math.max(0, 1 - (T - FIRE_AT) / 0.3) -- (it slams out wide, then settles)
+			local fade = 1 - e(GATE_HIT + 0.3, BEAM_OFF)
+			local flick = 0.9 + math.random() * 0.1
+			beamCore.Size = Vector3.new(4 * burst * fade * flick + 0.1, 4 * burst * fade * flick + 0.1, len)
+			beamSheath.Size = Vector3.new(10 * burst * fade + 0.2, 10 * burst * fade + 0.2, len)
+			beamOuter.Size = Vector3.new(18 * burst * fade + 0.3, 18 * burst * fade + 0.3, len)
+			beamCore.CFrame, beamSheath.CFrame, beamOuter.CFrame = cf, cf, cf
+			beamCore.Transparency = 0
+			beamSheath.Transparency = 0.35
+			beamOuter.Transparency = 0.75
+			strike.Size = Vector3.one * (8 + 6 * burst) * fade
+			strike.CFrame = CFrame.new(target)
+			strike.Transparency = 0.05
+			strikeLight.Brightness = 6 * fade
+			strikeSparks.Rate = 160 * fade
+			ctx.finaleShake = math.max(ctx.finaleShake, 0.45 * fade)
+			-- a glowing scar left along the sweep down the outer wall, cooling
+			if T >= SWEEP_FROM and T < GATE_HIT and (not lastScorch or (target - lastScorch).Magnitude > 3) then
+				local from = lastScorch or target
+				local s = newPart(folder, Vector3.new(3.2, 3.2, math.max(0.5, (target - from).Magnitude)), HOT, 0)
+				s.CFrame = CFrame.lookAt((from + target) / 2, target)
+				table.insert(scorches, { part = s, at = now })
+				lastScorch = target
+			end
+		else
+			beamCore.Transparency, beamSheath.Transparency, beamOuter.Transparency = 1, 1, 1
+			strike.Transparency = 1
+			strikeLight.Brightness = 0
+			strikeSparks.Rate = 0
+		end
+		for _, sc in ipairs(scorches) do
+			local age = now - sc.at
+			sc.part.Color = HOT:Lerp(Color3.fromRGB(30, 22, 20), math.clamp(age / 2.5, 0, 1))
+			sc.part.Transparency = smooth((age - 3) / 2)
+		end
+
+		-- the gate falls
+		if not gateDone and T >= GATE_HIT then
+			breakGate()
+			ctx.finaleShake = 1.2
+		end
+		ctx.finaleShake = math.max(0, ctx.finaleShake - dt * 0.9)
+		for i = #active, 1, -1 do
+			if not active[i](now) then
+				table.remove(active, i)
+			end
+		end
+	end, function()
+		for _, p in ipairs(hiddenGate) do
+			if p.Parent then
+				p.LocalTransparencyModifier = 0
+			end
+		end
+		if keeper and keeper.Parent and saved then
+			keeper:SetAttribute("SummonKind", saved.kind)
+			keeper:SetAttribute("SummonAt", saved.at)
+		end
+	end
+end
+
+-- ============================================================
 -- Play
 -- ============================================================
 function FleetStrike.play(opts)
@@ -1029,6 +1407,26 @@ function FleetStrike.play(opts)
 	local toTear = ctx.sky - axis * 250 - M.Position
 	ctx.D = Vector3.new(toTear.X, 0, toTear.Z).Unit
 	ctx.portal = CFrame.lookAt(ctx.sky - axis * 250, ctx.sky)
+	ctx.bow = (ctx.shipCF * CFrame.new(0, 0, -215)).Position
+	-- the realm keeper's eyes (the beam's first target), for the camera; the keeper nearest the gate
+	ctx.keeper = gate + Vector3.new(0, 80, 0)
+	do
+		local bestD
+		for _, k in ipairs(CollectionService:GetTagged("RealmHands")) do
+			local d = (k:GetPivot().Position - gate).Magnitude
+			if not bestD or d < bestD then
+				bestD = d
+				local sum, n = Vector3.zero, 0
+				for _, part in ipairs(k:GetDescendants()) do
+					if part:IsA("BasePart") and part.Name == "Eye" then
+						sum += part.Position
+						n += 1
+					end
+				end
+				ctx.keeper = n > 0 and sum / n or k:GetPivot().Position + Vector3.new(0, 60, 0)
+			end
+		end
+	end
 
 	-- ── Malak's beats: his poses (UnitAnimator), the effects, the army (server) ──
 	local scale = malak:GetScale()
@@ -1036,10 +1434,11 @@ function FleetStrike.play(opts)
 	fxFolder.Name = "FleetStrikeFx"
 	fxFolder.Parent = workspace
 	local tearUpdate, tearCleanup = skyTear(fxFolder, ctx.portal)
-	local warpUpdate, warpCleanup = warpIn(fxFolder, ctx.portal, ctx.shipCF)
+	local warpUpdate, warpCleanup = warpIn(fxFolder, ctx.portal, ctx.shipCF, ctx)
+	local finaleUpdate, finaleCleanup = finale(fxFolder, ctx)
 	local effects = { runePanel(fxFolder, malak, scale), transmitter(fxFolder, malak, scale), tearUpdate, warpUpdate,
-		barrage(fxFolder, ctx) }
-	local cleanups = { tearCleanup, warpCleanup }
+		barrage(fxFolder, ctx), finaleUpdate }
+	local cleanups = { tearCleanup, warpCleanup, finaleCleanup }
 	malak:SetAttribute("FleetStart", os.clock()) -- (client-only: drives his poses in UnitAnimator's Envoy block)
 	local devRemote = RunService:IsStudio() and game:GetService("ReplicatedStorage"):FindFirstChild("DevFleetStrike")
 	if devRemote then
@@ -1181,7 +1580,7 @@ function FleetStrike.play(opts)
 		camera.CFrame = CFrame.lookAt(pos, look)
 		camera.FieldOfView = fov
 		-- impacts on the gate shake the camera a little
-		local shake = ctx.barrageShake and ctx.barrageShake() or 0
+		local shake = math.max(ctx.barrageShake and ctx.barrageShake() or 0, ctx.finaleShake or 0)
 		if shake > 0 then
 			local tt = os.clock() * 37
 			camera.CFrame *= CFrame.new(math.sin(tt) * shake * 0.5, math.sin(tt * 1.3 + 1) * shake * 0.5, 0)

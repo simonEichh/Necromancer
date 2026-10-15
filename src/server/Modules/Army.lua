@@ -876,13 +876,59 @@ local FINISHER_FLEE_SPEED = 1.7
 
 -- Starts (or, with on = false, ends) a finisher cutscene on the plot (see the `finisher` block in update). `unit` is the
 -- Sovereign's entry (he stays put); fleeAt / length in seconds from now.
+-- The cutscene's camera flies to the lane's end (the gate, the keeper behind the outer wall) while the owner's character
+-- may stand far away (the plaza): with StreamingEnabled those parts might not be loaded on their client. So while a
+-- finisher runs the owner's streaming focus (Player.ReplicationFocus) is a point at the gate, and the server asks for
+-- the area round it at once; it goes back to the character when the finisher ends.
+local function setFinisherFocus(plotState, on)
+	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
+	if plotState.finisherFocus then
+		plotState.finisherFocus:Destroy()
+		plotState.finisherFocus = nil
+	end
+	if not owner then
+		return
+	end
+	if not on then
+		if owner.ReplicationFocus == nil or not owner.ReplicationFocus.Parent then
+			owner.ReplicationFocus = nil
+		end
+		return
+	end
+	local at = PlotFrame.toWorld(plotState, 0, plotState.wallFaceFwd) + Vector3.new(0, 20, 0)
+	local focus = Instance.new("Part")
+	focus.Name = "FinisherFocus"
+	focus.Anchored = true
+	focus.CanCollide, focus.CanQuery, focus.CanTouch = false, false, false
+	focus.Transparency = 1
+	focus.Size = Vector3.one
+	focus.Position = at
+	focus.Parent = workspace
+	plotState.finisherFocus = focus
+	owner.ReplicationFocus = focus
+	task.spawn(function()
+		pcall(function()
+			owner:RequestStreamAroundAsync(at, 5)
+		end)
+	end)
+end
+
 local function startFinisher(plotState, unit, fleeAt, length, on)
 	if on == false then
 		plotState.finisher = nil
+		setFinisherFocus(plotState, false)
 		return
 	end
 	local start = workspace:GetServerTimeNow()
-	plotState.finisher = { start = start, fleeAt = fleeAt, untilT = start + length, unit = unit }
+	local finisher = { start = start, fleeAt = fleeAt, untilT = start + length, unit = unit }
+	plotState.finisher = finisher
+	setFinisherFocus(plotState, true)
+	-- (the focus goes back when it runs out, even if nobody ends it)
+	task.delay(length + 1, function()
+		if plotState.finisher == finisher then
+			setFinisherFocus(plotState, false)
+		end
+	end)
 end
 
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.

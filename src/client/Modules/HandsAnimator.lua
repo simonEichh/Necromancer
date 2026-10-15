@@ -22,6 +22,11 @@
 --               battlements; the eyes open
 --   Waiting / Enter   a player's first visit: closed rifts and dark eyes until the owner steps onto the plot, then
 --               the Return, a little slower
+--   FleetStrike (Malak's finisher, client FleetStrike.lua sets SummonKind / SummonAt LOCALLY at the cutscene's start;
+--               its times are the cutscene's): he notices the ship during the scan (eyes red, hands tense), the barrage
+--               makes his hands shudder, he raises both hands high as a shield as the cannon charges, the beam slams
+--               into his palms (his eyes flinch shut, he recoils), and when the gate falls he is DRIVEN BACK (not killed:
+--               he is the secret world boss): dragged into the rifts, which close; his eyes dim
 -- The effects (dust, shake, tremor, threads) are small copies of Modules/TitanAnimator's (kept for the world boss).
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
@@ -80,7 +85,7 @@ end
 -- Behaviour timelines: per hand lift (deg, round the rift), back (studs into the rift), wrist (deg), clench (0..1),
 -- weave (0..1, left hand only); plus the rifts' scale and the eyes' anger / darkness
 -- ============================================================
-local LENGTH = { SlamWeave = 10.4, Return = 7.6, Enter = 8.8 }
+local LENGTH = { SlamWeave = 10.4, Return = 7.6, Enter = 8.8, FleetStrike = 56 }
 local HOLD = { Defeat = true, Waiting = true }
 
 local TL = {
@@ -120,6 +125,20 @@ local TL = {
 		wrist = { { 0, -20 }, { 5.2, -10 }, { 7.2, 0 } },
 		clench = { { 0, 1 }, { 5.2, 0.6 }, { 7.0, 0 } },
 		dark = { { 0, 1 }, { 3.4, 1 }, { 4.4, 0 } },
+	},
+	-- (times = Fleet Strike cutscene times: scan 31, barrage 38, cannon 42, beam 46, gate falls 49.4)
+	FleetStrike = {
+		anger = { { 0, 0 }, { 31.2, 0 }, { 32.6, 1 } },
+		clench = { { 0, 0 }, { 31.6, 0 }, { 32.8, 0.5 }, { 43.6, 0.5 }, { 44.6, 0 }, { 47.6, 0.25 }, { 49.8, 0.7 } },
+		lift = { { 0, 0 }, { 31.6, 0 }, { 32.8, 5 }, { 38.6, 5 }, { 39.4, 11 }, { 43.2, 11 }, { 45.2, 58 }, { 45.9, 62 },
+			{ 46.3, 54 }, { 47.6, 50 }, { 49.6, 22 }, { 51.6, 14 } },
+		wrist = { { 0, 0 }, { 31.6, 0 }, { 32.8, -6 }, { 43.2, -6 }, { 45.2, -38 }, { 45.9, -50 }, { 46.3, -36 },
+			{ 47.6, -40 }, { 49.6, -18 }, { 51.6, -30 } },
+		back = { { 0, 0 }, { 46.0, 0 }, { 46.4, 7 }, { 47.6, 5 }, { 49.8, 5 }, { 52.0, RETRACT, "in" } },
+		rift = { { 0, 1 }, { 51.8, 1 }, { 52.8, RIFT_CLOSED, "in" } },
+		squint = { { 0, 0 }, { 46.0, 0 }, { 46.15, 1 }, { 48.6, 1 }, { 49.2, 0.4 }, { 52.6, 0.4 } },
+		dark = { { 0, 0 }, { 50.0, 0 }, { 53.0, 0.85 } },
+		shudder = { { 0, 0 }, { 38.2, 0 }, { 38.7, 0.5 }, { 42, 0.5 }, { 43, 0 }, { 46.0, 0 }, { 46.2, 1 }, { 49.8, 1 }, { 51, 0.3 } },
 	},
 	Waiting = {
 		rift = { { 0, RIFT_CLOSED }, { 1, RIFT_CLOSED } },
@@ -627,6 +646,7 @@ RunService.RenderStepped:Connect(function()
 		if anger > 0 then
 			open = math.max(open, 1) * (1 + 0.25 * anger) -- (wide open with anger)
 		end
+		open *= 1 - 0.85 * v("squint", 0) -- (flinching shut: the Fleet Strike's beam)
 		local look = Vector3.zero
 		if hrp then
 			local lp = pivot:PointToObjectSpace(hrp.Position)
