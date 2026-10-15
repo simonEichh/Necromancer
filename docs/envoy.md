@@ -65,7 +65,13 @@ window lights run bow to stern; the reactor rings turn, the core pulses; haze th
 to the gate, red scan fan + scan line, five reticles lock) and barrage from 38 s (main salvos, tracers, 12 missiles,
 fire and smoke on the gate, camera shake). The camera is ONE continuous path through keyframes (`KEYS`, monotone
 Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: 5. main cannon (bow
-opens, cannon swivels to the gate, rings spin up and lock), beam, the gate breaks. 6. ending, the ship lingers and warps
+opens, cannon swivels to the gate, rings spin up and lock), beam, the gate breaks. IDEA (user, 2026-10-15): the final
+shot also strikes the realm keeper (his hands + eyes behind the gate, `HandsAnimator`). He is NOT killed: he is the
+secret world boss, so he is wounded and DRIVEN BACK (his existing Defeat: dragged into the rifts reads as a retreat).
+He notices the ship during the scan (eyes turn red, hands tense), the barrage also hits his hands; the cannon aims at
+him first (the gate is low, he is high above the outer wall: one straight beam cannot hit both): he raises both hands in
+front of his eyes, the beam slams into his palms, his eyes flinch shut, he recoils; still firing, the beam drags down the
+outer wall onto the gate and cuts it apart; the gate falls and he withdraws into the rifts (chosen: the sweep). 6. ending, the ship lingers and warps
 out, the army returns. 7. gameplay (trigger at 20% gate HP, gems unlock, settings toggle, view for other players).
 8. sound.
 
