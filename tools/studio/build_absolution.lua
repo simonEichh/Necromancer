@@ -148,8 +148,9 @@ local function blade(to, name, cf, w, L, t, opts)
 		deco(to, name .. "Lining", Vector3.new(w * 0.86, body * 0.95, t * 0.4), cf * CFrame.new(0, body / 2, -t * 0.65), VIOLET)
 	end
 	for _, s in ipairs({ -1, 1 }) do
-		deco(to, name .. "Edge", Vector3.new(e, body, t + e * 0.5), cf * CFrame.new(s * (w / 2 - e / 2), body / 2, 0), SILVER)
-		deco(to, name .. "TipEdge", Vector3.new(e, d, t + e * 0.5), cf * CFrame.new(s * w / 4, body + w / 4, 0) * CFrame.Angles(0, 0, s * math.rad(45)), SILVER)
+		-- (the silver edges stand PROUD of the plate and stop short of its ends: faces in one plane flicker)
+		deco(to, name .. "Edge", Vector3.new(e, body - 0.3, t + e * 0.5), cf * CFrame.new(s * (w / 2 - e / 2 + 0.12), body / 2, 0), SILVER)
+		deco(to, name .. "TipEdge", Vector3.new(e, d - 0.3, t + e * 0.5), cf * CFrame.new(s * w / 4, body + w / 4, 0) * CFrame.Angles(0, 0, s * math.rad(45)) * CFrame.new(s * 0.12, 0, 0), SILVER)
 	end
 	local side = opts.seamSide or 1
 	glow(to, name .. "Seam", Vector3.new(e * 1.6, body * 0.8, 0.3), cf * CFrame.new(side * (w / 2 - e * 3), body * 0.48, t / 2 + 0.1))
@@ -191,7 +192,7 @@ deco(root, "AftDeck", Vector3.new(AW * 2 - 8, 3, 100), Vector3.new(0, AH + 1.5, 
 deco(root, "AftKeel", Vector3.new(AW * 2 - 9, 3, 100), Vector3.new(0, -AH - 1.5, 66), CHROME_LIGHT)
 -- the collars either side of the core, and the struts that carry the hull through it
 for _, z in ipairs({ -14, 14 }) do
-	deco(root, "CoreCollar", Vector3.new(36, 36, 4), Vector3.new(0, 0, z), CHROME_LIGHT)
+	deco(root, "CoreCollar", Vector3.new(36, 36.6, 4), Vector3.new(0, 0, z), CHROME_LIGHT) -- (a little taller than the aft hull: no shared faces)
 	deco(root, "CoreCollarRim", Vector3.new(38, 38, 1.2), Vector3.new(0, 0, z + (z < 0 and 2.2 or -2.2)), SILVER)
 	glow(root, "CoreCollarGlow", Vector3.new(30, 0.8, 0.6), Vector3.new(0, 12, z + (z < 0 and 2.6 or -2.6)), 0.2)
 end
@@ -218,7 +219,7 @@ for _, s in ipairs({ -1, 1 }) do
 	cyl(root, "Pipe", Vector3.new(s * (FW + 0.9), 4.6, -68), Vector3.new(0, 0, 1), 100, 1.4, SILVER_DARK)
 	cyl(root, "PipeThin", Vector3.new(s * (FW + 0.8), 3.2, -70), Vector3.new(0, 0, 1), 92, 0.8, CHROME_LIGHT)
 	deco(root, "ForeBelt", Vector3.new(2.4, 12, 102), CFrame.new(s * (FW + 1.4), -3, -68) * CFrame.Angles(0, 0, s * 0.14), CHROME_LIGHT)
-	deco(root, "ForeBeltEdge", Vector3.new(2.6, 0.8, 102), Vector3.new(s * (FW + 1.9), 3.1, -68), SILVER)
+	deco(root, "ForeBeltEdge", Vector3.new(2.6, 0.8, 101.4),Vector3.new(s * (FW + 1.9), 3.1, -68), SILVER)
 	for i = 0, 5 do
 		local z = -112 + i * 17
 		-- vents in the belt: a dark recess with a glowing slit
@@ -233,7 +234,7 @@ for _, s in ipairs({ -1, 1 }) do
 	windowRow(s * (AW + 0.25), 13, 20, 116, 5, 2.4, 0.05)
 	windowRow(s * (AW + 0.25), 10, 22, 114, 5, 2.4, 0.3)
 	deco(root, "AftBelt", Vector3.new(2.6, 14, 96), CFrame.new(s * (AW + 1.5), -7, 68) * CFrame.Angles(0, 0, s * 0.14), CHROME_LIGHT)
-	deco(root, "AftBeltEdge", Vector3.new(2.8, 0.9, 96), Vector3.new(s * (AW + 2), 0.2, 68), SILVER)
+	deco(root, "AftBeltEdge", Vector3.new(2.8, 0.9, 95.4),Vector3.new(s * (AW + 2), 0.2, 68), SILVER)
 	for i = 0, 4 do
 		local z = 26 + i * 20
 		deco(root, "Vent", Vector3.new(0.6, 5, 8), Vector3.new(s * (AW + 2.9), -8, z), DARK)
@@ -281,7 +282,7 @@ local function turret(pos, up, size)
 		bar(h, "TurretBarrel", a, b, 0.6 * k, 0.6 * k, CHROME)
 		deco(h, "TurretMuzzle", Vector3.new(0.9 * k, 0.9 * k, 1.2 * k), CFrame.lookAt(b, b + (b - a)), SILVER)
 	end
-	glow(h, "TurretSight", Vector3.new(0.5 * k, 0.5 * k, 0.3 * k), hcf * CFrame.new(1.6 * k, 2 * k, -2.5 * k), 0)
+	glow(h, "TurretSight", Vector3.new(0.5 * k, 0.5 * k, 0.3 * k), hcf * CFrame.new(1.5 * k, 2.45 * k, -2.75 * k), 0) -- (on top of the mantlet, not sunk in it)
 	return h
 end
 
@@ -301,7 +302,7 @@ local function mainTurret(pos, up, size, barbette, yaw)
 	local hcf = h.CFrame
 	deco(h, "MainHousing", Vector3.new(13 * k, 5.5 * k, 15 * k), hcf * CFrame.new(0, 2.75 * k, 1.5 * k), CHROME)
 	deco(h, "MainHousingTop", Vector3.new(11 * k, 1.2 * k, 12 * k), hcf * CFrame.new(0, 6 * k, 2.2 * k), CHROME_LIGHT)
-	deco(h, "MainGlacis", Vector3.new(13 * k, 1.4 * k, 7 * k), hcf * CFrame.new(0, 4.6 * k, -7 * k) * CFrame.Angles(-0.45, 0, 0), CHROME_LIGHT)
+	deco(h, "MainGlacis", Vector3.new(12.6 * k, 1.4 * k, 7 * k), hcf * CFrame.new(0, 4.6 * k, -7 * k) * CFrame.Angles(-0.45, 0, 0), CHROME_LIGHT)
 	deco(h, "MainRear", Vector3.new(12 * k, 4.4 * k, 3 * k), hcf * CFrame.new(0, 2.6 * k, 10 * k), CHROME_LIGHT)
 	for _, s in ipairs({ -1, 1 }) do
 		deco(h, "MainCheek", Vector3.new(1 * k, 5 * k, 14 * k), hcf * CFrame.new(s * 6.8 * k, 2.6 * k, 1.5 * k) * CFrame.Angles(0, 0, s * 0.18), SILVER_DARK)
@@ -399,7 +400,7 @@ for _, s in ipairs({ -1, 1 }) do
 	bar(h, "BowChin", Vector3.new(s * 0.7, CHIN.Y - 0.6, CHIN.Z - 1.5), Vector3.new(s * 0.7, CHIN.Y - 10, CHIN.Z + 24), 1.8, 3.8, CHROME)
 	bar(h, "BowLip", Vector3.new(s * 1.8, BROW.Y + 0.7, BROW.Z - 0.3), Vector3.new(s * 1.8, CHIN.Y - 0.7, CHIN.Z - 0.3), 1.3, 1.8, SILVER)
 	bar(h, "BowSlit", Vector3.new(s * 0.5, BROW.Y - 1.5, BROW.Z - 0.9), Vector3.new(s * 0.5, CHIN.Y + 1.5, CHIN.Z - 0.9), 1, 1, GLOW_CORE, NEON)
-	local sg = bar(h, "BowSlitGlow", Vector3.new(s * 1.2, BROW.Y - 0.8, BROW.Z - 0.6), Vector3.new(s * 1.2, CHIN.Y + 0.8, CHIN.Z - 0.6), 2.6, 0.6, GLOW, NEON)
+	local sg = bar(h, "BowSlitGlow", Vector3.new(s * 1.2, BROW.Y - 0.8, BROW.Z - 0.5), Vector3.new(s * 1.2, CHIN.Y + 0.8, CHIN.Z - 0.5), 2.6, 0.6, GLOW, NEON)
 	sg.Transparency = 0.45
 	bar(h, "BowCheek", Vector3.new(s * 3.8, 8, -170), Vector3.new(s * 20.5, 12, BOW_BACK - 1), 1.3, 2, SILVER)
 	bar(h, "BowCheekLow", Vector3.new(s * 3.8, -9, -183), Vector3.new(s * 20, -13.5, BOW_BACK - 1), 1.3, 2, SILVER_DARK)
@@ -438,14 +439,15 @@ do
 		local cy = y + l.h / 2
 		deco(root, "BridgeLevel" .. i, Vector3.new(l.w, l.h, l.d), Vector3.new(0, cy, l.z), i % 2 == 1 and CHROME or CHROME_LIGHT)
 		-- the sloped front face and the silver lip along the top edge
-		deco(root, "BridgeFront" .. i, Vector3.new(l.w - 1, l.h * 1.05, 2), CFrame.new(0, cy, l.z - l.d / 2 - 0.4) * CFrame.Angles(-0.3, 0, 0), CHROME_LIGHT)
+		local frontCf = CFrame.new(0, cy, l.z - l.d / 2 - 0.4) * CFrame.Angles(-0.3, 0, 0)
+		deco(root, "BridgeFront" .. i, Vector3.new(l.w - 1, l.h * 1.05, 2), frontCf, CHROME_LIGHT)
 		deco(root, "BridgeLip" .. i, Vector3.new(l.w + 0.6, 0.6, l.d + 0.6), Vector3.new(0, y + l.h + 0.1, l.z), SILVER)
 		-- the window band round the level: front and both sides
 		local wy = cy + l.h * 0.12
-		glow(root, "BridgeWindows" .. i, Vector3.new(l.w * 0.8, 1, 0.4), CFrame.new(0, wy, l.z - l.d / 2 - 1.5) * CFrame.Angles(-0.3, 0, 0), i == #LEVELS and 0 or 0.1)
+		glow(root, "BridgeWindows" .. i, Vector3.new(l.w * 0.8, 1, 0.4), frontCf * CFrame.new(0, l.h * 0.12, -1.15), i == #LEVELS and 0 or 0.1)
 		for _, s in ipairs({ -1, 1 }) do
 			glow(root, "BridgeWindowsSide" .. i, Vector3.new(0.4, 0.8, l.d * 0.8), Vector3.new(s * (l.w / 2 + 0.15), wy, l.z), 0.15)
-			deco(root, "BridgeFin" .. i, Vector3.new(0.8, l.h * 0.9, l.d * 0.6), CFrame.new(s * (l.w / 2 + 0.5), cy, l.z + l.d * 0.1) * CFrame.Angles(0, 0, s * -0.1), SILVER_DARK)
+			deco(root, "BridgeFin" .. i, Vector3.new(0.8, l.h * 0.9, l.d * 0.6), CFrame.new(s * (l.w / 2 + 0.5), cy, l.z + l.d * 0.1 - 0.4) * CFrame.Angles(0, 0, s * -0.1), SILVER_DARK)
 		end
 		y += l.h
 	end
@@ -527,7 +529,7 @@ local function greatRing(name, frame, r, n, radial, height)
 		local a = k / 6 * math.pi * 2
 		local at = frame * CFrame.Angles(0, -a, 0) * CFrame.new(r + radial / 2 + 0.6, 0, 0)
 		deco(h, name .. "Stud", Vector3.new(radial * 0.4, height * 0.7, radial * 0.9), at, SILVER)
-		glow(h, name .. "StudGlow", Vector3.new(0.6, height * 0.4, 1.8), at * CFrame.new(0.6, 0, 0))
+		glow(h, name .. "StudGlow", Vector3.new(0.8, height * 0.4, 1.8), at * CFrame.new(0.6, 0, 0))
 	end
 	return h
 end
