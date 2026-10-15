@@ -18,6 +18,7 @@
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
+local Sfx = require(script.Parent.Sfx)
 
 local TAG = "ProceduralUnit"
 local BOARD_AT = 0.5
@@ -27,14 +28,15 @@ local LOCK_AT = 2.8
 local TAP_AT = 3.05 -- (= the press in UnitAnimator's Envoy block)
 local FIRE_AT = 3.1
 local IMPACT_AT = 3.9 -- (= Units.Malak.hitDelay; the shell takes 0.8 s to come down)
+local IMPACT_SOUND_LEAD = 0.2 -- the impact sound is started this much before the hit
 local ANTICIPATE = 0.22 -- right before the impact the reticle collapses to a point and the laser goes thin and white
 local MAX_DISTANCE = 260
 -- Where the ship hangs that fires the laser and the shell (relative to the spot on the wall): high up, far off to the
 -- side of the lane and a little out in front of the wall face, so the laser cuts DIAGONALLY across the sky onto the
 -- front of the wall (seen from the army it comes from the sky ahead and to the side, never from behind the unit, and
 -- it clears the top of the wall)
-local SKY_HEIGHT = 110
-local SKY_SIDE = 75
+local SKY_HEIGHT = 380 -- (the Absolution, out of sight: as high and far as it hangs in the Fleet Strike)
+local SKY_SIDE = 420
 local SKY_FORWARD = 18
 
 local RED = Color3.fromRGB(255, 40, 40)
@@ -87,9 +89,9 @@ end
 local function laser(aim, origin, normal, t0)
 	local beam = newPart(Vector3.new(0.07, 0.07, 1), RED_CORE)
 	local glow = newPart(Vector3.new(0.3, 0.3, 1), RED, 0.6)
-	local glint = newPart(Vector3.one * 2.2, RED_CORE, 1, Enum.PartType.Ball)
+	local glint = newPart(Vector3.one * 7, RED_CORE, 1, Enum.PartType.Ball)
 	glint.CFrame = CFrame.new(origin)
-	local glintHalo = newPart(Vector3.one * 6, RED, 1, Enum.PartType.Ball)
+	local glintHalo = newPart(Vector3.one * 20, RED, 1, Enum.PartType.Ball)
 	glintHalo.CFrame = CFrame.new(origin)
 	local dot = newPart(Vector3.one * 0.35, RED_CORE, 0, Enum.PartType.Ball)
 	local dotGlow = newPart(Vector3.one * 0.9, RED, 0.55, Enum.PartType.Ball)
@@ -117,7 +119,12 @@ local function laser(aim, origin, normal, t0)
 		table.insert(brackets, { a = a, h = newPart(Vector3.new(0.5, 0.07, 0.04), RED), v = newPart(Vector3.new(0.07, 0.5, 0.04), RED) })
 	end
 
+	local hum -- (the laser's hum while it burns on the wall)
+	local lockPlayed = false
 	local function cleanup()
+		if hum then
+			hum.stop(0.15)
+		end
 		beam:Destroy()
 		glow:Destroy()
 		glint:Destroy()
@@ -133,6 +140,11 @@ local function laser(aim, origin, normal, t0)
 		if st >= IMPACT_AT + 0.08 then
 			cleanup()
 			return false
+		end
+		-- the laser's hum starts as it begins to draw down (a moment early: a sound takes a little while to start)
+		if not hum and st >= LASER_AT - 0.1 then
+			hum = Sfx.loopAt("laser_hum", aim, 160)
+			hum.set(1)
 		end
 		if st < LASER_AT then
 			beam.Transparency, glow.Transparency, dot.Transparency, dotGlow.Transparency = 1, 1, 1, 1
@@ -159,6 +171,10 @@ local function laser(aim, origin, normal, t0)
 		glint.Transparency = lt > 0 and 0.1 or 1
 		glintHalo.Transparency = lt > 0 and (0.7 + (1 - flick)) or 1
 		local onWall = reach >= 1
+		if locked and not lockPlayed then
+			lockPlayed = true
+			Sfx.playAt("target_lock", aim, 1, 1, 160)
+		end
 		dot.Transparency = onWall and 0 or 1
 		dotGlow.Transparency = onWall and (0.55 + (1 - flick)) or 1
 		dot.CFrame, dotGlow.CFrame = CFrame.new(aim + normal * 0.3), CFrame.new(aim + normal * 0.3)
@@ -272,6 +288,12 @@ local function updateBoard(b, now, dt)
 	local fighting = model:GetAttribute("State") ~= "walk" and (now - b.last) < BOARD_HOLD
 		and not model:GetAttribute("FleetStart") -- (closed during the Fleet Strike cutscene)
 	b.open += ((fighting and 1 or 0) - b.open) * math.clamp(dt * 4, 0, 1)
+	if fighting and not b.openSound and b.open > 0.05 then
+		b.openSound = true
+		Sfx.playAt("holo_open", (root.CFrame * CFrame.new(BOARD_OFFSET * model:GetScale())).Position, 1, 1, 90)
+	elseif not fighting and b.open < 0.02 then
+		b.openSound = false
+	end
 	if b.open < 0.01 then
 		hideBoard(b)
 		b.cf = nil
@@ -398,6 +420,7 @@ local function tapRipple(b, t0)
 			local p = tip and (tip.CFrame * CFrame.new(0, 0, -tip.Size.Z / 2)).Position or b.ringCF.Position
 			local n = b.cf.LookVector
 			at = p - n * n:Dot(p - b.cf.Position)
+			Sfx.playAt("holo_tap", at, 1, 0.97 + math.random() * 0.06, 90)
 		end
 		local face = b.cf - b.cf.Position + at
 		local k = b.k
@@ -450,7 +473,7 @@ end
 -- man-sized slug comes down the laser's line in SHELL_FLIGHT s (slow enough to follow), a long tracer behind it,
 -- shockwave rings popping off its path and a sonic boom ring halfway down
 -- ====================================================================
-local SHELL_RING_EVERY = 10 -- studs between the rings along its path
+local SHELL_RING_EVERY = 22 -- studs between the rings along its path (a long way down now)
 
 local function shell(aim, origin, t0)
 	local flash = newPart(Vector3.one, WHITE, 1, Enum.PartType.Ball)
@@ -498,6 +521,7 @@ local function shell(aim, origin, t0)
 	local nextRing = SHELL_RING_EVERY
 	local boomed = false
 	local blasted = false
+	local whistled = false
 	return function(now)
 		local st = now - t0
 		if st < FIRE_AT then
@@ -513,21 +537,26 @@ local function shell(aim, origin, t0)
 		end
 		if not blasted then
 			blasted = true
+			Sfx.playAt("cannon_far", aim + Vector3.new(0, 40, 0), 1, 0.95 + math.random() * 0.1, 400)
 			-- the muzzle blast: a ring rolling out square to the shot, a second wider and fainter one
-			table.insert(active, shockRing(origin, dir, 3, 34, 0.7, WHITE, 0.6, 28))
-			table.insert(active, shockRing(origin, dir, 2, 22, 0.9, HOT, 0.9, 22))
+			table.insert(active, shockRing(origin, dir, 6, 80, 0.8, WHITE, 1.4, 28))
+			table.insert(active, shockRing(origin, dir, 4, 52, 1.0, HOT, 2, 22))
 		end
 		-- the flash in the sky blooms and fades in 0.4 s
 		local ft = (st - FIRE_AT) / 0.4
 		if ft < 1 then
-			flash.Size = Vector3.one * (4 + 18 * smooth(ft))
+			flash.Size = Vector3.one * (10 + 40 * smooth(ft))
 			flash.Transparency = ft
-			flashHalo.Size = Vector3.one * (8 + 30 * smooth(ft))
+			flashHalo.Size = Vector3.one * (20 + 70 * smooth(ft))
 			flashHalo.Transparency = 0.4 + 0.6 * ft
 			flashLight.Brightness = 6 * (1 - ft)
 		else
 			flash.Transparency, flashHalo.Transparency = 1, 1
 			flashLight.Brightness = 0
+		end
+		if not whistled and st >= IMPACT_AT - 0.8 then
+			whistled = true
+			Sfx.playAt("shell_whistle", aim + Vector3.new(0, 18, 0), 1, 0.95 + math.random() * 0.1, 260)
 		end
 		-- the slug: heavy, picking up speed as it falls
 		local f = ((st - FIRE_AT) / flight) ^ 1.35
@@ -804,6 +833,7 @@ local DRONE_FIRE = 1.6
 local DRONE_STAGGER = 0.06
 local DRONE_FLIGHT = 0.33
 local DRONE_IMPACT = 2.05 -- (= Units.Malak.companion.hitAt; the last bolt arrives just before)
+local DRONE_SOUND_LEAD = 0.12 -- the bolt sounds start this much before the bolts leave (a sound takes a moment to start)
 local DRONE_COLD = Color3.fromRGB(150, 175, 255)
 local DRONE_CORE = Color3.fromRGB(235, 242, 255)
 
@@ -959,9 +989,25 @@ local function onDroneShot(model)
 			table.insert(active, droneBolt(hinge, aim, shotAt, fireAt))
 		end
 	end
+	-- sounds: three rising charge blips from the rings, a bolt per ring, the hit where they meet
+	local elapsed = workspace:GetServerTimeNow() - shotAt
+	for i = 1, 3 do
+		local hinge = model:FindFirstChild("DroneRingHinge" .. i, true)
+		task.delay(math.max(0, DRONE_CHARGE + (i - 1) * 0.2 - elapsed), function()
+			if hinge and hinge.Parent then
+				Sfx.playAt("drone_charge", hinge.Position, 1, 1 + (i - 1) * 0.12, 120)
+			end
+		end)
+		task.delay(math.max(0, DRONE_FIRE + (i - 1) * DRONE_STAGGER - DRONE_SOUND_LEAD - elapsed), function()
+			if hinge and hinge.Parent then
+				Sfx.playAt("drone_bolt", hinge.Position, 1, 0.94 + (i - 1) * 0.06, 120)
+			end
+		end)
+	end
 	local wait = DRONE_FIRE + 2 * DRONE_STAGGER + DRONE_FLIGHT - (workspace:GetServerTimeNow() - shotAt)
 	task.delay(math.max(0, wait), function()
 		table.insert(active, droneImpact(aim, normal))
+		Sfx.playAt("drone_hit", aim, 1, 0.95 + math.random() * 0.1, 160)
 	end)
 end
 
@@ -995,6 +1041,10 @@ local function onAttack(model)
 		table.insert(active, shell(aim, origin, t0))
 		task.delay(math.max(0, IMPACT_AT - (os.clock() - t0)), function()
 			table.insert(active, impact(aim, normal, model:GetAttribute("OwnerId")))
+		end)
+		-- (the impact sound starts a moment early: a sound takes a little while to start, it would land late)
+		task.delay(math.max(0, IMPACT_AT - IMPACT_SOUND_LEAD - (os.clock() - t0)), function()
+			Sfx.playAt("shell_impact", aim + normal * 0.6, 1, 0.95 + math.random() * 0.1, 260)
 		end)
 	end)
 end

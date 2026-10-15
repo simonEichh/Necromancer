@@ -92,6 +92,83 @@ Priority: **A** = needed for the basic cinematics, **B** = makes them much bette
 
 Everything scales with the pull's rarity in code (pitch, volume, how many layers), so one version of each sound is enough.
 
+## malak/ (Malak, the Envoy: his attacks and the Fleet Strike; docs/envoy.md)
+
+Tone: cold, precise, HIGH-TECH (not magic): clean synthetic tones, servo whirs, sub bass, glassy UI blips. The only
+"warm" sounds are the explosions. Mono unless marked stereo (stereo = played flat for the cutscene's owner).
+
+**His basic attack and the drone** (every 6.5 s / 4.5 s, so they must not get tiring: short, dry, a little variation)
+
+| File | Length | Sound | Used in | Prio | Asset id |
+|---|---|---|---|---|---|
+| `holo_open.ogg` | 0.3-0.6 s | hologram opening, soft digital shimmer | his pad opening into the big hologram | B | 134658410245808 |
+| `holo_tap.ogg` | 0.1-0.3 s | crisp glassy touchscreen tap | the press on the hologram | A | 107161022622819 |
+| `target_lock.ogg` | 0.3-0.6 s | targeting lock-on: two rising blips, a confirm tone | reticle locking on the wall | A | 130032888810460 |
+| `laser_hum.ogg` | 2-3 s loop | thin electric hum of the red targeting laser | while the laser is on the wall | B | 109042425391276 |
+| `cannon_far.ogg` | 1-2 s | a far-away heavy gun firing high up in the sky (distant thump with a long tail) | the gunship fires | A | 131391741535295 |
+| `shell_whistle.ogg` | 0.6-1 s | a fast descending whistle / incoming shriek | the shell coming down | A | |
+| `shell_impact.ogg` | 1-2 s | heavy explosion, crunch of stone, debris | the shell hits | A | 81958184521977 |
+| `drone_charge.ogg` | 0.5-0.8 s | three quick rising charge blips | the drone's rings charging | B | 101800259271161 |
+| `drone_bolt.ogg` | 0.2-0.4 s | short sharp energy zap (played 3x, staggered) | the drone's bolts | A | 77110040590592 |
+| `drone_hit.ogg` | 0.3-0.6 s | cold crack / energy pop | where the bolts meet | B | 99175078643431 |
+
+Done 2026-10-15 (originals in `_source/malak/`, adapted with prep_sound.py): cannon_far cut to 2.5 s, drone_bolt to
+0.6 s (played 3x, rising pitch), drone_charge to 0.8 s (played 3x as rising blips), drone_hit to its first 0.4 s,
+shell_impact to 3 s, laser_hum a 2.5 s loop; shell_whistle: the generated placeholder (tools/audio/make_whistle.py)
+sounded off and is switched off (empty id): the slot waits for a real one. Wired in client OrbitalStrike.lua through Sfx.playAt / Sfx.loopAt.
+
+**The Fleet Strike** (54 s; times are seconds from its start; each is one moment, so they can be big)
+
+| File | Length | Sound | At | Prio | Asset id |
+|---|---|---|---|---|---|
+| `rune_click.ogg` | 0.1-0.2 s | tiny precise click (several variants ok) | his left hand typing (1.5-5 s) | B || 129592415819508 |
+| `rune_confirm.ogg` | 0.4-0.8 s | a clean confirm tone, slightly ominous | the last rune clicks home (5.3 s) | A || 80333702320714 |
+| `drone_transform.ogg` | 1.5-2.5 s | mechanical servos, rings locking, rising whine | the drone stacking into a transmitter (6-8 s) | A || 71750103238347 |
+| `transmit_pulse.ogg` | 1.5-3 s | a powerful pulse shooting upwards, then fading pings (stereo) | the pulse into the sky (9.0 s) | A || 99067426480453 |
+| `sky_tear.ogg` | 4-6 s | the sky tearing: a deep groan, crackling, glass-like cracks (stereo) | the tear (13-19 s) | A | |
+| `portal_hum.ogg` | 3-5 s loop | deep unstable hum of the open portal | while the portal is open | B || 133901763364756 |
+| `warp_in.ogg` | 8-10 s | the big one: a slow sub-bass swell, pressure building, metal groaning (stereo) | the Absolution sliding out (20-29.5 s) | A || 3 layers: suspense 84069854063299, scanner 132548472903596, warhorn 83144722290957 |
+| `portal_snap.ogg` | 1.5-3 s | the portal slamming shut + a shockwave boom (stereo) | the snap (29.8 s) | A || 108174408928980 |
+| `ship_hum.ogg` | 4-6 s loop | the ship's engines: a low, massive drone | while the ship is in the sky | B || 93352074241039 (ship_hum2: 125935309800038) |
+| `scan_sweep.ogg` | 2-4 s | a scanning sweep, electronic (stereo) | the red scan fan (32-35.6 s) | B || 132910803481650 |
+| `turret_turn.ogg` | 0.5-1 s | heavy turret servo turning | the turrets turning (31.3 s on) | C || 124298652524588 |
+| `broadside.ogg` | 1-2 s | heavy naval guns firing in a salvo (played per salvo) | the barrage (38-42 s) | A | |
+| `missile_launch.ogg` | 0.5-1 s | missile launch whoosh | the missiles (38.4 s on) | B || 87074924125787 |
+| `bow_open.ogg` | 1.5-2.5 s | huge armour plates unlocking and sliding apart, hydraulic hiss | the bow opening (42.2-43.8 s) | A || 75819785753943 |
+| `reactor_spin.ogg` | 2-3 s | rising turbine whine, ending in a heavy lock (clunk) | the rings spinning up and locking (42.4-45.6 s) | A || 2 files: reactor_windup 80732352001103, reactor_lock 109134827602753 |
+| `cannon_charge.ogg` | 1.5-2 s | charge building to a peak that CUTS OFF (the half second of silence) | the charge (44.4-46 s) | A || 136468737245177 |
+| `main_beam.ogg` | 3-4 s | the beam: a massive roar with crackle, sustained (stereo) | the beam (46-49.4 s) | A || 95516675338021 |
+| `keeper_roar.ogg` | 1-2 s | the keeper's pained roar (deep, inhuman) | his palms are struck (46 s) | B || 130529185820696 |
+| `gate_collapse.ogg` | 2-3 s | the gate exploding and collapsing: stone, crash, rumble (stereo) | the gate falls (49.4 s) | A || 79285090609348 |
+| `warp_out.ogg` | 3-5 s | low boom as the portal collapses behind the leaving ship | the warp-out | B || 77036647861580 |
+
+Done 2026-10-15 (originals in `_source/malak/`, all stereo and played flat; the cue sheet is "Step 8" in
+FleetStrike.lua): rune_click cut to 0.3 s (played at his two taps, 3.11 and 4.08 s, and softer where the drag starts), transmit_pulse whole (5.9 s, 1.5 s fade, the swell covers the rising rings),
+portal_hum a 5 s loop (open 16.4-29.8 s, and again for the warp-out portal), the warp-in is three layers (suspense at 19,
+scanner at 20, warhorn at 21.5; each cut to 7 s), portal_snap 6 s (also when the warp-out portal shuts), ship_hum a 3.5 s
+loop and ship_hum2 a 6 s loop (compare them with `SHIP_HUM` in FleetStrike.lua), scan_sweep 3.5 s at 32, turret_turn
+2.5 s at 31.3 (quiet, 0.35; may be dropped). Second batch: missile_launch 1.5 s (4 launches from 38.4), bow_open spliced (its opening
+clunk + the end clunk from 3.85 s, which lands 1.35 s in = the bow fully open), reactor_windup = 1-5 s of the original at
+1.5x (42.4-45.0), reactor_lock cut to 0.8 s at 45.0, cannon_charge = only the build (3.0-7.35 s of the 10 s original) at
+1.25x, hard cut at its peak 0.5 s before the beam (46), main_beam 4.3 s, keeper_roar and gate_collapse whole, warp_out
+whole (replaces the portal snap when the ship leaves). After the user's first listen: drone_transform volume halved, target_lock (his basic attack's) plays at each reticle
+locking on after the scan fan (LOCKS, rising pitch). The barrage plays cannon_far (his basic attack's gun) per salvo instead of broadside, and the missiles are
+silent (the user wants only the distant cannons; missile_launch is uploaded but not cued). Second listen: drone_transform volume 0.12, transmit_pulse cut to 2.3 s (silent when the beam is
+gone, 11.2 s), turret_turn not cued (too far to hear servos), shell_impact (his basic attack's) at the barrage's shell
+and missile hits (boom() in FleetStrike.lua, at most one per 0.12 s, lower pitch). sky_tear is three files: tear_rumble (6 s from 0.5 s of
+_source/deep_tear_rumble_thunder.ogg, 2 s fade, at 13), tear_crack (from 0.45 s, at 15.2), tear_open (a swell from 0.5 s,
+2.54 s, timed so its peak lands on OPEN_AT 17.4; taken out again after a listen: uploaded, not cued). Volumes after
+listening: tear_crack 0.2, bow_open 0.4. Music: _source/malak/fleet_music.ogg (76.7 s) cut to its first
+52.5 s with a 2 s fade (`malak/fleet_music.ogg`), played from 1.5 s through Sfx.music (Music group), only for whoever
+watches, ducked to silence 45.5-46 s (before the beam). A first try: not cut to the beats yet.
+
+**Music (optional but the biggest win): `fleet_music.ogg`, stereo, ~54 s, timed to the beats** (no loop):
+0-1.5 silence falls; 1.5-6 calm, precise (he types); 6-11 tension rises with the transmitter, pulse at 9.0; 11-13 the
+army flees (unease); 13-19 dread builds (the sky tears); 20-29.5 the slow, heavy reveal of the ship, a big hit at the
+snap (29.8); 31-36 cold, mechanical (scan, lock-ons); 36-38 a breath; 38-42 full force (barrage); 42-46 rising, unbearable
+(the bow, the charge) and then SILENCE for ~0.5 s before 46; 46-49.4 the beam; 49.4 the gate falls (biggest hit);
+50-54 a calm, cold resolve (he looks at what is left).
+
 ## Preparing files
 
 Originals go in `_source/` (kept, not uploaded). `tools/audio/prep_sound.py` makes the game versions:

@@ -29,6 +29,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local mainGui = require(script.Parent.Gui)
 local Theme = require(script.Parent.Theme)
+local Sfx = require(script.Parent.Sfx)
 
 local player = Players.LocalPlayer
 
@@ -44,9 +45,15 @@ local BAR_TIME = 0.8
 -- Where the tear opens and the ship hangs: NOT over the player but diagonally away, high up, off to the side of the lane
 -- (Malak's left: the side his basic attack's red laser comes from) and down the lane towards the gate, so from his
 -- spot the ship is seen side-on, not from below
-local SKY_HEIGHT = 400 -- (far away and not too steep: the player sees the whole broadside, not the belly)
-local SKY_SIDE = 650
-local SKY_LEFT = 150 -- (then shifted this far to the left as seen from Malak)
+-- The whole sky scene (the ship, the portal and its tear, the warp-out) is built at SKY_SCALE of its design size and
+-- that much closer: it looks the same from the camera, but stays inside what low graphics quality still draws (measured
+-- 2026-10-15: Level 1 draws to ~300-350 studs, Level 5 ~450, Level 10 ~700; at full size the ship sat ~800 away and
+-- vanished whenever Automatic quality dropped). Every sky distance / size below is multiplied by it.
+local SKY_SCALE = 1 / 3
+local SKY_HEIGHT = 400 * SKY_SCALE -- (far away and not too steep: the player sees the whole broadside, not the belly)
+local SKY_SIDE = 650 * SKY_SCALE
+local SKY_LEFT = 150 * SKY_SCALE -- (then shifted this far to the left as seen from Malak)
+local PORTAL_BEHIND = 250 * SKY_SCALE -- the portal's distance behind the ship's final place
 local SKY_ALONG = 0.75 -- (of the way from Malak to the gate)
 
 -- The beats (docs/envoy.md, "Fleet Strike cutscene"): start time and name (the Studio caption; the camera runs on its
@@ -341,7 +348,7 @@ local function transmitter(folder, malak, scale)
 		end
 		table.insert(rings, { segs = segs, at = PULSE_AT + i * 0.3 })
 	end
-	local BEAM_LEN = 720 -- (up past the height of the tear)
+	local BEAM_LEN = 720 * SKY_SCALE -- (up past the height of the tear)
 	return function(ft)
 		if not droneRoot or not droneRoot.Parent then
 			return
@@ -415,7 +422,7 @@ local WARP_AT = 19
 local EMERGE_FROM = 20 -- the bow touches the portal ...
 local EMERGE_TO = 29.5 -- ... and the stern clears it (slow and ominous)
 local SNAP_AT = 29.8 -- the portal snaps shut
-local PORTAL_RADIUS = 190 -- (big: it opens far away)
+local PORTAL_RADIUS = 190 * SKY_SCALE -- (big: it opens far away)
 local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
 local VOID = Color3.fromRGB(14, 10, 30)
 local VORTEX = Color3.fromRGB(70, 56, 110)
@@ -445,39 +452,39 @@ local function skyTear(folder, portal)
 		local em = Instance.new("ParticleEmitter")
 		em.Texture = SMOKE
 		em.Color = ColorSequence.new(VORTEX, Color3.fromRGB(30, 24, 52))
-		em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 28), NumberSequenceKeypoint.new(1, 60) })
+		em.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 28 * SKY_SCALE), NumberSequenceKeypoint.new(1, 60 * SKY_SCALE) })
 		em.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
 		em.Lifetime = NumberRange.new(2, 3)
-		em.Speed = NumberRange.new(0, 2)
+		em.Speed = NumberRange.new(0, 2 * SKY_SCALE)
 		em.Rate = 0
 		em.LightInfluence = 0.3
 		em.Rotation = NumberRange.new(0, 360)
 		em.RotSpeed = NumberRange.new(-20, 20)
 		em.Parent = p
-		table.insert(swirl, { part = p, em = em, a = i / 14 * math.pi * 2, r = 420 + (i % 3) * 50 })
+		table.insert(swirl, { part = p, em = em, a = i / 14 * math.pi * 2, r = (420 + (i % 3) * 50) * SKY_SCALE })
 	end
 	-- the rune ring: an outer band of segments that etch themselves one after another, an inner counter-turning ring,
 	-- rune marks outside the band
 	local N = 64
 	local band, inner, marks = {}, {}, {}
 	for k = 0, N - 1 do
-		table.insert(band, newPart(folder, Vector3.new(1, 4, 2.4), GLOW, 1))
+		table.insert(band, newPart(folder, Vector3.new(1, 4, 2.4) * SKY_SCALE, GLOW, 1))
 		if k % 2 == 0 then
-			table.insert(inner, newPart(folder, Vector3.new(1, 2.2, 1.6), GLOW_CORE, 1))
+			table.insert(inner, newPart(folder, Vector3.new(1, 2.2, 1.6) * SKY_SCALE, GLOW_CORE, 1))
 		end
 		if k % 4 == 0 then
-			table.insert(marks, newPart(folder, Vector3.new(7, 7, 1.6), GLOW, 1))
+			table.insert(marks, newPart(folder, Vector3.new(7, 7, 1.6) * SKY_SCALE, GLOW, 1))
 		end
 	end
 	-- the cracks: jagged lines of light growing outwards from the ring
 	local cracks = {}
 	for c = 1, 12 do
 		local a = c / 12 * math.pi * 2 + (c % 3) * 0.13
-		local pts = { ringPoint(face, PORTAL_RADIUS + 3, a) }
+		local pts = { ringPoint(face, PORTAL_RADIUS + 3 * SKY_SCALE, a) }
 		local dir = a
 		for j = 1, 4 do
 			dir += (math.random() - 0.5) * 0.7
-			local len = 30 + math.random() * 40
+			local len = (30 + math.random() * 40) * SKY_SCALE
 			local prev = pts[#pts]
 			local out = (face * CFrame.Angles(0, 0, dir) * CFrame.new(len, 0, 0)).Position - face.Position
 			table.insert(pts, prev + out)
@@ -490,11 +497,13 @@ local function skyTear(folder, portal)
 	end
 	-- the void inside the ring, its glowing rim, the light pouring out at the warp-in
 	local void = newPart(folder, Vector3.new(0.5, 1, 1), VOID, 1, Enum.PartType.Cylinder)
-	void.Material = Enum.Material.SmoothPlastic
+	-- (Neon: not lit by lamps. As SmoothPlastic, close up it caught the edge of the area round the camera in which lights
+	-- are computed: a lit half circle with a hard straight edge. At this near-black colour Neon stays dark.)
+	void.Material = Enum.Material.Neon
 	local voidGlow = newPart(folder, Vector3.new(0.4, 1, 1), GLOW, 1, Enum.PartType.Cylinder)
 	local voidLight = Instance.new("PointLight")
 	voidLight.Color = GLOW
-	voidLight.Range = 120
+	voidLight.Range = 120 * SKY_SCALE
 	voidLight.Brightness = 0
 	voidLight.Shadows = false
 	voidLight.Parent = voidGlow
@@ -538,20 +547,20 @@ local function skyTear(folder, portal)
 			local a = (k - 0.5) / N * math.pi * 2 + turn
 			local on = alive and (k / N) <= etched
 			local seg = 2 * ringR * math.sin(math.pi / N) * 0.92
-			p.Size = Vector3.new(math.max(0.1, seg), 4, 2.4)
+			p.Size = Vector3.new(math.max(0.1, seg), 4 * SKY_SCALE, 2.4 * SKY_SCALE)
 			p.CFrame = face * CFrame.Angles(0, 0, a) * CFrame.new(ringR, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
 			p.Transparency = on and (T > OPEN_AT and 0 or 0.2) or 1
 		end
 		for k, p in ipairs(inner) do
 			local a = (k - 0.5) / #inner * math.pi * 2 - turn * 2.5
 			local r = ringR * 0.9
-			p.Size = Vector3.new(math.max(0.1, 2 * r * math.sin(math.pi / #inner) * 0.6), 2.2, 1.6)
+			p.Size = Vector3.new(math.max(0.1, 2 * r * math.sin(math.pi / #inner) * 0.6), 2.2 * SKY_SCALE, 1.6 * SKY_SCALE)
 			p.CFrame = face * CFrame.Angles(0, 0, a) * CFrame.new(r, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
 			p.Transparency = (alive and etched >= 1) and 0.3 or 1
 		end
 		for k, p in ipairs(marks) do
 			local a = (k - 0.5) / #marks * math.pi * 2 + turn
-			p.CFrame = face * CFrame.Angles(0, 0, a) * CFrame.new(ringR + 10, 0, 0) * CFrame.Angles(0, 0, math.rad(45))
+			p.CFrame = face * CFrame.Angles(0, 0, a) * CFrame.new(ringR + 10 * SKY_SCALE, 0, 0) * CFrame.Angles(0, 0, math.rad(45))
 			p.Transparency = (alive and (k / #marks) <= etched) and 0.15 or 1
 		end
 		-- the cracks of light
@@ -561,7 +570,7 @@ local function skyTear(folder, portal)
 			for j, sgm in ipairs(c.segs) do
 				local f = math.clamp(grow * n - (j - 1), 0, 1)
 				local b = sgm.a:Lerp(sgm.b, math.max(0.02, f))
-				sgm.part.Size = Vector3.new(2.6 - j * 0.45, 2.6 - j * 0.45, (b - sgm.a).Magnitude)
+				sgm.part.Size = Vector3.new((2.6 - j * 0.45) * SKY_SCALE, (2.6 - j * 0.45) * SKY_SCALE, (b - sgm.a).Magnitude)
 				sgm.part.CFrame = CFrame.lookAt((sgm.a + b) / 2, b)
 				local flick = math.random() < 0.08 and 0.5 or 0
 				sgm.part.Transparency = (alive and f > 0) and math.min(1, 0.05 + flick + 0.9 * e(WARP_AT + 1, SNAP_AT)) or 1
@@ -582,8 +591,8 @@ local function skyTear(folder, portal)
 		local sf = (T - SNAP_AT - 0.2) / 1.6
 		for _, s in ipairs(shock) do
 			if sf > 0 and sf < 1 then
-				local r = 20 + 420 * (1 - (1 - sf) ^ 3)
-				s.part.Size = Vector3.new(2 * r * math.sin(math.pi / 40) * 0.9, 3 * (1 - sf) + 0.3, 3)
+				local r = (20 + 420 * (1 - (1 - sf) ^ 3)) * SKY_SCALE
+				s.part.Size = Vector3.new(2 * r * math.sin(math.pi / 40) * 0.9, (3 * (1 - sf) + 0.3) * SKY_SCALE, 3 * SKY_SCALE)
 				s.part.CFrame = face * CFrame.Angles(0, 0, s.a) * CFrame.new(r, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
 				s.part.Transparency = 0.2 + 0.8 * sf
 			else
@@ -616,6 +625,13 @@ local function warpIn(folder, portal, shipFinal, ctx)
 		return function() end, function() end
 	end
 	local ship = template:Clone()
+	ship:ScaleTo(ship:GetScale() * SKY_SCALE)
+	-- (ScaleTo leaves the lights' ranges alone: at full reach the bow light lit up the portal's dark void)
+	for _, d in ipairs(ship:GetDescendants()) do
+		if d:IsA("Light") then
+			d.Range *= SKY_SCALE
+		end
+	end
 	ship.PrimaryPart.Anchored = true
 	ship:PivotTo(CFrame.new(0, -5000, 0))
 	ship.Parent = folder
@@ -627,7 +643,7 @@ local function warpIn(folder, portal, shipFinal, ctx)
 			if d.Name == "Window" then
 				-- (dark until the lights run down the hull; its place along the hull, 0 = bow .. 1 = stern)
 				local z = (ship.PrimaryPart.CFrame:PointToObjectSpace(d.Position)).Z
-				table.insert(windows, { part = d, base = d.Transparency, along = math.clamp((z + 140) / 280, 0, 1) })
+				table.insert(windows, { part = d, base = d.Transparency, along = math.clamp((z + 140 * SKY_SCALE) / (280 * SKY_SCALE), 0, 1) })
 				d.Transparency = 1
 			end
 		end
@@ -647,9 +663,9 @@ local function warpIn(folder, portal, shipFinal, ctx)
 	local haloSize = coreHalo and coreHalo.Size
 	local haloBase = coreHalo and coreHalo.Transparency
 	local axis = shipFinal.LookVector
-	-- the bow tip sits ~225 studs ahead of the core, the stern ~210 behind: from "bow touching the portal" to "stern
+	-- the bow tip sits ~225 studs (x SKY_SCALE) ahead of the core, the stern ~210 behind: from "bow touching the portal" to "stern
 	-- just clear of it"
-	local startCF = shipFinal - axis * (portal.Position - shipFinal.Position):Dot(-axis) - axis * 225
+	local startCF = shipFinal - axis * (portal.Position - shipFinal.Position):Dot(-axis) - axis * 225 * SKY_SCALE
 	local travel = (shipFinal.Position - startCF.Position).Magnitude
 	return function(T)
 		if T < EMERGE_FROM - 0.2 then
@@ -667,7 +683,7 @@ local function warpIn(folder, portal, shipFinal, ctx)
 			cf = cf:Lerp(CFrame.lookAt(cf.Position, cf.Position + dir), turn * TURN_SHARE)
 		end
 		ship:PivotTo(cf)
-		ctx.bow = (cf * CFrame.new(0, 0, -215)).Position -- (the camera follows the bow round)
+		ctx.bow = (cf * CFrame.new(0, 0, -215 * SKY_SCALE)).Position -- (the camera follows the bow round)
 		for _, r in ipairs(rings) do
 			r.joint.Transform = CFrame.Angles(0, T * r.speed, 0)
 		end
@@ -712,7 +728,7 @@ local BARRAGE_END = 42
 local SALVO_EVERY = 0.55 -- a main turret fires every ... s (they take turns)
 local TRACERS_PER_SECOND = 26
 local MISSILES = 12
-local SHELL_SPEED = 900
+local SHELL_SPEED = 900 * SKY_SCALE -- (the same flight times as at full size)
 local RED = Color3.fromRGB(255, 40, 40)
 local RED_CORE = Color3.fromRGB(255, 190, 180)
 local HOT = Color3.fromRGB(255, 196, 120)
@@ -756,6 +772,18 @@ local function blast(folder, active, pos, k, color)
 		ball.Transparency = 0.2 + 0.8 * f
 		return true
 	end)
+end
+
+-- an explosion's sound where a shell or missile hits the gate (his basic attack's impact, a little lower: far away);
+-- the hits come in bunches, so at most one every 0.12 s. ctx.soundLoud is set by the soundtrack (watching or not).
+local lastBoom = 0
+local function boom(ctx, volume)
+	local now = os.clock()
+	if now - lastBoom < 0.12 then
+		return
+	end
+	lastBoom = now
+	Sfx.play("shell_impact", nil, (ctx.soundLoud or 0.35) * volume, 0.8 + math.random() * 0.2)
 end
 
 -- a projectile from `from` to `to` in `flight` s: a glowing head and a trail; calls onHit at the end
@@ -918,7 +946,7 @@ local function barrage(folder, ctx)
 			end
 		end
 		-- the scan fan: from the bow over the gate, sweeping down and up twice
-		local bow = ship and ship.PrimaryPart and (ship.PrimaryPart.CFrame * CFrame.new(0, 0, -200)).Position
+		local bow = ship and ship.PrimaryPart and (ship.PrimaryPart.CFrame * CFrame.new(0, 0, -200 * SKY_SCALE)).Position
 		local fanOn = bow and T >= FAN_FROM and T < FAN_TO
 		local sweep = fanOn and (0.5 - 0.5 * math.cos((T - FAN_FROM) / (FAN_TO - FAN_FROM) * math.pi * 4)) or 0
 		for i, p in ipairs(fan) do
@@ -966,9 +994,10 @@ local function barrage(folder, ctx)
 					local m = mainMuzzles[((salvoIndex - 1) * 3 + b) % #mainMuzzles + 1]
 					local from = m.Position
 					local to = gatePoint(ctx, (math.random() - 0.5) * 1.8, math.random())
-					blast(folder, active, from, 1.4, HOT) -- (the muzzle flash)
+					blast(folder, active, from, 1.4 * SKY_SCALE, HOT) -- (the muzzle flash)
 					projectile(folder, active, from, to, (to - from).Magnitude / SHELL_SPEED, 1.4, HOT, function()
 						blast(folder, active, to, 2.2)
+						boom(ctx, 0.7)
 						shake = math.max(shake, 0.6)
 					end)
 				end
@@ -979,7 +1008,7 @@ local function barrage(folder, ctx)
 				tracerDebt -= 1
 				local m = secondaryMuzzles[math.random(1, #secondaryMuzzles)]
 				local to = gatePoint(ctx, (math.random() - 0.5) * 2.2, math.random())
-				projectile(folder, active, m.Position, to, (to - m.Position).Magnitude / 1400, 0.5, RED_CORE, function()
+				projectile(folder, active, m.Position, to, (to - m.Position).Magnitude / (1400 * SKY_SCALE), 0.5, RED_CORE, function()
 					if math.random() < 0.35 then
 						blast(folder, active, to, 0.6, RED_CORE)
 					end
@@ -990,10 +1019,10 @@ local function barrage(folder, ctx)
 			while missileLaunched < due do
 				missileLaunched += 1
 				local root = ship.PrimaryPart.CFrame
-				local from = (root * CFrame.new((missileLaunched % 2 == 0 and 1 or -1) * 30, 25, 120 + (missileLaunched % 4) * 12)).Position
+				local from = (root * CFrame.new(Vector3.new((missileLaunched % 2 == 0 and 1 or -1) * 30, 25, 120 + (missileLaunched % 4) * 12) * SKY_SCALE)).Position
 				local to = gatePoint(ctx, (math.random() - 0.5) * 1.8, 0.2 + math.random() * 0.7)
-				local up = from + Vector3.new(0, 90, 0) + (root.RightVector * ((missileLaunched % 2 == 0) and 60 or -60))
-				local mid = up:Lerp(to, 0.5) + Vector3.new(0, 60, 0)
+				local up = from + (Vector3.new(0, 90, 0) + root.RightVector * ((missileLaunched % 2 == 0) and 60 or -60)) * SKY_SCALE
+				local mid = up:Lerp(to, 0.5) + Vector3.new(0, 60 * SKY_SCALE, 0)
 				local function curve(f)
 					local a = from:Lerp(up, f)
 					local b = up:Lerp(mid, f)
@@ -1002,6 +1031,7 @@ local function barrage(folder, ctx)
 				end
 				projectile(folder, active, from, to, 2.4, 1.1, Color3.fromRGB(200, 210, 255), function()
 					blast(folder, active, to, 1.8)
+					boom(ctx, 0.45)
 					shake = math.max(shake, 0.4)
 				end, curve)
 			end
@@ -1035,7 +1065,8 @@ local SWEEP_MID = 48.6
 local GATE_HIT = 49.4 -- ... onto the gate, which falls
 local BEAM_OFF = 50.3
 local BOW_OPEN_ANGLE = 0.62
-local CANNON_SLIDE = 30
+local CANNON_SLIDE = 30 * SKY_SCALE
+local BEAM_WIDTH = 0.6 -- (the beam's thickness: between full size and SKY_SCALE, as it ends on the keeper close by)
 local WHITE = Color3.fromRGB(255, 255, 255)
 
 local function finale(folder, ctx)
@@ -1118,7 +1149,7 @@ local function finale(folder, ctx)
 	local chargeHalo = newPart(folder, Vector3.one, GLOW, 1, Enum.PartType.Ball)
 	local chargeLight = Instance.new("PointLight")
 	chargeLight.Color = GLOW
-	chargeLight.Range = 60
+	chargeLight.Range = 60 * SKY_SCALE
 	chargeLight.Brightness = 0
 	chargeLight.Shadows = false
 	chargeLight.Parent = charge
@@ -1126,9 +1157,9 @@ local function finale(folder, ctx)
 	pull.Texture = SPARK
 	pull.Color = ColorSequence.new(GLOW_CORE, GLOW)
 	pull.LightEmission = 1
-	pull.Size = NumberSequence.new(1.6, 0.2)
+	pull.Size = NumberSequence.new(1.6 * SKY_SCALE, 0.2 * SKY_SCALE)
 	pull.Lifetime = NumberRange.new(0.5, 0.8)
-	pull.Speed = NumberRange.new(40, 60)
+	pull.Speed = NumberRange.new(40 * SKY_SCALE, 60 * SKY_SCALE)
 	pull.Shape = Enum.ParticleEmitterShape.Sphere
 	pull.ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward
 	pull.Rate = 0
@@ -1293,11 +1324,11 @@ local function finale(folder, ctx)
 		end
 
 		-- the charge at the muzzle
-		local mz = muzzle and muzzle.Position or (root * CFrame.new(0, 0, -200)).Position
+		local mz = muzzle and muzzle.Position or (root * CFrame.new(0, 0, -200 * SKY_SCALE)).Position
 		local ch = e(CHARGE_FROM, FIRE_AT)
 		local firing = T >= FIRE_AT and T < BEAM_OFF
 		if T >= CHARGE_FROM and T < BEAM_OFF then
-			local size = 4 + 14 * ch + (firing and 6 or 0)
+			local size = (4 + 14 * ch + (firing and 6 or 0)) * SKY_SCALE
 			charge.Size = Vector3.one * size
 			chargeHalo.Size = Vector3.one * size * 1.8
 			charge.CFrame, chargeHalo.CFrame = CFrame.new(mz), CFrame.new(mz)
@@ -1315,7 +1346,7 @@ local function finale(folder, ctx)
 		if firing then
 			local len = (target - mz).Magnitude
 			local cf = CFrame.lookAt(mz, target) * CFrame.new(0, 0, -len / 2)
-			local burst = 1 + 0.6 * math.max(0, 1 - (T - FIRE_AT) / 0.3) -- (it slams out wide, then settles)
+			local burst = BEAM_WIDTH * (1 + 0.6 * math.max(0, 1 - (T - FIRE_AT) / 0.3)) -- (it slams out wide, then settles)
 			local fade = 1 - e(GATE_HIT + 0.3, BEAM_OFF)
 			local flick = 0.9 + math.random() * 0.1
 			beamCore.Size = Vector3.new(4 * burst * fade * flick + 0.1, 4 * burst * fade * flick + 0.1, len)
@@ -1383,6 +1414,118 @@ local function finale(folder, ctx)
 end
 
 -- ============================================================
+-- Step 8: sound (sounds/README.md, malak/ "The Fleet Strike"; ids in Sfx). A slot without an id stays silent.
+-- Everything plays flat (a score, not from a spot in the world): full volume for whoever watches, quieter for the
+-- players who only see it in the sky. `near` cues are Malak's own small sounds, only heard while watching.
+-- ============================================================
+local SHIP_HUM = "ship_hum" -- (two versions to compare: "ship_hum" or "ship_hum2")
+local SKY_VOLUME = 0.35 -- (for players who are not watching, and for the ship lingering after the cutscene)
+local CUES = {
+	{ at = 5.3, name = "rune_confirm", near = true },
+	{ at = 6.0, name = "drone_transform", near = true },
+	{ at = PULSE_AT, name = "transmit_pulse" },
+	-- the tear: the sky groans (under all of it), the cracks spread (tear_open, the sucking swell, was taken out)
+	{ at = TEAR_AT, name = "tear_rumble" },
+	{ at = CRACKS_AT, name = "tear_crack" },
+	{ at = WARP_AT, name = "warp_in_suspense" },
+	{ at = EMERGE_FROM, name = "warp_in_scanner" },
+	{ at = 21.5, name = "warp_in_warhorn" },
+	{ at = SNAP_AT, name = "portal_snap" },
+	{ at = 32, name = "scan_sweep" },
+	{ at = BOW_OPEN_FROM, name = "bow_open" }, -- (its second clunk 1.35 s in: the bow is open)
+	{ at = RINGS_SPIN_FROM, name = "reactor_windup", pitch = 1.5 }, -- (4 s at 1.5x: up to the lock)
+	{ at = RINGS_LOCK_AT, name = "reactor_lock" },
+	-- the charge's build (4.35 s) at 1.25x, cut off at its peak half a second before the beam: the silence
+	{ at = FIRE_AT - 0.5 - 4.35 / 1.25, name = "cannon_charge", pitch = 1.25 },
+	{ at = FIRE_AT, name = "main_beam" },
+	{ at = FIRE_AT, name = "keeper_roar" },
+	{ at = GATE_HIT, name = "gate_collapse" },
+}
+do
+	local rng = Random.new(7)
+	-- his left hand (UnitAnimator's Envoy block): a click at each tap's lowest point (its dips are
+	-- sin(ft * 6.5) ^ 6 between 2.6 and 5 s), a softer one where the drag starts (3.3); the press home is rune_confirm
+	for k = 0, 10 do
+		local at = (math.pi / 2 + k * 2 * math.pi) / 6.5
+		if at > 2.6 and at < 5 then
+			table.insert(CUES, { at = at - 0.03, name = "rune_click", near = true, pitch = rng:NextNumber(0.95, 1.1) })
+		end
+	end
+	table.insert(CUES, { at = 3.3, name = "rune_click", near = true, volume = 0.6, pitch = 0.85 })
+	-- the reticles locking onto the gate after the scan fan, one by one, each a little higher
+	for i, at in ipairs(LOCKS) do
+		table.insert(CUES, { at = at, name = "target_lock", pitch = 1 + (i - 1) * 0.04 })
+	end
+	-- the barrage: one distant gun per salvo (his basic attack's gunship sound; no missile sounds, only the cannons)
+	for s = BARRAGE_AT, BARRAGE_END - 0.1, SALVO_EVERY do
+		table.insert(CUES, { at = s, name = "cannon_far", pitch = rng:NextNumber(0.92, 1.05) })
+	end
+end
+
+-- update(T, watching) every frame; stop() at the end; takeHum() hands the ship's hum to lingerShip
+local MUSIC_AT = 1.5 -- the music (52.5 s, only for whoever watches) starts once the silence has fallen
+
+local function soundtrack(ctx)
+	local fired = {}
+	local portalHum, shipHum, music
+	local musicVol, lastClock = 0, os.clock()
+	local s = {}
+	function s.update(T, watching)
+		local loud = watching and 1 or SKY_VOLUME
+		ctx.soundLoud = loud
+		-- the music: fades in / out with watching; silent for the half second before the beam, back with it
+		local now = os.clock()
+		musicVol += ((watching and 1 or 0) - musicVol) * math.min(1, (now - lastClock) * 3)
+		lastClock = now
+		if T >= MUSIC_AT and not music then
+			music = Sfx.music("fleet_music", T - MUSIC_AT)
+		end
+		if music then
+			local duck = (T >= FIRE_AT - 0.8 and T < FIRE_AT) and 1 - smooth((T - FIRE_AT + 0.8) / 0.3) or 1
+			music.set(musicVol * duck)
+		end
+		for i, c in ipairs(CUES) do
+			if not fired[i] and T >= c.at then
+				fired[i] = true
+				if T - c.at < 0.5 and (watching or not c.near) then -- (joined late: past cues stay silent)
+					Sfx.play(c.name, nil, loud * (c.volume or 1), c.pitch)
+				end
+			end
+		end
+		-- the portal hums while it is open
+		if T >= OPEN_AT - 1 and T < SNAP_AT then
+			portalHum = portalHum or Sfx.loop("portal_hum")
+			portalHum.set(smooth((T - OPEN_AT + 1) / 2) * loud)
+		elseif portalHum then
+			portalHum.stop(0.3)
+			portalHum = nil
+		end
+		-- the ship's engines from the moment it slides out
+		if T >= EMERGE_FROM then
+			shipHum = shipHum or Sfx.loop(SHIP_HUM)
+			shipHum.set(smooth((T - EMERGE_FROM) / 4) * loud)
+		end
+	end
+	function s.takeHum()
+		local h = shipHum
+		shipHum = nil
+		return h
+	end
+	function s.stop()
+		if music then
+			music.stop(1)
+		end
+		if portalHum then
+			portalHum.stop(0.3)
+		end
+		if shipHum then
+			shipHum.stop(1)
+		end
+	end
+	return s
+end
+
+-- ============================================================
 -- Step 6: after the cutscene the Absolution lingers over the arena, then leaves backwards through a portal
 -- ============================================================
 local LINGER = 16 -- s it stays after the cutscene before the portal opens behind it
@@ -1393,8 +1536,9 @@ local WARP_OUT_AFTER = 4 -- ... the portal snaps shut; then everything is cleane
 local RING_IDLE = { RingA = 0.12, RingB = -0.18, RingC = 0.3 }
 
 -- `ship` is the warp-in's clone (moved out of the cutscene's folder); `deferred` are the cutscene's cleanups that must
--- wait until the ship is gone (the haze stays thin while it is in the sky); `onGone` runs at the very end.
-local function lingerShip(ship, deferred, onGone)
+-- wait until the ship is gone (the haze stays thin while it is in the sky); `onGone` runs at the very end; `hum` is the
+-- engines' loop from the soundtrack (or nil).
+local function lingerShip(ship, deferred, onGone, hum)
 	local folder = Instance.new("Folder")
 	folder.Name = "FleetStrikeLinger"
 	folder.Parent = workspace
@@ -1402,7 +1546,7 @@ local function lingerShip(ship, deferred, onGone)
 	local cf0 = ship.PrimaryPart.CFrame
 	local look = cf0.LookVector
 	-- the portal opens behind its stern, facing it (its own tear: rune ring, cracks, void, the snap)
-	local portal = CFrame.lookAt(cf0.Position - look * 250, cf0.Position)
+	local portal = CFrame.lookAt(cf0.Position - look * PORTAL_BEHIND, cf0.Position)
 	local tearUpdate, tearCleanup = skyTear(folder, portal)
 	local joints, parts = {}, {}
 	for _, d in ipairs(ship:GetDescendants()) do
@@ -1416,9 +1560,24 @@ local function lingerShip(ship, deferred, onGone)
 	local coreHalo = ship:FindFirstChild("CoreHalo", true)
 	local coreSize, haloSize = core and core.Size, coreHalo and coreHalo.Size
 	local t0 = os.clock()
+	local portalHum
 	local conn
 	conn = RunService.RenderStepped:Connect(function()
 		local lt = os.clock() - t0
+		-- sound: the engines go quiet (the cutscene is over); the warp-out portal hums, the ship fades into it, the boom
+		local wo0 = lt - LINGER
+		local into = math.clamp((wo0 - WARP_OUT_TEAR) / WARP_OUT_DRIFT, 0, 1)
+		if hum then
+			hum.set(SKY_VOLUME * (1 - smooth(lt / 2) * 0.3) * (1 - into))
+		end
+		if wo0 > 0 and wo0 < WARP_OUT_TEAR + WARP_OUT_DRIFT then
+			portalHum = portalHum or Sfx.loop("portal_hum")
+			portalHum.set(smooth(wo0 / 2) * SKY_VOLUME)
+		elseif portalHum then
+			portalHum.stop(0.3)
+			portalHum = nil
+			Sfx.play("warp_out", nil, SKY_VOLUME)
+		end
 		-- settle: the bow closes, the cannon slides back in, the turrets turn home, the rings unlock and turn slowly
 		local k = smooth(lt / SETTLE)
 		for _, s in ipairs(joints) do
@@ -1445,7 +1604,7 @@ local function lingerShip(ship, deferred, onGone)
 			end
 			tearUpdate(tt)
 			local u = math.clamp((wo - WARP_OUT_TEAR) / WARP_OUT_DRIFT, 0, 1)
-			ship:PivotTo(cf0 - look * 480 * u ^ 1.7) -- (slow to start, the heavy ship gathering way)
+			ship:PivotTo(cf0 - look * 480 * SKY_SCALE * u ^ 1.7) -- (slow to start, the heavy ship gathering way)
 			local pp = portal.Position
 			for _, p in ipairs(parts) do
 				local behind = (p.part.Position - pp):Dot(look) < 0
@@ -1457,6 +1616,9 @@ local function lingerShip(ship, deferred, onGone)
 		end
 		if wo > WARP_OUT_TEAR + WARP_OUT_DRIFT + WARP_OUT_AFTER then
 			conn:Disconnect()
+			if hum then
+				hum.stop(0)
+			end
 			tearCleanup()
 			for _, c in ipairs(deferred) do
 				c()
@@ -1517,10 +1679,10 @@ function FleetStrike.play(opts)
 	local axis = (axisFlat * math.cos(0.08) - Vector3.new(0, math.sin(0.08), 0)).Unit
 	ctx.shipCF = CFrame.lookAt(ctx.sky, ctx.sky + axis)
 	-- the camera's line from the drone to the warp-in: from Malak towards the tear, level
-	local toTear = ctx.sky - axis * 250 - M.Position
+	local toTear = ctx.sky - axis * PORTAL_BEHIND - M.Position
 	ctx.D = Vector3.new(toTear.X, 0, toTear.Z).Unit
-	ctx.portal = CFrame.lookAt(ctx.sky - axis * 250, ctx.sky)
-	ctx.bow = (ctx.shipCF * CFrame.new(0, 0, -215)).Position
+	ctx.portal = CFrame.lookAt(ctx.sky - axis * PORTAL_BEHIND, ctx.sky)
+	ctx.bow = (ctx.shipCF * CFrame.new(0, 0, -215 * SKY_SCALE)).Position
 	-- the realm keeper's eyes (the beam's first target), for the camera; the keeper nearest the gate
 	ctx.keeper = gate + Vector3.new(0, 80, 0)
 	do
@@ -1678,6 +1840,7 @@ function FleetStrike.play(opts)
 	local T = workspace:GetServerTimeNow() - startAt
 	local done = false
 	local BIND = "FleetStrikeCamera"
+	local sound = soundtrack(ctx)
 
 	local function finish()
 		if done then
@@ -1700,7 +1863,7 @@ function FleetStrike.play(opts)
 				if ctx.preview then
 					keeperRestore(true)
 				end
-			end)
+			end, sound.takeHum())
 		else
 			for _, c in ipairs(cleanups) do
 				c()
@@ -1709,6 +1872,7 @@ function FleetStrike.play(opts)
 				keeperRestore(false)
 			end
 		end
+		sound.stop()
 		fxFolder:Destroy()
 		if malak and malak.Parent then
 			malak:SetAttribute("FleetStart", nil)
@@ -1742,6 +1906,7 @@ function FleetStrike.play(opts)
 		for _, effect in ipairs(effects) do
 			effect(T)
 		end
+		sound.update(T, watching)
 		if watchBtn.root.Visible and T >= 44 then
 			watchBtn.root.Visible = false -- (too late to start watching)
 		end

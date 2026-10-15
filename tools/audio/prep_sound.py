@@ -3,7 +3,7 @@
   Loop (seamless, mono, peak -1 dB):
     python tools/audio/prep_sound.py loop <in> <out.ogg> [--length 4] [--start auto] [--xfade 0.5] [--stereo]
   One-shot (trim the silence at the start, mono, peak -1 dB, optional max length with a short fade-out):
-    python tools/audio/prep_sound.py shot <in> <out.ogg> [--max 2] [--stereo]
+    python tools/audio/prep_sound.py shot <in> <out.ogg> [--max 2] [--fade 0.15] [--start 0] [--stereo]
   Info (channels, length, levels, loudness every 0.5 s):
     python tools/audio/prep_sound.py info <in>
 
@@ -84,13 +84,15 @@ def db_arr(r):
 
 def shot(args):
     x = load(args.input, 2 if args.stereo else 1)
+    if args.start:
+        x = x[int(args.start * SR):]
     level = np.abs(x).max(axis=1)
     above = np.nonzero(level > np.abs(x).max() * 10 ** (-40 / 20))[0]
     a = max(0, above[0] - int(0.005 * SR)) if len(above) else 0
     x = x[a:]
     if args.max and len(x) > args.max * SR:
         x = x[:int(args.max * SR)].copy()
-        f = int(0.15 * SR)
+        f = int(args.fade * SR)
         x[-f:] *= np.linspace(1, 0, f)[:, None]
     save(args.output, normalize(x))
     print("trimmed %.3f s at the start, %.2f s long" % (a / SR, len(x) / SR))
@@ -111,6 +113,8 @@ ps = sub.add_parser("shot")
 ps.add_argument("input")
 ps.add_argument("output")
 ps.add_argument("--max", type=float, default=0)
+ps.add_argument("--fade", type=float, default=0.15)
+ps.add_argument("--start", type=float, default=0)
 ps.add_argument("--stereo", action="store_true")
 a = p.parse_args()
 {"info": info, "loop": loop, "shot": shot}[a.cmd](a)

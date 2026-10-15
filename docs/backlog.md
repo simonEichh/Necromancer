@@ -1,5 +1,42 @@
 # Backlog, state and open issues
 
+## State at the end of the 2026-10-15 Malak session (read this first)
+
+**Built and committed:** formation spacing; **Malak, the Envoy** (first Sovereign; model + drone, idle, orbital tag
+basic attack with the big hologram, drone volley as a generic `companion`, z-fighting fixed); **the Absolution** ship
+model; **the Fleet Strike** finisher cutscene steps 1-7 (frame, Malak's beats, warp-in, scan + barrage, cannon on the
+realm keeper + gate falls, ending with the ship lingering, real gameplay: 1000-gem unlock, trigger at 20% gate HP,
+everyone sees it, Watch button). Design notes: docs/envoy.md (everything about Malak), Design.md "Signature value"
+(decided) + "Gacha direction" (discussed).
+
+**Committed 2026-10-15 (evening):** the Settings panel (Master / Effects / Music, saved), Malak's attack sounds, the
+Fleet Strike sounds + music, the sky scene at SKY_SCALE. Sound files: the game versions (`sounds/malak/`) are in git,
+the originals (`sounds/_source/`, git-ignored) and the .wav drafts in `impacts/` / `magic/` are not.
+`tools/audio/make_whistle.py` is still untracked (its whistle sounded off): ask whether to delete it.
+
+**Next steps (agreed / open):**
+1. **Fleet Strike sounds:** the user is making them; they drop files into `sounds/malak/` with the names in
+   sounds/README.md (Fleet Strike table) + optional `fleet_music.ogg` (54 s cue, plan in the README). Adapt lengths
+   with prep_sound.py, upload (upload_sound.py), add ids to Sfx.lua, wire them into FleetStrike.lua at the beat times.
+   `shell_whistle` slot is empty (waits for a real one). **2026-10-15: the first 13 are in and wired (cue sheet = "Step 8"
+   in FleetStrike.lua, list in sounds/README.md); second batch (missiles, bow, reactor, charge, beam,
+   roar, gate, warp_out) in too; the tear in (3 files), the barrage uses cannon_far + shell_impact;
+   the music in (first try, cut to 52.5 s, not fitted to the beats). Not yet heard in play by the user.**
+2. Malak still open: rarity / pool weight (now weight 0 = DEV only), real damage numbers, the Sovereign class look (name
+   style, "Sovereign" on reveal / tooltip), the rail lance skill (special), shadow form (lv 10).
+3. Signatures rework per Design.md "Signature value" (specials = seconds of army DPS, small auras, cap of 3).
+4. From "general ideas.txt" (discussed, not started): small 3D unit over a magic circle on its grave (Malak is 750
+   parts: needs a simple copy), the portal visible behind the gate before it falls (remove the door), no reveal
+   overlay after single grave cinematics, Mastery for maxed units, gacha direction (featured unit, hard pity).
+5. Small: the user mentioned the Fleet Strike camera is fine now.
+6. **Fleet Strike draw distance (found 2026-10-15):** the ship (~800 studs from the camera) and the portal (~900) are not
+   drawn at lower graphics quality (Automatic drops it when the frame rate dips: the portal "spawns late or not at all";
+   on low-end phones the whole sky part is missing). Measured in Studio (neon parts, size does not help): Level 1 draws to
+   ~300-350 studs, Level 5 ~400-450, Level 10 ~700, Level 21 1000+. Fix: bring the whole sky scene in and scale it down by
+   the same factor (ship model, SKY_HEIGHT / SKY_SIDE / SKY_LEFT, PORTAL_RADIUS, the tear's vortex, beam / projectile
+   lengths), so it looks the same but sits inside ~300 studs. **Done (untested by the user): `SKY_SCALE = 1/3` in FleetStrike.lua
+   (the ship is `ScaleTo`'d, projectile speeds scaled so flight times stay, beam width x0.6 = `BEAM_WIDTH`).**
+
 ## State at the end of the 2026-10-14 / 15 session (read this first)
 
 **Built and committed (in order):**

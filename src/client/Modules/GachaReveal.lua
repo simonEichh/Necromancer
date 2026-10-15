@@ -46,6 +46,7 @@ local function playSound(name)
 		local s = Instance.new("Sound")
 		s.SoundId = id
 		s.Volume = 0.6
+		s.SoundGroup = require(script.Parent.Sfx).Effects
 		s.Parent = screenGui
 		s:Play()
 		game:GetService("Debris"):AddItem(s, 6)
