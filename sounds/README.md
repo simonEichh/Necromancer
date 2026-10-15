@@ -168,8 +168,8 @@ clunk + the end clunk from 3.85 s, which lands 1.35 s in = the bow fully open), 
 whole (replaces the portal snap when the ship leaves). After the user's first listen: drone_transform volume halved, target_lock (his basic attack's) plays at each reticle
 locking on after the scan fan (LOCKS, rising pitch). The barrage plays cannon_far (his basic attack's gun) per salvo instead of broadside, and the missiles are
 silent (the user wants only the distant cannons; missile_launch is uploaded but not cued). Second listen: drone_transform volume 0.12, transmit_pulse replaced by two layers (the user split it):
-transmit_laser (10 s of _source/malak/transmit_pulse_laser.ogg, 1.5 s fade, at 9.0, volume 0.5) and sublift_scanner (8.4 s, 1.5 s fade, at 9.0,
-volume 0.6, fading into the portal hum at 16.4-17.4), turret_turn not cued (too far to hear servos), shell_impact (his basic attack's) at the barrage's shell
+transmit_laser (10 s of _source/malak/transmit_pulse_laser.ogg, 1.5 s fade, at 9.0, volume 0.5) and sublift_scanner (9.9 s, 1.5 s fade, at 9.0,
+volume 0.6, full until the void opens at 17.4, then fading out by 18.9), turret_turn not cued (too far to hear servos), shell_impact (his basic attack's) at the barrage's shell
 and missile hits (boom() in FleetStrike.lua, at most one per 0.12 s, lower pitch). sky_tear is three files: tear_rumble (6 s from 0.5 s of
 _source/deep_tear_rumble_thunder.ogg, 2 s fade, at 13), tear_crack (from 0.45 s, at 15.2), tear_open (a swell from 0.5 s,
 2.54 s, timed so its peak lands on OPEN_AT 17.4; taken out again after a listen: uploaded, not cued). Volumes after
