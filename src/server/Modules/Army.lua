@@ -126,11 +126,19 @@ local function spawnUnit(unitType, customPos, plotState, level)
 	local walkTrack, attackTrack
 	local rigModel -- set for procedurally animated rigs (see client UnitAnimator)
 	local labelBase = def.size.Y / 2 + 1.3 -- height of the info label above the block centre
-	local unitModelTemplate = modelsFolder and modelsFolder:FindFirstChild(unitType)
+	-- an awakened unit (Economy.AWAKEN_LEVEL+) appears in its shadow form when it has one ("<Unit>_Shadow"); the form is
+	-- picked when it spawns (a unit levelled up while standing on a grave changes when it is placed again)
+	local shadowTemplate = nil
+	if modelsFolder and (level or 0) >= Economy.AWAKEN_LEVEL then
+		shadowTemplate = modelsFolder:FindFirstChild(unitType .. "_Shadow")
+	end
+	local unitModelTemplate = shadowTemplate or (modelsFolder and modelsFolder:FindFirstChild(unitType))
 	if unitModelTemplate and unitModelTemplate:IsA("Model") then
 		block.Transparency = 1
 		block.Parent = workspace
 		local modelClone = unitModelTemplate:Clone()
+		modelClone.Name = unitType -- (a shadow form keeps the unit's own name; the attribute Form tells them apart)
+		modelClone:SetAttribute("Form", shadowTemplate and "Shadow" or "Base")
 		local walkAnimId
 		local runAnimId
 		local attackAnimId
@@ -295,6 +303,7 @@ local function spawnUnit(unitType, customPos, plotState, level)
 		id = nextUnitId, -- stable order inside a formation row (see layoutFormation)
 		walkTrack = walkTrack, attackTrack = attackTrack,
 		model = rigModel, labelBase = labelBase,
+		shadowForm = shadowTemplate ~= nil, -- (its hits use the shadow version of its hit effect: "<hitFx>Shadow")
 	})
 end
 
@@ -1018,7 +1027,8 @@ local function update(now, dt)
 							plotState.wallHP = math.max(0, plotState.wallHP - damage)
 							earnHitGold(plotState, u, damage)
 							updateWallGui(plotState)
-							sendWallHit(plotState, impactPos, damage, u.def.transparent, u.def.hitFx)
+							sendWallHit(plotState, impactPos, damage, u.def.transparent,
+								u.def.hitFx and (u.shadowForm and u.def.hitFx .. "Shadow" or u.def.hitFx))
 							if plotState.wallHP <= 0 then breakWall(plotState) end
 						end
 						if u.def.hitDelay then

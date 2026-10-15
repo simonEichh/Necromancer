@@ -189,7 +189,7 @@ require(Modules.ForgePanel)
 require(Modules.GemShopPanel) -- the Gem Shop (Shop tile, right) and the Remote Forge tile (left)
 require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
 require(Modules.AltarFx) -- the Soul Altar's braziers burn as high as the realm upgrade levels
-require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 / 10
+require(Modules.LevelAuras) -- necromantic auras on units of level 3 / 6 / 9 (none from 10: the shadow form)
 require(Modules.Pickups) -- loot drops on the lane, the Soul Wisp, the first objective
 require(Modules.FingerBeam) -- the finger-beam attack (Hush): magic circle at the fingertip, beam to the wall
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains

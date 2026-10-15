@@ -191,6 +191,8 @@ function Economy.dustOf(rarity)
 end
 
 Economy.MAX_UNIT_LEVEL = 10
+-- from this level on a unit is "awakened": it appears in its shadow form (the model "<Unit>_Shadow", when it has one)
+Economy.AWAKEN_LEVEL = 10
 local LEVEL_DAMAGE = 0.30 -- +30% damage per level
 local UPGRADE_BASE_COST, UPGRADE_COST_GROWTH = 4, 1.55
 local UPGRADE_FAIL_LOSS = 0.5 -- a failed attempt costs this share of the materials

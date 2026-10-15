@@ -42,6 +42,14 @@ raised by the necromancer: a power fantasy told with darkness and light. Rules:
   Violet is the shared identity, plus **one accent per unit = a trace of what it was in life** (Zombie: rot green
   glowing through its cracks; Skelly: bone white; Ghoul: its yellow eyes), like a knight whose armor turned black
   but kept its red plume. The blue System-style UI frames come later, not now.
+- **Shadow = the awakened form (decided 2026-10-15, replaces "every unit in the shadow style"):** units keep a
+  dungeon-fantasy base look up to level 9; at `Economy.AWAKEN_LEVEL` (10) they appear in their shadow form (model
+  `<Unit>_Shadow`, same shape and rig, so the same animations; Army picks it at spawn, its hits send
+  `"<hitFx>Shadow"`). Level 10 shows no level aura: the shadow form is the reward (LevelAuras tiers 3 / 6 / 9 only).
+  Done: the Zombie (base: rotting flesh, bone shards, flies, a rot-green crush; shadow: the look above, violet crush),
+  the Skelly (shadow: black bones and skull, only the teeth bone white, violet-edged blade) and the Ghoul (shadow: black, its
+  yellow eyes kept, violet claws, low smoke). Every shadow form has the ethereal layer (ForceField shimmer, dark flames,
+  a faint violet tint); the forms differ by silhouette, accent and their own extras (blade smear, crawling smoke).
 - **Origin (agreed):** the graves hold the dead; digging one is the raising. The necromancer's command is **RISE**:
   the grave cracks, black smoke pours out, a shape rises and its eyes ignite violet. The reveal's fake-out becomes
   "the soul resists" (the smoke collapses, the grave shakes, then it gives in). Owned units live in the necromancer's

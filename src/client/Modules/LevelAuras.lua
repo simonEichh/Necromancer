@@ -3,12 +3,15 @@
 --   level 3  Grave Mark      souls rising from a ring around the feet
 --   level 6  Soul Orbit      + soul orbs with trails circling the body, a soft green light
 --   level 9  Necrotic Flame  + dark green flames licking up from the feet, black miasma on the ground
---   level 10 Lich Crown      + a ring of small skulls with glowing eyes circling above the head, a violet core in the
---                            flames, and a flash when the level is reached
+-- From Economy.AWAKEN_LEVEL (10) on a unit shows NO aura: it is awakened into its shadow form, and that is the reward
+-- (decided 2026-10-15; the old level-10 "Lich Crown" tier with its skull ring and flash was removed).
 -- Same look for every unit (no rarity special cases); sizes follow the unit's bounding box. Auras are only built for
 -- units near the camera. Highlights are NOT used (Roblox draws at most 31 per client).
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Economy = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Economy"))
 
 local TAG = "ProceduralUnit"
 local BUILD_DISTANCE = 140 -- auras exist only for units this close to the camera
@@ -18,12 +21,10 @@ local SOUL = Color3.fromRGB(120, 255, 190)
 local SOUL_PALE = Color3.fromRGB(200, 255, 230)
 local NECRO = Color3.fromRGB(40, 150, 80)
 local NECRO_DARK = Color3.fromRGB(10, 40, 24)
-local VOID = Color3.fromRGB(160, 70, 255)
-local BONE = Color3.fromRGB(226, 220, 196)
 
-local TIERS = { 3, 6, 9, 10 }
+local TIERS = { 3, 6, 9 }
 
-local auras = {} -- [model] = { level, folder, orbs = {welds}, skulls = {welds}, size, t0 }
+local auras = {} -- [model] = { level, folder, orbs = {welds}, size, t0 }
 
 local function seq(...)
 	local keys = {}
@@ -34,6 +35,9 @@ local function seq(...)
 end
 
 local function tierOf(level)
+	if (level or 0) >= Economy.AWAKEN_LEVEL then
+		return 0 -- (awakened: the shadow form replaces the aura)
+	end
 	local tier = 0
 	for i, need in ipairs(TIERS) do
 		if (level or 0) >= need then
@@ -105,7 +109,7 @@ local function build(model, level)
 	local folder = Instance.new("Folder")
 	folder.Name = "LevelAura"
 	folder.Parent = model
-	local aura = { level = level, folder = folder, orbs = {}, skulls = {}, t0 = os.clock(), width = width, height = height, feetY = feetY }
+	local aura = { level = level, folder = folder, orbs = {}, t0 = os.clock(), width = width, height = height, feetY = feetY }
 
 	-- 1) Grave Mark: souls rise from a ring around the feet (no visible ground circle: the user did not want one)
 	local ringR = width * 0.75 + 0.6
@@ -158,9 +162,7 @@ local function build(model, level)
 	-- 3) Necrotic Flame: dark green flames up the body, black miasma at the feet
 	if tier >= 3 then
 		local body = holder(folder, root, "AuraBody", Vector3.new(width, height * 0.8, width * 0.8), CFrame.new(0, feetY + height * 0.4, 0))
-		local flameColor = (tier >= 4)
-			and ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 200, 255)), ColorSequenceKeypoint.new(0.35, VOID), ColorSequenceKeypoint.new(0.7, NECRO), ColorSequenceKeypoint.new(1, NECRO_DARK) })
-			or ColorSequence.new({ ColorSequenceKeypoint.new(0, SOUL_PALE), ColorSequenceKeypoint.new(0.4, NECRO), ColorSequenceKeypoint.new(1, NECRO_DARK) })
+		local flameColor = ColorSequence.new({ ColorSequenceKeypoint.new(0, SOUL_PALE), ColorSequenceKeypoint.new(0.4, NECRO), ColorSequenceKeypoint.new(1, NECRO_DARK) })
 		emitter(body, {
 			Name = "Flame",
 			Texture = "rbxasset://textures/particles/fire_main.dds",
@@ -182,7 +184,7 @@ local function build(model, level)
 		emitter(body, {
 			Name = "FlameCore",
 			Texture = "rbxasset://textures/particles/fire_main.dds",
-			Color = ColorSequence.new((tier >= 4) and Color3.fromRGB(240, 220, 255) or SOUL_PALE, (tier >= 4) and VOID or SOUL),
+			Color = ColorSequence.new(SOUL_PALE, SOUL),
 			LightEmission = 0.4,
 			Size = seq({ 0, 1.4 * s }, { 0.5, 1.9 * s }, { 1, 0 }),
 			Transparency = seq({ 0, 0.55 }, { 0.5, 0.7 }, { 1, 1 }),
@@ -211,43 +213,6 @@ local function build(model, level)
 		})
 	end
 
-	-- 4) Lich Crown: a ring of small skulls above the head
-	if tier >= 4 then
-		local crownR = math.max(1.1, width * 0.45)
-		local sk = math.min(s, 3) * 1.5
-		for k = 1, 5 do
-			local skull, w = visiblePart(folder, root, "AuraSkull", Vector3.new(0.5, 0.5, 0.5) * sk, CFrame.new(), BONE, Enum.PartType.Ball, 0)
-			skull.Material = Enum.Material.SmoothPlastic
-			for _, side in ipairs({ -1, 1 }) do
-				local eye = Instance.new("Part")
-				eye.Name = "AuraSkullEye"
-				eye.Shape = Enum.PartType.Ball
-				eye.Size = Vector3.new(0.13, 0.13, 0.13) * sk
-				eye.Material = Enum.Material.Neon
-				eye.Color = SOUL
-				eye.CanCollide, eye.CanQuery, eye.CanTouch, eye.Massless, eye.CastShadow = false, false, false, true, false
-				eye.CFrame = skull.CFrame * CFrame.new(side * 0.11 * sk, 0.03 * sk, -0.21 * sk)
-				eye.Parent = folder
-				local ew = Instance.new("Weld")
-				ew.Part0, ew.Part1 = skull, eye
-				ew.C0 = CFrame.new(side * 0.11 * sk, 0.03 * sk, -0.21 * sk)
-				ew.Parent = eye
-			end
-			local jaw = Instance.new("Part")
-			jaw.Name = "AuraSkullJaw"
-			jaw.Size = Vector3.new(0.3, 0.14, 0.26) * sk
-			jaw.Material = Enum.Material.SmoothPlastic
-			jaw.Color = BONE
-			jaw.CanCollide, jaw.CanQuery, jaw.CanTouch, jaw.Massless, jaw.CastShadow = false, false, false, true, false
-			jaw.Parent = folder
-			local jw = Instance.new("Weld")
-			jw.Part0, jw.Part1 = skull, jaw
-			jw.C0 = CFrame.new(0, -0.24 * sk, -0.06 * sk)
-			jw.Parent = jaw
-			table.insert(aura.skulls, { weld = w, radius = crownR, phase = (k - 1) / 5 * 2 * math.pi, y = feetY + height + 0.5 * sk })
-		end
-	end
-
 	return aura
 end
 
@@ -259,47 +224,8 @@ local function destroy(model)
 	end
 end
 
--- a short burst of souls and a flash when a unit reaches the top level
-local function maxLevelFlash(model)
-	local root = rootOf(model)
-	if not root then return end
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = false, false, false, false
-	p.Shape = Enum.PartType.Ball
-	p.Material = Enum.Material.Neon
-	p.Color = SOUL_PALE
-	p.Size = Vector3.new(1, 1, 1)
-	p.CFrame = root.CFrame
-	p.Parent = workspace
-	local e = emitter(p, {
-		Texture = "rbxasset://textures/particles/sparkles_main.dds",
-		Color = ColorSequence.new(SOUL_PALE, VOID),
-		LightEmission = 1,
-		Size = seq({ 0, 0.8 }, { 1, 0 }),
-		Lifetime = NumberRange.new(0.8, 1.4),
-		Speed = NumberRange.new(10, 22),
-		SpreadAngle = Vector2.new(180, 180),
-		Rate = 0,
-	})
-	e:Emit(60)
-	local t0 = os.clock()
-	local conn
-	conn = RunService.RenderStepped:Connect(function()
-		local f = (os.clock() - t0) / 0.5
-		if f >= 1 then
-			p.Transparency = 1
-			conn:Disconnect()
-			task.delay(1.6, function() p:Destroy() end)
-			return
-		end
-		p.Size = Vector3.new(1, 1, 1) * (1 + 14 * f)
-		p.Transparency = f
-	end)
-end
-
 -- ============================================================
--- Tracking: build/destroy auras by level and distance, animate orbs and skulls
+-- Tracking: build/destroy auras by level and distance, animate the orbs
 -- ============================================================
 local tracked = {} -- [model] = true
 
@@ -322,12 +248,7 @@ local function track(model)
 	if tracked[model] or not model:IsA("Model") then return end
 	tracked[model] = true
 	model:GetAttributeChangedSignal("Level"):Connect(function()
-		local before = auras[model] and auras[model].level or 0
 		refresh(model)
-		local level = model:GetAttribute("Level") or 0
-		if level >= TIERS[#TIERS] and before < TIERS[#TIERS] and auras[model] then
-			maxLevelFlash(model)
-		end
 	end)
 	refresh(model)
 end
@@ -362,12 +283,6 @@ RunService.RenderStepped:Connect(function()
 		for _, orb in ipairs(aura.orbs) do
 			local a = t * 2.2 + orb.phase
 			orb.weld.C0 = CFrame.new(math.cos(a) * orb.radius, orb.y + math.sin(t * 3 + orb.phase) * 0.25, math.sin(a) * orb.radius)
-		end
-		for _, skull in ipairs(aura.skulls) do
-			local a = -t * 1.1 + skull.phase
-			local pos = Vector3.new(math.cos(a) * skull.radius, skull.y + math.sin(t * 2 + skull.phase) * 0.1, math.sin(a) * skull.radius)
-			-- each skull looks outward
-			skull.weld.C0 = CFrame.lookAt(pos, pos + Vector3.new(pos.X, 0, pos.Z))
 		end
 	end
 end)

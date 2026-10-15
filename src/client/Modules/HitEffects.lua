@@ -104,14 +104,17 @@ local function stroke(normal, a, b, bulge, thickness, coreColor, glowColor, dela
 	end
 end
 
-local function slash(origin, normal, scale)
+local SHADOW_GLOW = Color3.fromRGB(120, 60, 255) -- the awakened forms' cuts: the unit's accent in the core, violet round it
+
+local function slash(origin, normal, scale, shadow)
+	local glowColor = shadow and SHADOW_GLOW or SLASH_GLOW
 	local right = (-normal):Cross(Vector3.yAxis) -- the attacker looks along -normal: its right hand side
 	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
 	local up = Vector3.yAxis
 	local a = origin + (right * 1.35 + up * 1.15) * scale
 	local b = origin - (right * 1.35 + up * 1.0) * scale
 	local bulge = (right - up).Unit * 0.45 * scale -- the arc of the swing bows out a little
-	stroke(normal, a, b, bulge, 0.3, SLASH_COLOR, SLASH_GLOW, 0, SLASH_SWEEP, scale)
+	stroke(normal, a, b, bulge, 0.3, SLASH_COLOR, glowColor, 0, SLASH_SWEEP, scale)
 
 	-- the flash where the edge bites (the middle of the cut)
 	local centre = (a + b) / 2 + bulge + normal * 0.3
@@ -132,7 +135,7 @@ local function slash(origin, normal, scale)
 	emitterPart.Transparency = 1
 	local sparks = Instance.new("ParticleEmitter")
 	sparks.Texture = SPARK_TEXTURE
-	sparks.Color = ColorSequence.new(SLASH_COLOR, Color3.fromRGB(255, 236, 190))
+	sparks.Color = ColorSequence.new(SLASH_COLOR, shadow and SHADOW_GLOW or Color3.fromRGB(255, 236, 190))
 	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.32 * scale), NumberSequenceKeypoint.new(1, 0) })
 	sparks.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
 	sparks.LightEmission = 1
@@ -165,7 +168,7 @@ local function slash(origin, normal, scale)
 	dust:Emit(2)
 
 	local light = Instance.new("PointLight")
-	light.Color = SLASH_GLOW
+	light.Color = glowColor
 	light.Range = 10 * scale
 	light.Brightness = 5
 	light.Shadows = false
@@ -181,7 +184,9 @@ end
 local CLAW_COLOR = Color3.fromRGB(222, 244, 150)
 local CLAW_GLOW = Color3.fromRGB(140, 190, 60)
 
-local function claw(origin, normal, scale)
+local function claw(origin, normal, scale, shadow)
+	local coreColor = shadow and Color3.fromRGB(244, 238, 150) or CLAW_COLOR -- (the shadow Ghoul's yellow eyes)
+	local glowColor = shadow and SHADOW_GLOW or CLAW_GLOW
 	local right = (-normal):Cross(Vector3.yAxis)
 	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
 	local up = Vector3.yAxis
@@ -189,7 +194,7 @@ local function claw(origin, normal, scale)
 		local off = right * (i * 0.42 * scale)
 		local a = origin + off + (up * 1.1 + right * (0.18 + i * 0.06)) * scale
 		local b = origin + off * 1.2 - (up * 1.0 + right * 0.1) * scale
-		stroke(normal, a, b, right * 0.12 * scale, 0.16, CLAW_COLOR, CLAW_GLOW, math.abs(i) * 0.025, 0.08, scale)
+		stroke(normal, a, b, right * 0.12 * scale, 0.16, coreColor, glowColor, math.abs(i) * 0.025, 0.08, scale)
 	end
 
 	local emitterPart = newPart("HitEmitter", Vector3.one * 0.2, CFrame.lookAt(origin + normal * 0.3, origin + normal * 1.3 - up * 0.3))
@@ -231,7 +236,7 @@ local function claw(origin, normal, scale)
 	dust:Emit(3)
 
 	local light = Instance.new("PointLight")
-	light.Color = CLAW_GLOW
+	light.Color = glowColor
 	light.Range = 8 * scale
 	light.Brightness = 2.5
 	light.Shadows = false
@@ -244,14 +249,26 @@ end
 -- Style "Crush" (the Zombie's club slam; shadow-army look): blunt force. A violet shockwave ring bursts out across the
 -- wall face, a spider-web of cracks spreads from the impact (glowing shadow violet, cooling to dark scratches, the inner
 -- segments first), black smoke and rubble burst off the wall, and dust rolls out along the ground at the wall's base.
-local CRUSH_HOT = Color3.fromRGB(190, 150, 255)
-local CRUSH_GLOW = Color3.fromRGB(110, 50, 230)
+-- two palettes: the base form's rot green and the awakened shadow form's violet (style "CrushShadow")
+local CRUSH_PALETTES = {
+	base = {
+		hot = Color3.fromRGB(200, 255, 140),
+		glow = Color3.fromRGB(80, 160, 30),
+		smoke = { Color3.fromRGB(70, 74, 52), Color3.fromRGB(110, 112, 90) },
+	},
+	shadow = {
+		hot = Color3.fromRGB(190, 150, 255),
+		glow = Color3.fromRGB(110, 50, 230),
+		smoke = { Color3.fromRGB(16, 10, 28), Color3.fromRGB(50, 26, 90) },
+	},
+}
 local CRACK_COUNT = 7
 
 local groundParams = RaycastParams.new()
 groundParams.FilterType = Enum.RaycastFilterType.Exclude
 
-local function crush(origin, normal, scale)
+local function crush(origin, normal, scale, shadow)
+	local pal = shadow and CRUSH_PALETTES.shadow or CRUSH_PALETTES.base
 	local right = (-normal):Cross(Vector3.yAxis)
 	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
 	local up = normal:Cross(right).Unit
@@ -264,7 +281,7 @@ local function crush(origin, normal, scale)
 	local ring = newPart("CrushRing", Vector3.new(0.06, 0.6 * scale, 0.6 * scale), ringCF)
 	ring.Shape = Enum.PartType.Cylinder
 	ring.Material = Enum.Material.Neon
-	ring.Color = CRUSH_GLOW
+	ring.Color = pal.glow
 	ring.Transparency = 0.25
 	TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Size = Vector3.new(0.06, 6 * scale, 6 * scale),
@@ -276,7 +293,7 @@ local function crush(origin, normal, scale)
 	local core = newPart("HitCore", Vector3.one * 0.6 * scale, CFrame.new(origin + normal * 0.3))
 	core.Shape = Enum.PartType.Ball
 	core.Material = Enum.Material.Neon
-	core.Color = CRUSH_HOT
+	core.Color = pal.hot
 	core.Transparency = 0.1
 	TweenService:Create(core, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Size = Vector3.one * 2.6 * scale,
@@ -298,12 +315,12 @@ local function crush(origin, normal, scale)
 			local width = (0.14 - k * 0.03) * scale
 			local p = newPart("CrushCrack", Vector3.new(width, 0.05, seg.Magnitude + width), CFrame.lookAt(mid, mid + seg, normal))
 			p.Material = Enum.Material.Neon
-			p.Color = CRUSH_HOT
+			p.Color = pal.hot
 			p.Transparency = 1
 			task.delay((k - 1) * 0.03, function()
 				p.Transparency = 0
 				local cool = TweenService:Create(p, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					Color = CRUSH_GLOW,
+					Color = pal.glow,
 					Transparency = 0.3,
 				})
 				cool.Completed:Connect(function()
@@ -324,7 +341,7 @@ local function crush(origin, normal, scale)
 	emitterPart.Transparency = 1
 	local smoke = Instance.new("ParticleEmitter")
 	smoke.Texture = DUST_TEXTURE
-	smoke.Color = ColorSequence.new(Color3.fromRGB(16, 10, 28), Color3.fromRGB(50, 26, 90))
+	smoke.Color = ColorSequence.new(pal.smoke[1], pal.smoke[2])
 	smoke.LightInfluence = 0
 	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2 * scale), NumberSequenceKeypoint.new(1, 3.6 * scale) })
 	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
@@ -359,7 +376,7 @@ local function crush(origin, normal, scale)
 	rubble:Emit(math.floor(10 + 4 * scale))
 
 	local light = Instance.new("PointLight")
-	light.Color = CRUSH_GLOW
+	light.Color = pal.glow
 	light.Range = 12 * scale
 	light.Brightness = 4
 	light.Shadows = false
@@ -435,6 +452,11 @@ local function flash(position, forward, damage, isGhost, style)
 	local normal = -(typeof(forward) == "Vector3" and forward.Magnitude > 0.1 and forward.Unit or Vector3.zAxis)
 	local origin = position + normal * 0.4
 	local facing = CFrame.lookAt(origin, origin + normal)
+	-- an awakened unit's hits come as "<style>Shadow" (the shadow palette of that hit effect)
+	local shadow = type(style) == "string" and style:sub(-6) == "Shadow"
+	if shadow then
+		style = style:sub(1, -7)
+	end
 	if style == "Slash" or style == "Claw" or style == "Crush" then
 		-- the cuts lie flat on the wall: sample the real (bumpy) surface across the area they cover and put them just in
 		-- front of the stone that sticks out furthest
@@ -449,11 +471,11 @@ local function flash(position, forward, damage, isGhost, style)
 		end
 		local at = position + normal * (depth + 0.2)
 		if style == "Slash" then
-			slash(at, normal, scale)
+			slash(at, normal, scale, shadow)
 		elseif style == "Claw" then
-			claw(at, normal, scale)
+			claw(at, normal, scale, shadow)
 		else
-			crush(at, normal, scale)
+			crush(at, normal, scale, shadow)
 		end
 		return
 	end
