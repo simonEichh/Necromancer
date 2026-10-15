@@ -40,6 +40,8 @@ the originals (`sounds/_source/`, git-ignored) and the .wav drafts in `impacts/`
    own (e.g. a separate SHIP_SCALE ~0.4-0.45 while the distances stay at SKY_SCALE 1/3: check it still clears the
    portal, the ship-relative offsets in warpIn / barrage / finale use SKY_SCALE and would need SHIP_SCALE), or tighter
    lenses (lower FOV) in the warp-in / barrage camera keys. Keep it within ~300 studs of the camera.
+   **Done: `SHIP_SCALE = 0.55` (65% bigger than 1/3; measured in play: 263 studs long, was 160, ~244 from the camera) for the ship and every offset measured on it; PORTAL_BEHIND is
+   ship-sized too so the stern clears the portal. The sky positions, portal and vortex stay at SKY_SCALE.**
 
 ## State at the end of the 2026-10-14 / 15 session (read this first)
 

@@ -50,10 +50,13 @@ local BAR_TIME = 0.8
 -- 2026-10-15: Level 1 draws to ~300-350 studs, Level 5 ~450, Level 10 ~700; at full size the ship sat ~800 away and
 -- vanished whenever Automatic quality dropped). Every sky distance / size below is multiplied by it.
 local SKY_SCALE = 1 / 3
+-- The ship itself is a little bigger than that (the user: "it should look a bit bigger"): its own size and every
+-- offset measured on it (bow, muzzle, missile tubes, the cannon slide, the warp travel) use SHIP_SCALE
+local SHIP_SCALE = 0.55
 local SKY_HEIGHT = 400 * SKY_SCALE -- (far away and not too steep: the player sees the whole broadside, not the belly)
 local SKY_SIDE = 650 * SKY_SCALE
 local SKY_LEFT = 150 * SKY_SCALE -- (then shifted this far to the left as seen from Malak)
-local PORTAL_BEHIND = 250 * SKY_SCALE -- the portal's distance behind the ship's final place
+local PORTAL_BEHIND = 250 * SHIP_SCALE -- the portal's distance behind the ship's final place (ship-sized: its stern must clear the portal)
 local SKY_ALONG = 0.75 -- (of the way from Malak to the gate)
 
 -- The beats (docs/envoy.md, "Fleet Strike cutscene"): start time and name (the Studio caption; the camera runs on its
@@ -625,11 +628,11 @@ local function warpIn(folder, portal, shipFinal, ctx)
 		return function() end, function() end
 	end
 	local ship = template:Clone()
-	ship:ScaleTo(ship:GetScale() * SKY_SCALE)
+	ship:ScaleTo(ship:GetScale() * SHIP_SCALE)
 	-- (ScaleTo leaves the lights' ranges alone: at full reach the bow light lit up the portal's dark void)
 	for _, d in ipairs(ship:GetDescendants()) do
 		if d:IsA("Light") then
-			d.Range *= SKY_SCALE
+			d.Range *= SHIP_SCALE
 		end
 	end
 	ship.PrimaryPart.Anchored = true
@@ -643,7 +646,7 @@ local function warpIn(folder, portal, shipFinal, ctx)
 			if d.Name == "Window" then
 				-- (dark until the lights run down the hull; its place along the hull, 0 = bow .. 1 = stern)
 				local z = (ship.PrimaryPart.CFrame:PointToObjectSpace(d.Position)).Z
-				table.insert(windows, { part = d, base = d.Transparency, along = math.clamp((z + 140 * SKY_SCALE) / (280 * SKY_SCALE), 0, 1) })
+				table.insert(windows, { part = d, base = d.Transparency, along = math.clamp((z + 140 * SHIP_SCALE) / (280 * SHIP_SCALE), 0, 1) })
 				d.Transparency = 1
 			end
 		end
@@ -663,9 +666,9 @@ local function warpIn(folder, portal, shipFinal, ctx)
 	local haloSize = coreHalo and coreHalo.Size
 	local haloBase = coreHalo and coreHalo.Transparency
 	local axis = shipFinal.LookVector
-	-- the bow tip sits ~225 studs (x SKY_SCALE) ahead of the core, the stern ~210 behind: from "bow touching the portal" to "stern
+	-- the bow tip sits ~225 studs (x SHIP_SCALE) ahead of the core, the stern ~210 behind: from "bow touching the portal" to "stern
 	-- just clear of it"
-	local startCF = shipFinal - axis * (portal.Position - shipFinal.Position):Dot(-axis) - axis * 225 * SKY_SCALE
+	local startCF = shipFinal - axis * (portal.Position - shipFinal.Position):Dot(-axis) - axis * 225 * SHIP_SCALE
 	local travel = (shipFinal.Position - startCF.Position).Magnitude
 	return function(T)
 		if T < EMERGE_FROM - 0.2 then
@@ -946,7 +949,7 @@ local function barrage(folder, ctx)
 			end
 		end
 		-- the scan fan: from the bow over the gate, sweeping down and up twice
-		local bow = ship and ship.PrimaryPart and (ship.PrimaryPart.CFrame * CFrame.new(0, 0, -200 * SKY_SCALE)).Position
+		local bow = ship and ship.PrimaryPart and (ship.PrimaryPart.CFrame * CFrame.new(0, 0, -200 * SHIP_SCALE)).Position
 		local fanOn = bow and T >= FAN_FROM and T < FAN_TO
 		local sweep = fanOn and (0.5 - 0.5 * math.cos((T - FAN_FROM) / (FAN_TO - FAN_FROM) * math.pi * 4)) or 0
 		for i, p in ipairs(fan) do
@@ -994,7 +997,7 @@ local function barrage(folder, ctx)
 					local m = mainMuzzles[((salvoIndex - 1) * 3 + b) % #mainMuzzles + 1]
 					local from = m.Position
 					local to = gatePoint(ctx, (math.random() - 0.5) * 1.8, math.random())
-					blast(folder, active, from, 1.4 * SKY_SCALE, HOT) -- (the muzzle flash)
+					blast(folder, active, from, 1.4 * SHIP_SCALE, HOT) -- (the muzzle flash)
 					projectile(folder, active, from, to, (to - from).Magnitude / SHELL_SPEED, 1.4, HOT, function()
 						blast(folder, active, to, 2.2)
 						boom(ctx, 0.7)
@@ -1019,9 +1022,9 @@ local function barrage(folder, ctx)
 			while missileLaunched < due do
 				missileLaunched += 1
 				local root = ship.PrimaryPart.CFrame
-				local from = (root * CFrame.new(Vector3.new((missileLaunched % 2 == 0 and 1 or -1) * 30, 25, 120 + (missileLaunched % 4) * 12) * SKY_SCALE)).Position
+				local from = (root * CFrame.new(Vector3.new((missileLaunched % 2 == 0 and 1 or -1) * 30, 25, 120 + (missileLaunched % 4) * 12) * SHIP_SCALE)).Position
 				local to = gatePoint(ctx, (math.random() - 0.5) * 1.8, 0.2 + math.random() * 0.7)
-				local up = from + (Vector3.new(0, 90, 0) + root.RightVector * ((missileLaunched % 2 == 0) and 60 or -60)) * SKY_SCALE
+				local up = from + (Vector3.new(0, 90, 0) + root.RightVector * ((missileLaunched % 2 == 0) and 60 or -60)) * SHIP_SCALE
 				local mid = up:Lerp(to, 0.5) + Vector3.new(0, 60 * SKY_SCALE, 0)
 				local function curve(f)
 					local a = from:Lerp(up, f)
@@ -1065,7 +1068,7 @@ local SWEEP_MID = 48.6
 local GATE_HIT = 49.4 -- ... onto the gate, which falls
 local BEAM_OFF = 50.3
 local BOW_OPEN_ANGLE = 0.62
-local CANNON_SLIDE = 30 * SKY_SCALE
+local CANNON_SLIDE = 30 * SHIP_SCALE
 local BEAM_WIDTH = 0.6 -- (the beam's thickness: between full size and SKY_SCALE, as it ends on the keeper close by)
 local WHITE = Color3.fromRGB(255, 255, 255)
 
@@ -1149,7 +1152,7 @@ local function finale(folder, ctx)
 	local chargeHalo = newPart(folder, Vector3.one, GLOW, 1, Enum.PartType.Ball)
 	local chargeLight = Instance.new("PointLight")
 	chargeLight.Color = GLOW
-	chargeLight.Range = 60 * SKY_SCALE
+	chargeLight.Range = 60 * SHIP_SCALE
 	chargeLight.Brightness = 0
 	chargeLight.Shadows = false
 	chargeLight.Parent = charge
@@ -1157,9 +1160,9 @@ local function finale(folder, ctx)
 	pull.Texture = SPARK
 	pull.Color = ColorSequence.new(GLOW_CORE, GLOW)
 	pull.LightEmission = 1
-	pull.Size = NumberSequence.new(1.6 * SKY_SCALE, 0.2 * SKY_SCALE)
+	pull.Size = NumberSequence.new(1.6 * SHIP_SCALE, 0.2 * SHIP_SCALE)
 	pull.Lifetime = NumberRange.new(0.5, 0.8)
-	pull.Speed = NumberRange.new(40 * SKY_SCALE, 60 * SKY_SCALE)
+	pull.Speed = NumberRange.new(40 * SHIP_SCALE, 60 * SHIP_SCALE)
 	pull.Shape = Enum.ParticleEmitterShape.Sphere
 	pull.ShapeInOut = Enum.ParticleEmitterShapeInOut.Inward
 	pull.Rate = 0
@@ -1324,11 +1327,11 @@ local function finale(folder, ctx)
 		end
 
 		-- the charge at the muzzle
-		local mz = muzzle and muzzle.Position or (root * CFrame.new(0, 0, -200 * SKY_SCALE)).Position
+		local mz = muzzle and muzzle.Position or (root * CFrame.new(0, 0, -200 * SHIP_SCALE)).Position
 		local ch = e(CHARGE_FROM, FIRE_AT)
 		local firing = T >= FIRE_AT and T < BEAM_OFF
 		if T >= CHARGE_FROM and T < BEAM_OFF then
-			local size = (4 + 14 * ch + (firing and 6 or 0)) * SKY_SCALE
+			local size = (4 + 14 * ch + (firing and 6 or 0)) * SHIP_SCALE
 			charge.Size = Vector3.one * size
 			chargeHalo.Size = Vector3.one * size * 1.8
 			charge.CFrame, chargeHalo.CFrame = CFrame.new(mz), CFrame.new(mz)
@@ -1725,7 +1728,7 @@ local function lingerShip(ship, deferred, onGone, hum)
 			end
 			tearUpdate(tt)
 			local u = math.clamp((wo - WARP_OUT_TEAR) / WARP_OUT_DRIFT, 0, 1)
-			ship:PivotTo(cf0 - look * 480 * SKY_SCALE * u ^ 1.7) -- (slow to start, the heavy ship gathering way)
+			ship:PivotTo(cf0 - look * 480 * SHIP_SCALE * u ^ 1.7) -- (slow to start, the heavy ship gathering way)
 			local pp = portal.Position
 			for _, p in ipairs(parts) do
 				local behind = (p.part.Position - pp):Dot(look) < 0
@@ -1803,7 +1806,7 @@ function FleetStrike.play(opts)
 	local toTear = ctx.sky - axis * PORTAL_BEHIND - M.Position
 	ctx.D = Vector3.new(toTear.X, 0, toTear.Z).Unit
 	ctx.portal = CFrame.lookAt(ctx.sky - axis * PORTAL_BEHIND, ctx.sky)
-	ctx.bow = (ctx.shipCF * CFrame.new(0, 0, -215 * SKY_SCALE)).Position
+	ctx.bow = (ctx.shipCF * CFrame.new(0, 0, -215 * SHIP_SCALE)).Position
 	-- the realm keeper's eyes (the beam's first target), for the camera; the keeper nearest the gate
 	ctx.keeper = gate + Vector3.new(0, 80, 0)
 	do
