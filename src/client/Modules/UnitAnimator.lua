@@ -158,6 +158,44 @@ local STRIKE = {
 	{ 1.12, table.unpack(STRIKE_GUARD) },
 }
 
+-- AttackStyle "Pounce" (the crawling Ghoul, Pose "Crawler"; see the Crawler block in animate). Keys { t, lift, forward
+-- (- = towards the wall), body pitch (+ = front up), spine, neck pitch (+ = head up), jaw, front shoulder (+ = arm
+-- forward / up), front elbow, wrist extra (+ = claws up, - = hooked down; the hand is kept level otherwise), hind hip,
+-- hind knee, ankle extra }. Like a cat: crouch and coil back, leap (the hind legs push off, the arms fly up), rake down
+-- with both claws at the top of the leap (contact ~0.46 s: the unit def's hitDelay 0.48 lands the WallHit then), land
+-- in a crouch, hop back into the stalking crouch. Starts and ends in that crouch.
+local POUNCE_READY = { -0.2, 0, -0.05, 0.05, 0.2, 0.15, 0, 0.15, 0, 0.3, -0.55, 0 }
+local POUNCE = {
+	{ 0.00, table.unpack(POUNCE_READY) },
+	{ 0.22, -0.45, 0.35, -0.15, 0.12, 0.35, 0.1, -0.25, 0.35, 0, 0.65, -1.0, 0 }, -- coiled: low, weight back
+	{ 0.30, 0.45, -0.8, 0.35, 0.25, -0.05, 0.6, 1.5, -0.1, 0.6, -0.5, 0.25, -0.4 }, -- launch: the hind legs push off
+	{ 0.40, 1.0, -2.0, 0.5, 0.1, -0.25, 0.75, 2.2, 0.15, 0.8, -0.55, 0.1, -0.4 }, -- the top: claws high, jaws wide
+	{ 0.46, 0.5, -3.0, 0.05, -0.25, -0.1, 0.35, 0.35, 0.1, -0.9, 0.45, -0.6, 0.2 }, -- the rake: both claws slam down
+	{ 0.62, -0.2, -2.8, -0.2, -0.15, 0.3, 0.2, -0.1, 0.6, 0, 0.55, -0.95, 0 }, -- landed, crouched under the wall
+	{ 0.84, 0.3, -1.3, 0.08, 0.05, 0.2, 0.05, 0.45, 0.45, 0.2, -0.1, -0.3, 0 }, -- the hop back
+	{ 1.05, table.unpack(POUNCE_READY) },
+}
+
+-- How far a unit can lunge before it would go into the wall: the distance from `origin` along `dir` to the first
+-- anchored, visible part (the wall's real, bumpy surface; the units in the way are unanchored), or nil.
+local wallRayParams = RaycastParams.new()
+wallRayParams.FilterType = Enum.RaycastFilterType.Exclude
+local function distanceAhead(origin, dir, maxDist)
+	local ignore = {}
+	for _ = 1, 6 do
+		wallRayParams.FilterDescendantsInstances = ignore
+		local hit = workspace:Raycast(origin, dir * maxDist, wallRayParams)
+		if not hit then
+			return nil
+		end
+		if hit.Instance.Anchored and hit.Instance.Transparency < 1 then
+			return hit.Distance
+		end
+		table.insert(ignore, hit.Instance)
+	end
+	return nil
+end
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -250,7 +288,7 @@ local function animate(model, rig, dt, now)
 				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 			end
 		end
-	elseif u and style ~= "Strike" then
+	elseif u and style ~= "Strike" and style ~= "Pounce" then
 		local shoulder, elbow, lean, mouth = attackPose(u)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
@@ -418,6 +456,172 @@ local function animate(model, rig, dt, now)
 		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
 		local jitter = rattle * 0.015 * (1 - fw)
 		set(rig, "Root", CFrame.new((sm("lat", lat) + jitter) * scale, bob + float + rise + sm("lift", lift) * scale, sm("fwd", fwd) * scale))
+	end
+
+	-- Pose "Crawler" (the Ghoul, AttackStyle "Pounce"): a starved thing on all fours (build_ghoul.lua). Every joint turns
+	-- about the model's own axes. Three layers, mixed and then run through stiff springs (no snapping):
+	--   walk: a fast skittering diagonal gait (left front with right hind), the paws lift as they swing forward and stay
+	--     level, the body rolls and bobs under a head that stays steady;
+	--   idle: a stalking crouch, breathing; the head jerks to new spots (a stiff, underdamped spring: it snaps and
+	--     overshoots), sniffs now and then, scratches the ground twice with the right claw (~6.5 s) and has a full-body
+	--     spasm (~9 s);
+	--   fight: the POUNCE cycle (the right side trails the left by 0.03 s), the hind end wiggles before the leap like a
+	--     cat's; between attacks it holds the crouch and eases out ~1 s after the last attack.
+	if model:GetAttribute("Pose") == "Crawler" then
+		local cr = rig.crawler
+		if not cr then
+			cr = { sm = {}, fight = 0, phase = 0, yaw = 0, yawV = 0, pitch = 0, pitchV = 0 }
+			rig.crawler = cr
+		end
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+		local cd = model:GetAttribute("AttackCD") or 1.2
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.0
+		cr.fight += ((fighting and 1 or 0) - cr.fight) * clamp01(dt * (fighting and 10 or 2.5))
+		local fw = cr.fight * cr.fight * (3 - 2 * cr.fight) * (1 - w)
+		local sw = 1 - w
+		cr.phase += dt * (4 + speed * 0.55) * w
+
+		-- channels
+		local L = { S = 0, E = 0, Wx = 0, H = 0, K = 0, Ax = 0 } -- left front + left hind
+		local R = { S = 0, E = 0, Wx = 0, H = 0, K = 0, Ax = 0 }
+		local lift, fwd, pitch, roll, yaw, spine, spineYaw = 0, 0, 0, 0, 0, 0, 0
+		local neckP, neckY, neckR, mouth = 0, 0, 0, 0
+
+		-- walk
+		local function gait(side, ph)
+			local swingF, liftF = math.sin(ph), math.max(0, math.cos(ph))
+			local swingH, liftH = math.sin(ph + math.pi), math.max(0, math.cos(ph + math.pi))
+			side.S, side.E = swingF * 0.45 * w, liftF * 0.55 * w
+			side.H, side.K, side.Ax = swingH * 0.4 * w, -liftH * 0.55 * w, liftH * 0.2 * w
+		end
+		gait(L, cr.phase)
+		gait(R, cr.phase + math.pi)
+		lift = -math.abs(math.cos(cr.phase)) * 0.07 * w
+		roll = math.sin(cr.phase) * 0.06 * w
+		spine = math.sin(cr.phase * 2) * 0.04 * w
+		neckP = -spine * 0.8 + 0.05 * w
+		mouth = 0.12 * w
+
+		-- idle
+		if sw > 0.001 then
+			local breath = math.sin(t * 1.6)
+			-- the head jerks to a new spot about once a second
+			local idx = math.floor(t * 1.1)
+			local r1 = (math.sin(idx * 12.9898) * 43758.5453) % 1
+			local r2 = (math.sin(idx * 78.233) * 12345.6789) % 1
+			cr.yaw, cr.yawV = springStep(cr.yaw, cr.yawV, (r1 - 0.5) * 0.9, 320, 14, dt)
+			cr.pitch, cr.pitchV = springStep(cr.pitch, cr.pitchV, (r2 - 0.5) * 0.35, 320, 14, dt)
+			local sniffCyc = (t * 0.3) % 1
+			local sniff = sniffCyc < 0.2 and math.sin(sniffCyc / 0.2 * math.pi) or 0
+			local scratchCyc = (t * 0.155) % 1
+			local scratch = scratchCyc < 0.12 and math.sin(scratchCyc / 0.12 * math.pi) or 0
+			local rake = scratch > 0 and math.sin(scratchCyc / 0.12 * math.pi * 4) or 0
+			local spasmCyc = (t * 0.11) % 1
+			local spasm = spasmCyc < 0.035 and math.sin(spasmCyc / 0.035 * math.pi) or 0
+			local jolt = math.sin(now * 53) * spasm
+
+			lift = mix(lift, -0.12 + breath * 0.02, sw)
+			spine = mix(spine, breath * 0.03 + jolt * 0.12, sw)
+			roll = mix(roll, jolt * 0.06, sw)
+			neckP = mix(neckP, 0.1 + cr.pitch + math.sin(now * 16) * 0.05 * sniff - scratch * 0.25 + jolt * 0.2, sw)
+			neckY = mix(neckY, cr.yaw * (1 - scratch) - scratch * 0.3, sw)
+			neckR = mix(neckR, cr.yaw * -0.3 + jolt * 0.15, sw)
+			mouth = mix(mouth, 0.08 + math.abs(math.sin(now * 23)) * 0.08 * sniff + spasm * 0.3, sw)
+			for _, side in ipairs({ L, R }) do
+				side.S = mix(side.S, -0.05, sw)
+				side.E = mix(side.E, 0.15, sw)
+				side.H = mix(side.H, 0.25, sw)
+				side.K = mix(side.K, -0.45, sw)
+				side.Ax = mix(side.Ax, 0, sw)
+			end
+			-- the scratching claw: lifted, reaching forward and pulling back twice
+			R.S += (0.3 * scratch + rake * 0.25 * scratch) * sw
+			R.E += 0.45 * scratch * sw
+			R.Wx += -0.4 * scratch * sw
+		end
+
+		-- the leap is shortened to fit the room in front of it (measured once per attack, at three heights, against the
+		-- real wall surface incl. the plinth): the front of the body reaches ~2.1 design units past the lunge at the rake
+		if rig.lastShot and cr.measuredShot ~= rig.lastShot then
+			cr.measuredShot = rig.lastShot
+			cr.reach = 1
+			local hrp = model.PrimaryPart
+			if hrp then
+				local look = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+				if look.Magnitude > 0.1 then
+					look = look.Unit
+					local floorY = hrp.Position.Y - (model:GetAttribute("RootHeight") or 2) * scale
+					local room
+					for _, h in ipairs({ 0.3, 1.0, 2.0 }) do
+						local d = distanceAhead(Vector3.new(hrp.Position.X, floorY + h * scale, hrp.Position.Z), look, 14)
+						if d then
+							room = math.min(room or d, d)
+						end
+					end
+					if room then
+						local maxLunge = POUNCE[5][3] -- (the deepest forward key, the rake; negative)
+						cr.reach = math.clamp((room - 2.1 * scale - 0.15) / (-maxLunge * scale), 0, 1)
+					end
+				end
+			end
+		end
+
+		-- fight
+		if fw > 0.001 then
+			local a = math.min(since, POUNCE[#POUNCE][1])
+			local function key(i, lag)
+				return sampleKeys(POUNCE, math.max(0, a - (lag or 0)), i)
+			end
+			local wiggle = (a > 0.05 and a < 0.25) and math.sin((a - 0.05) / 0.2 * math.pi * 3) * 0.12 or 0
+			lift = mix(lift, key(2), fw)
+			fwd = mix(fwd, key(3) * (cr.reach or 1), fw)
+			pitch = mix(pitch, key(4), fw)
+			roll = mix(roll, 0, fw)
+			yaw = mix(yaw, wiggle, fw)
+			spineYaw = mix(spineYaw, -wiggle * 1.3, fw)
+			spine = mix(spine, key(5), fw)
+			neckP = mix(neckP, key(6), fw)
+			neckY = mix(neckY, 0, fw)
+			neckR = mix(neckR, 0, fw)
+			mouth = mix(mouth, key(7), fw)
+			for _, e in ipairs({ { L, 0 }, { R, 0.03 } }) do
+				local side, lag = e[1], e[2]
+				side.S = mix(side.S, key(8, lag), fw)
+				side.E = mix(side.E, key(9, lag), fw)
+				side.Wx = mix(side.Wx, key(10, lag), fw)
+				side.H = mix(side.H, key(11, lag), fw)
+				side.K = mix(side.K, key(12, lag), fw)
+				side.Ax = mix(side.Ax, key(13, lag), fw)
+			end
+		end
+
+		local function sm(name, x)
+			local e = cr.sm[name]
+			if not e then
+				e = { x = x, v = 0 }
+				cr.sm[name] = e
+			end
+			e.x, e.v = springStep(e.x, e.v, x, 900, 60, dt)
+			return e.x
+		end
+		set(rig, "Root", CFrame.new(0, (sm("lift", lift)) * scale + float + rise, sm("fwd", fwd) * scale)
+			* ANGLES(sm("pitch", pitch), sm("yaw", yaw), sm("roll", roll)))
+		set(rig, "Spine", ANGLES(sm("spine", spine), sm("spineYaw", spineYaw), 0))
+		set(rig, "Neck", ANGLES(sm("neckP", neckP), sm("neckY", neckY), sm("neckR", neckR)))
+		for name, side in pairs({ L = L, R = R }) do
+			local S, E = sm(name .. "S", side.S), sm(name .. "E", side.E)
+			local H, K = sm(name .. "H", side.H), sm(name .. "K", side.K)
+			set(rig, name .. "Shoulder", ANGLES(S, 0, 0))
+			set(rig, name .. "Elbow", ANGLES(E, 0, 0))
+			set(rig, name .. "Wrist", ANGLES(-(S + E) + sm(name .. "Wx", side.Wx), 0, 0)) -- (the paw stays level)
+			set(rig, name .. "Hip", ANGLES(H, 0, 0))
+			set(rig, name .. "Knee", ANGLES(K, 0, 0))
+			set(rig, name .. "Ankle", ANGLES(-(H + K) + sm(name .. "Ax", side.Ax), 0, 0)) -- (the foot stays flat)
+		end
+		jaw = sm("mouth", mouth)
 	end
 
 	-- Knell (Pose "Bellbearer"): it carries its own belfry; the right hand holds the bell rope. Built on the classic

@@ -29,6 +29,9 @@ local UNITS = {
 		speed = 14,
 		attackRange = 6,
 		attackCD = 1.2,
+		hitDelay = 0.48, -- (the pounce's claws rake the wall ~0.46 s into the leap, UnitAnimator "Pounce")
+		hitFx = "Claw",
+		hitHeight = 2.8, -- (studs above the floor: it rakes from the top of its leap, above the wall's 1.6-stud plinth)
 	},
 	-- ── Uncommon ────────────────────────────────────────────────────────
 	Ghost = {

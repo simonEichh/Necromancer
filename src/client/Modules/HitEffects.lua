@@ -175,6 +175,72 @@ local function slash(origin, normal, scale)
 	Debris:AddItem(emitterPart, LIFETIME)
 end
 
+-- Style "Claw" (the crawling Ghoul's pounce): three parallel gashes raked down the wall (the outer two a beat behind
+-- the middle one, slightly fanned), glowing a sickly yellow-green before they cool into dark scratches; rough stone
+-- chips and dust burst off the wall, a dim green light.
+local CLAW_COLOR = Color3.fromRGB(222, 244, 150)
+local CLAW_GLOW = Color3.fromRGB(140, 190, 60)
+
+local function claw(origin, normal, scale)
+	local right = (-normal):Cross(Vector3.yAxis)
+	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
+	local up = Vector3.yAxis
+	for i = -1, 1 do
+		local off = right * (i * 0.42 * scale)
+		local a = origin + off + (up * 1.1 + right * (0.18 + i * 0.06)) * scale
+		local b = origin + off * 1.2 - (up * 1.0 + right * 0.1) * scale
+		stroke(normal, a, b, right * 0.12 * scale, 0.16, CLAW_COLOR, CLAW_GLOW, math.abs(i) * 0.025, 0.08, scale)
+	end
+
+	local emitterPart = newPart("HitEmitter", Vector3.one * 0.2, CFrame.lookAt(origin + normal * 0.3, origin + normal * 1.3 - up * 0.3))
+	emitterPart.Transparency = 1
+	-- stone chips: dark, not glowing, thrown out and falling fast
+	local chips = Instance.new("ParticleEmitter")
+	chips.Texture = SPARK_TEXTURE
+	chips.Color = ColorSequence.new(Color3.fromRGB(150, 142, 132), Color3.fromRGB(96, 90, 84))
+	chips.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.28 * scale), NumberSequenceKeypoint.new(1, 0.12 * scale) })
+	chips.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.8, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	chips.LightEmission = 0
+	chips.LightInfluence = 1
+	chips.Lifetime = NumberRange.new(0.35, 0.6)
+	chips.Speed = NumberRange.new(8 * scale, 16 * scale)
+	chips.SpreadAngle = Vector2.new(50, 50)
+	chips.Rotation = NumberRange.new(0, 360)
+	chips.RotSpeed = NumberRange.new(-300, 300)
+	chips.EmissionDirection = Enum.NormalId.Front
+	chips.Acceleration = Vector3.new(0, -50, 0)
+	chips.Rate = 0
+	chips.Parent = emitterPart
+
+	local dust = Instance.new("ParticleEmitter")
+	dust.Texture = DUST_TEXTURE
+	dust.Color = ColorSequence.new(Color3.fromRGB(165, 158, 145), Color3.fromRGB(110, 108, 96))
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.0 * scale), NumberSequenceKeypoint.new(1, 3.0 * scale) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	dust.Lifetime = NumberRange.new(0.5, 0.9)
+	dust.Speed = NumberRange.new(2, 5)
+	dust.SpreadAngle = Vector2.new(70, 70)
+	dust.EmissionDirection = Enum.NormalId.Front
+	dust.Rotation = NumberRange.new(0, 360)
+	dust.Drag = 2
+	dust.LightInfluence = 1
+	dust.Rate = 0
+	dust.Parent = emitterPart
+
+	chips:Emit(math.floor(8 + 4 * scale))
+	dust:Emit(3)
+
+	local light = Instance.new("PointLight")
+	light.Color = CLAW_GLOW
+	light.Range = 8 * scale
+	light.Brightness = 2.5
+	light.Shadows = false
+	light.Parent = emitterPart
+	TweenService:Create(light, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Brightness = 0 }):Play()
+
+	Debris:AddItem(emitterPart, LIFETIME)
+end
+
 -- The server sends a point on the wall's nominal face plane, but the wall models have stones sticking out past it, so a
 -- flat cut drawn there sits inside the stone. Cast a ray from in front of the wall back along -normal and return the
 -- real surface point (only anchored parts count: the units in the way are unanchored); nil if nothing was hit.
@@ -218,7 +284,7 @@ local function flash(position, forward, damage, isGhost, style)
 	local normal = -(typeof(forward) == "Vector3" and forward.Magnitude > 0.1 and forward.Unit or Vector3.zAxis)
 	local origin = position + normal * 0.4
 	local facing = CFrame.lookAt(origin, origin + normal)
-	if style == "Slash" then
+	if style == "Slash" or style == "Claw" then
 		-- the cuts lie flat on the wall: sample the real (bumpy) surface across the area they cover and put them just in
 		-- front of the stone that sticks out furthest
 		local right = (-normal):Cross(Vector3.yAxis)
@@ -231,7 +297,11 @@ local function flash(position, forward, damage, isGhost, style)
 			end
 		end
 		local at = position + normal * (depth + 0.2)
-		slash(at, normal, scale)
+		if style == "Slash" then
+			slash(at, normal, scale)
+		else
+			claw(at, normal, scale)
+		end
 		return
 	end
 
