@@ -384,7 +384,7 @@ local RARITY_UNITS = {
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
 		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
-		{ unit = "Malak", weight = 0 }, -- (work in progress: never rolled yet)
+		{ unit = "Malak", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: rarer than a Signature, and only from the Celestial grave (`graves`: Rolling skips the entry elsewhere, the wheel never gives him)
 	},
 }
 

@@ -54,7 +54,7 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 
 		-- Roll rarity and unit
 		local rarity = rollRarity(boostedGrave, player, graveType)
-		local unitType = rollUnit(rarity)
+		local unitType = rollUnit(rarity, graveType)
 		local oneIn = getBaseOneIn(unitType)
 		PlayerData.addUnit(player, unitType, oneIn)
 		PlayerData.recordPull(player, unitType) -- (the Codex)

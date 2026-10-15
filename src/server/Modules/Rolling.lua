@@ -69,25 +69,33 @@ local function rollRarity(grave, player, graveType)
 	return picked
 end
 
--- Pick a weighted random unit from a rarity pool
-local function rollUnit(rarity)
+-- Pick a weighted random unit from a rarity pool. An entry with `graves` (a set of grave keys) only rolls from those
+-- graves (Malak: Celestial only); without a graveType (the wheel) such entries never roll.
+local function rollUnit(rarity, graveType)
 	local pool = RARITY_UNITS[rarity]
 	if not pool or #pool == 0 then
 		return "Skelly"
 	end
+	local function allowed(entry)
+		return not entry.graves or (graveType ~= nil and entry.graves[graveType] == true)
+	end
 	local totalWeight = 0
 	for _, entry in ipairs(pool) do
-		totalWeight += entry.weight
+		if allowed(entry) then
+			totalWeight += entry.weight
+		end
 	end
 	local roll = math.random() * totalWeight -- (weights may be fractions: Signature units have very low ones)
 	local cumulative = 0
 	for _, entry in ipairs(pool) do
-		cumulative += entry.weight
-		if roll < cumulative then
-			return entry.unit
+		if allowed(entry) then
+			cumulative += entry.weight
+			if roll < cumulative then
+				return entry.unit
+			end
 		end
 	end
-	return pool[#pool].unit
+	return pool[1].unit
 end
 
 local function remove(player)
