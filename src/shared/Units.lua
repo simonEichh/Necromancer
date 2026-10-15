@@ -37,18 +37,23 @@ local UNITS = {
 		hitHeight = 2.8, -- (studs above the floor: it rakes from the top of its leap, above the wall's 1.6-stud plinth)
 	},
 	-- ── Uncommon ────────────────────────────────────────────────────────
-	Ghost = {
-		color = BrickColor.new("Pastel blue"),
+	-- a spider that grew into a human skull (replaced the Ghost on 2026-10-15). It spits a glob of venom: released
+	-- `releaseAt` s into the attack (UnitAnimator "Spit"), flying at `projectileSpeed` studs/s in an arc (client VenomFx)
+	CryptSpider = {
+		color = BrickColor.new("Dark taupe"),
 		size = Vector3.new(2.2, 2.2, 2.2),
 		damage = 26,
 		speed = 14,
 		attackRange = 10,
 		attackCD = 0.8,
-		transparent = true,
+		releaseAt = 0.4, -- (= 0.5 of the attack cycle)
+		projectileSpeed = 45,
+		hitFx = "Venom",
+		hitHeight = 2.4, -- (studs above the floor: above the wall's 1.6-stud plinth)
 	},
 	-- a dead archer keeping his post (replaced the Goblin on 2026-10-15; old saves are renamed, see RENAMED below).
 	-- Its arrow is a real projectile: released `releaseAt` s into the attack (UnitAnimator "Bow"), it flies at
-	-- `arrowSpeed` studs/s (client ArrowFx draws it); the server lands the damage when it arrives.
+	-- `projectileSpeed` studs/s (client ArrowFx draws it); the server lands the damage when it arrives.
 	HollowArcher = {
 		color = BrickColor.new("Dark green"),
 		size = Vector3.new(2, 2, 2),
@@ -57,7 +62,7 @@ local UNITS = {
 		attackRange = 30,
 		attackCD = 1.5,
 		releaseAt = 0.825, -- (= 0.55 of the attack cycle, UnitAnimator ARCHER.RELEASE x attackCD)
-		arrowSpeed = 140,
+		projectileSpeed = 140,
 		hitFx = "Arrow",
 		hitHeight = 3.5, -- (studs above the floor: it shoots level from its chin)
 	},
@@ -314,7 +319,7 @@ local RARITY_UNITS = {
 		{ unit = "Ghoul", weight = 2 },
 	},
 	Uncommon = {
-		{ unit = "Ghost", weight = 4 },
+		{ unit = "CryptSpider", weight = 4 },
 		{ unit = "HollowArcher", weight = 3 },
 		{ unit = "Wraith", weight = 2 },
 		{ unit = "CryptBat", weight = 1 },
@@ -371,7 +376,7 @@ local UNIT_EMOJIS = {
 	Zombie = "",
 	Ghoul = "",
 	-- Uncommon
-	Ghost = "",
+	CryptSpider = "",
 	HollowArcher = "",
 	Wraith = "",
 	CryptBat = "",
@@ -444,6 +449,7 @@ end
 -- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
 local RENAMED = {
 	Goblin = "HollowArcher",
+	Ghost = "CryptSpider",
 }
 
 return {

@@ -1,9 +1,9 @@
 -- Hollow Archer arrows (client only). UnitAnimator's Bow block calls ArrowFx.fire at the moment of release; every client
 -- does that for every archer from the same attack timing, so nothing is sent per arrow. The server lands the damage
--- after the same release time + flight (Units: releaseAt, arrowSpeed), so the wall's HP bar drops when the arrow hits.
+-- after the same release time + flight (Units: releaseAt, projectileSpeed), so the wall's HP bar drops when the arrow hits.
 --
 -- An arrow flies straight from the bow to the real wall surface (a ray towards AimPos; only anchored parts count) at
--- the unit's arrowSpeed:
+-- the unit's projectileSpeed:
 --   * a burst ring at the bow on release, then a shockwave ring every RING_EVERY studs along the flight (a thin neon disc
 --     across the path that bursts outward and fades), a short bright trail behind it;
 --   * on arrival it sticks in the stone (the head buried), quivers on a damped wobble, throws chips, dust and a flash

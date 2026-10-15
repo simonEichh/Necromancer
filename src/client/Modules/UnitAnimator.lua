@@ -254,7 +254,21 @@ local ARCHER = {
 	QUIVER = Vector3.new(0.34, 4.35, 0.5), -- (in the torso's space: the top of the quiver over the right shoulder)
 }
 
+-- AttackStyle "Spit" (the Crypt Spider; see the Spider block). Keys over one attack cycle (0..1, stretched to AttackCD):
+-- { t, body pitch (+ = front up), lift, forward (- = towards the wall), front legs' lift, front legs' swing, front
+-- knees, middle legs' lift, hind legs' lift, fangs (+ = open), abdomen pitch }. Rear up with the front legs high (the
+-- threat display), hold while the venom gathers, drop forward and spit at 0.5, settle.
+local SPIT_KEYS = {
+	{ 0.00, 0, 0, 0, 0, 0, 0, 0.05, 0, 0.05, 0 },
+	{ 0.30, 0.45, 0.35, 0.15, 0.95, 0.35, 0.4, 0.25, -0.2, 0.4, -0.25 },
+	{ 0.42, 0.5, 0.38, 0.16, 1.0, 0.38, 0.42, 0.27, -0.22, 0.45, -0.28 },
+	{ 0.50, -0.2, 0.0, -0.35, 0.3, 0.1, 0.1, 0, 0.1, 0.65, 0.15 },
+	{ 0.62, -0.05, -0.05, -0.15, 0.1, 0.02, 0.02, 0, 0.02, 0.15, 0.05 },
+	{ 1.00, 0, 0, 0, 0, 0, 0, 0.05, 0, 0.05, 0 },
+}
+
 local ArrowFx = require(script.Parent.ArrowFx)
+local VenomFx = require(script.Parent.VenomFx)
 local Units = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Units"))
 
 local function animate(model, rig, dt, now)
@@ -349,7 +363,7 @@ local function animate(model, rig, dt, now)
 				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 			end
 		end
-	elseif u and style ~= "Strike" and style ~= "Pounce" and style ~= "Slam" and style ~= "Bow" then
+	elseif u and style ~= "Strike" and style ~= "Pounce" and style ~= "Slam" and style ~= "Bow" and style ~= "Spit" then
 		local shoulder, elbow, lean, mouth = attackPose(u)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
@@ -623,9 +637,9 @@ local function animate(model, rig, dt, now)
 			ab.firedShot = rig.lastShot
 			local aim = model:GetAttribute("AimPos")
 			local def = Units.Stats[model.Name]
-			if ab.lHand and typeof(aim) == "Vector3" and def and def.arrowSpeed then
+			if ab.lHand and typeof(aim) == "Vector3" and def and def.projectileSpeed then
 				local from = ab.lHand.CFrame:PointToWorldSpace(Vector3.new(0, 0, (A.brace + A.drawLen) * scale))
-				ArrowFx.fire(model, from, aim, def.arrowSpeed)
+				ArrowFx.fire(model, from, aim, def.projectileSpeed)
 			end
 		end
 
@@ -827,6 +841,137 @@ local function animate(model, rig, dt, now)
 		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
 		set(rig, "Root", CFrame.new(sm("lat", lat) * scale, sm("lift", lift) * scale + float + rise, sm("fwd", fwd) * scale))
 		jaw = sm("mouth", mouth, 200, 20)
+	end
+
+	-- Pose "Spider" (the Crypt Spider, AttackStyle "Spit", build_cryptspider.lua): eight legs, joints <side><n>Hip /
+	-- Knee / Ankle (n = 1 front .. 4), Root (the body), Pedicel (the skull abdomen), LFang / RFang; every joint turns
+	-- about the model's axes. A leg's hip = a swing fore/aft (about Y) and a lift (about Z); `side` mirrors left/right.
+	--   walk: the alternating tetrapod gait of real spiders (L1 R2 L3 R4 step together, then the other four), fast, the
+	--     body low and level;
+	--   idle: still, then a front leg taps the stone, the fangs twitch, the body turns a few degrees in a sudden jerk
+	--     (an underdamped spring), the skull breathes;
+	--   fight, one attack = SPIT_KEYS stretched to AttackCD: it rears up on its hind legs with the front legs spread high
+	--     (a threat display), the skull abdomen pulses as the venom gathers, then it drops forward and spits at 0.5 of
+	--     the cycle (Units releaseAt = 0.5 x attackCD): VenomFx flies the glob to AimPos.
+	if model:GetAttribute("Pose") == "Spider" then
+		local sp = rig.spider
+		if not sp then
+			sp = { sm = {}, fight = 0, phase = 0, yaw = 0, yawV = 0 }
+			rig.spider = sp
+		end
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+		local cd = model:GetAttribute("AttackCD") or 0.8
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.0
+		sp.fight += ((fighting and 1 or 0) - sp.fight) * clamp01(dt * (fighting and 8 or 2.5))
+		local fw = sp.fight * sp.fight * (3 - 2 * sp.fight) * (1 - w)
+		local sw = 1 - w
+		sp.phase += dt * (6 + speed * 0.6) * w
+
+		-- per leg: swing and lift (walk + idle), then the attack adds on top
+		local legSwing, legLift, legKnee = {}, {}, {}
+		local GROUP_A = { L1 = true, R2 = true, L3 = true, R4 = true }
+		for _, s in ipairs({ "L", "R" }) do
+			for n = 1, 4 do
+				local key = s .. n
+				local ph = sp.phase + (GROUP_A[key] and 0 or math.pi)
+				legSwing[key] = math.sin(ph) * 0.32 * w
+				legLift[key] = math.max(0, math.cos(ph)) * 0.32 * w
+				legKnee[key] = 0
+			end
+		end
+		local pitch, lift, fwd, yaw = 0, -math.abs(math.cos(sp.phase)) * 0.04 * w, 0, 0
+		local fangs, abdomen = math.sin(t * 9) * 0.04, math.sin(t * 1.5) * 0.03
+
+		-- idle: a tapping front leg, a sudden jerk of the body every few seconds
+		if sw > 0.001 then
+			local idx = math.floor(t * 0.33)
+			local r = (math.sin(idx * 12.9898) * 43758.5453) % 1
+			sp.yaw, sp.yawV = springStep(sp.yaw, sp.yawV, (r - 0.5) * 0.5, 420, 18, dt)
+			yaw = mix(yaw, sp.yaw, sw)
+			local tapCyc = (t * 0.4) % 1
+			local tapLeg = (math.floor(t * 0.4) % 2 == 0) and "L1" or "R1"
+			if tapCyc < 0.25 then
+				local u = tapCyc / 0.25
+				legLift[tapLeg] += (math.sin(u * math.pi) * 0.25 + math.max(0, math.sin(u * math.pi * 4)) * 0.12) * sw
+			end
+			local twitch = ((t * 0.7) % 1) < 0.06 and 0.25 or 0
+			fangs += twitch * sw
+		end
+
+		-- fight
+		if fw > 0.001 then
+			local a = math.min(since / cd, 1.0)
+			local function key(i)
+				return sampleKeys(SPIT_KEYS, a, i)
+			end
+			local pulse = (a > 0.3 and a < 0.48) and math.sin(a * 90) * 0.07 or 0
+			pitch = mix(pitch, key(2), fw)
+			lift = mix(lift, key(3), fw)
+			fwd = mix(fwd, key(4), fw)
+			yaw = mix(yaw, 0, fw)
+			fangs = mix(fangs, key(10), fw)
+			abdomen = mix(abdomen, key(11) + pulse, fw)
+			for _, s in ipairs({ "L", "R" }) do
+				for n = 1, 4 do
+					local k = s .. n
+					if n == 1 then
+						legLift[k] = mix(legLift[k], key(5), fw)
+						legSwing[k] = mix(legSwing[k], key(6), fw)
+						legKnee[k] = mix(legKnee[k], key(7), fw)
+					elseif n == 2 then
+						legLift[k] = mix(legLift[k], key(8), fw)
+						legSwing[k] = mix(legSwing[k], 0, fw)
+					else
+						-- the hind legs stay planted: they press down as the body rears
+						legLift[k] = mix(legLift[k], key(9), fw)
+						legSwing[k] = mix(legSwing[k], 0, fw)
+					end
+				end
+			end
+		end
+
+		-- loose the venom once per attack
+		local releaseAt = 0.5 * cd
+		if rig.lastShot and since >= releaseAt and sp.firedShot ~= rig.lastShot then
+			sp.firedShot = rig.lastShot
+			local aim = model:GetAttribute("AimPos")
+			local def = Units.Stats[model.Name]
+			local thorax = model:FindFirstChild("Thorax")
+			if thorax and typeof(aim) == "Vector3" and def and def.projectileSpeed then
+				VenomFx.fire(model, thorax.CFrame:PointToWorldSpace(Vector3.new(0, -0.08, -0.66) * scale), aim, def.projectileSpeed)
+			end
+		end
+
+		local function sm(name, x)
+			local e = sp.sm[name]
+			if not e then
+				e = { x = x, v = 0 }
+				sp.sm[name] = e
+			end
+			e.x, e.v = springStep(e.x, e.v, x, 900, 60, dt)
+			return e.x
+		end
+		local pitchS = sm("pitch", pitch)
+		set(rig, "Root", CFrame.new(0, sm("lift", lift) * scale + float + rise, sm("fwd", fwd) * scale) * ANGLES(pitchS, sm("yaw", yaw), 0))
+		set(rig, "Pedicel", ANGLES(sm("abdomen", abdomen) - pitchS * 0.6, 0, 0)) -- (the skull stays roughly level as it rears)
+		local fangS = sm("fangs", fangs)
+		set(rig, "LFang", ANGLES(0, -fangS, 0))
+		set(rig, "RFang", ANGLES(0, fangS, 0))
+		for _, s in ipairs({ "L", "R" }) do
+			local side = (s == "R") and 1 or -1
+			for n = 1, 4 do
+				local k = s .. n
+				local swing, liftK, knee = sm(k .. "s", legSwing[k]), sm(k .. "l", legLift[k]), sm(k .. "k", legKnee[k])
+				-- (the hind legs counter the body's pitch so their feet stay on the ground)
+				local counter = (n >= 3) and -pitchS or 0
+				set(rig, k .. "Hip", ANGLES(counter, side * swing, side * liftK))
+				set(rig, k .. "Knee", ANGLES(0, 0, side * knee))
+				set(rig, k .. "Ankle", ANGLES(0, 0, -side * (liftK * 0.5 + knee * 0.3)))
+			end
+		end
 	end
 
 	-- Pose "Crawler" (the Ghoul, AttackStyle "Pounce"): a starved thing on all fours (build_ghoul.lua). Every joint turns

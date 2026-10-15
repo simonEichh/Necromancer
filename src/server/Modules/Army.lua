@@ -990,12 +990,12 @@ local function update(now, dt)
 							u.def.hitFx and (u.shadowForm and u.def.hitFx .. "Shadow" or u.def.hitFx))
 						if plotState.wallHP <= 0 then breakWall(plotState) end
 					end
-					-- a delayed hit: the attack animation shoots something first (Hush's finger beam, the Hollow Archer's arrow): the
+					-- a delayed hit: the attack animation shoots something first (Hush's finger beam, the Hollow Archer's arrow, the Crypt Spider's venom): the
 					-- client aims it at AimPos and the damage lands when it arrives. An archer's delay is its release time plus the
-					-- arrow's flight (arrowSpeed studs/s from where it stands)
+					-- arrow's flight (projectileSpeed studs/s from where it stands)
 					local delay = u.def.hitDelay
-					if u.def.arrowSpeed then
-						delay = (u.def.releaseAt or 0) + (impactPos - fromPos).Magnitude / u.def.arrowSpeed
+					if u.def.projectileSpeed then
+						delay = (u.def.releaseAt or 0) + (impactPos - fromPos).Magnitude / u.def.projectileSpeed
 					end
 					if delay then
 						if u.model then u.model:SetAttribute("AimPos", impactPos) end
