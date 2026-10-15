@@ -21,6 +21,9 @@ local UNITS = {
 		speed = 5,
 		attackRange = 5,
 		attackCD = 2.0,
+		hitDelay = 0.82, -- (the club lands ~0.80 s into the slam, UnitAnimator "Slam")
+		hitFx = "Crush",
+		hitHeight = 2.9, -- (studs above the floor: the fist lands above the wall's plinth)
 	},
 	Ghoul = {
 		color = BrickColor.new("Dark orange"),

@@ -241,6 +241,157 @@ local function claw(origin, normal, scale)
 	Debris:AddItem(emitterPart, LIFETIME)
 end
 
+-- Style "Crush" (the Zombie's club slam; shadow-army look): blunt force. A violet shockwave ring bursts out across the
+-- wall face, a spider-web of cracks spreads from the impact (glowing shadow violet, cooling to dark scratches, the inner
+-- segments first), black smoke and rubble burst off the wall, and dust rolls out along the ground at the wall's base.
+local CRUSH_HOT = Color3.fromRGB(190, 150, 255)
+local CRUSH_GLOW = Color3.fromRGB(110, 50, 230)
+local CRACK_COUNT = 7
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function crush(origin, normal, scale)
+	local right = (-normal):Cross(Vector3.yAxis)
+	right = right.Magnitude > 0.1 and right.Unit or Vector3.xAxis
+	local up = normal:Cross(right).Unit
+	if up.Y < 0 then
+		up = -up
+	end
+
+	-- shockwave ring (a thin neon disc on the wall face, growing and fading)
+	local ringCF = CFrame.lookAt(origin + normal * 0.08, origin + normal * 1.08) * CFrame.Angles(0, math.rad(90), 0)
+	local ring = newPart("CrushRing", Vector3.new(0.06, 0.6 * scale, 0.6 * scale), ringCF)
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Material = Enum.Material.Neon
+	ring.Color = CRUSH_GLOW
+	ring.Transparency = 0.25
+	TweenService:Create(ring, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.06, 6 * scale, 6 * scale),
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(ring, 0.4)
+
+	-- the core flash
+	local core = newPart("HitCore", Vector3.one * 0.6 * scale, CFrame.new(origin + normal * 0.3))
+	core.Shape = Enum.PartType.Ball
+	core.Material = Enum.Material.Neon
+	core.Color = CRUSH_HOT
+	core.Transparency = 0.1
+	TweenService:Create(core, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.one * 2.6 * scale,
+		Transparency = 1,
+	}):Play()
+	Debris:AddItem(core, 0.3)
+
+	-- the cracks: CRACK_COUNT jagged lines of 3 segments each, spreading outward
+	for i = 1, CRACK_COUNT do
+		local angle = (i / CRACK_COUNT) * math.pi * 2 + (math.random() - 0.5) * 0.5
+		local dir = (right * math.cos(angle) + up * math.sin(angle)).Unit
+		local side = dir:Cross(normal).Unit
+		local length = (1.0 + math.random() * 0.8) * scale
+		local prev = origin
+		for k = 1, 3 do
+			local nextP = origin + dir * length * (k / 3) + side * (math.random() - 0.5) * 0.35 * scale
+			local seg = nextP - prev
+			local mid = (prev + nextP) / 2 + normal * 0.05
+			local width = (0.14 - k * 0.03) * scale
+			local p = newPart("CrushCrack", Vector3.new(width, 0.05, seg.Magnitude + width), CFrame.lookAt(mid, mid + seg, normal))
+			p.Material = Enum.Material.Neon
+			p.Color = CRUSH_HOT
+			p.Transparency = 1
+			task.delay((k - 1) * 0.03, function()
+				p.Transparency = 0
+				local cool = TweenService:Create(p, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Color = CRUSH_GLOW,
+					Transparency = 0.3,
+				})
+				cool.Completed:Connect(function()
+					p.Material = Enum.Material.SmoothPlastic
+					p.Color = SCRATCH_COLOR
+					p.Transparency = 0.3
+					TweenService:Create(p, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1 }):Play()
+				end)
+				cool:Play()
+			end)
+			Debris:AddItem(p, LIFETIME)
+			prev = nextP
+		end
+	end
+
+	-- black smoke and rubble bursting off the wall
+	local emitterPart = newPart("HitEmitter", Vector3.one * 0.2, CFrame.lookAt(origin + normal * 0.3, origin + normal * 1.3))
+	emitterPart.Transparency = 1
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Texture = DUST_TEXTURE
+	smoke.Color = ColorSequence.new(Color3.fromRGB(16, 10, 28), Color3.fromRGB(50, 26, 90))
+	smoke.LightInfluence = 0
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2 * scale), NumberSequenceKeypoint.new(1, 3.6 * scale) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Lifetime = NumberRange.new(0.6, 1.0)
+	smoke.Speed = NumberRange.new(4, 9)
+	smoke.SpreadAngle = Vector2.new(80, 80)
+	smoke.Drag = 4
+	smoke.Rotation = NumberRange.new(0, 360)
+	smoke.RotSpeed = NumberRange.new(-60, 60)
+	smoke.EmissionDirection = Enum.NormalId.Front
+	smoke.Rate = 0
+	smoke.Parent = emitterPart
+
+	local rubble = Instance.new("ParticleEmitter")
+	rubble.Texture = SPARK_TEXTURE
+	rubble.Color = ColorSequence.new(Color3.fromRGB(150, 142, 132), Color3.fromRGB(90, 85, 80))
+	rubble.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.42 * scale), NumberSequenceKeypoint.new(1, 0.2 * scale) })
+	rubble.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.85, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	rubble.LightEmission = 0
+	rubble.LightInfluence = 1
+	rubble.Lifetime = NumberRange.new(0.5, 0.8)
+	rubble.Speed = NumberRange.new(8 * scale, 16 * scale)
+	rubble.SpreadAngle = Vector2.new(60, 60)
+	rubble.Rotation = NumberRange.new(0, 360)
+	rubble.RotSpeed = NumberRange.new(-300, 300)
+	rubble.EmissionDirection = Enum.NormalId.Front
+	rubble.Acceleration = Vector3.new(0, -60, 0)
+	rubble.Rate = 0
+	rubble.Parent = emitterPart
+
+	smoke:Emit(7)
+	rubble:Emit(math.floor(10 + 4 * scale))
+
+	local light = Instance.new("PointLight")
+	light.Color = CRUSH_GLOW
+	light.Range = 12 * scale
+	light.Brightness = 4
+	light.Shadows = false
+	light.Parent = emitterPart
+	TweenService:Create(light, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Brightness = 0 }):Play()
+	Debris:AddItem(emitterPart, LIFETIME)
+
+	-- dust rolling out along the ground at the wall's base (find the ground just in front of the wall)
+	groundParams.FilterDescendantsInstances = { fxFolder }
+	local ground = Workspace:Raycast(origin + normal * 1.5, Vector3.new(0, -12, 0), groundParams)
+	if ground then
+		local base = newPart("HitDust", Vector3.new(4 * scale, 0.2, 0.4), CFrame.lookAt(ground.Position + normal * 0.6 + Vector3.new(0, 0.2, 0), ground.Position + normal * 1.6 + Vector3.new(0, 0.2, 0)))
+		base.Transparency = 1
+		local dust = Instance.new("ParticleEmitter")
+		dust.Texture = DUST_TEXTURE
+		dust.Color = ColorSequence.new(Color3.fromRGB(150, 144, 135), Color3.fromRGB(100, 96, 90))
+		dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8 * scale), NumberSequenceKeypoint.new(1, 2.6 * scale) })
+		dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) })
+		dust.Lifetime = NumberRange.new(0.6, 1.0)
+		dust.Speed = NumberRange.new(4, 8)
+		dust.SpreadAngle = Vector2.new(70, 10)
+		dust.Drag = 3
+		dust.Rotation = NumberRange.new(0, 360)
+		dust.LightInfluence = 1
+		dust.EmissionDirection = Enum.NormalId.Front
+		dust.Rate = 0
+		dust.Parent = base
+		dust:Emit(8)
+		Debris:AddItem(base, LIFETIME)
+	end
+end
+
 -- The server sends a point on the wall's nominal face plane, but the wall models have stones sticking out past it, so a
 -- flat cut drawn there sits inside the stone. Cast a ray from in front of the wall back along -normal and return the
 -- real surface point (only anchored parts count: the units in the way are unanchored); nil if nothing was hit.
@@ -284,7 +435,7 @@ local function flash(position, forward, damage, isGhost, style)
 	local normal = -(typeof(forward) == "Vector3" and forward.Magnitude > 0.1 and forward.Unit or Vector3.zAxis)
 	local origin = position + normal * 0.4
 	local facing = CFrame.lookAt(origin, origin + normal)
-	if style == "Slash" or style == "Claw" then
+	if style == "Slash" or style == "Claw" or style == "Crush" then
 		-- the cuts lie flat on the wall: sample the real (bumpy) surface across the area they cover and put them just in
 		-- front of the stone that sticks out furthest
 		local right = (-normal):Cross(Vector3.yAxis)
@@ -299,8 +450,10 @@ local function flash(position, forward, damage, isGhost, style)
 		local at = position + normal * (depth + 0.2)
 		if style == "Slash" then
 			slash(at, normal, scale)
-		else
+		elseif style == "Claw" then
 			claw(at, normal, scale)
+		else
+			crush(at, normal, scale)
 		end
 		return
 	end

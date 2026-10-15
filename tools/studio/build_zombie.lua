@@ -194,7 +194,29 @@ deco(rUpper, "ElbowMass", Vector3.new(0.95, 0.6, 0.95), Vector3.new(1.5, 2.65, 0
 local rFore = part("RForearm", Vector3.new(1.2, 1.4, 1.15), CFrame.new(1.55, 1.95, -0.05) * CFrame.Angles(0, 0, -0.04), VOID)
 motor("RElbow", rUpper, rFore, Vector3.new(1.5, 2.65, 0))
 -- the fused fist: a knuckled mass of flesh and obsidian
-deco(rFore, "Fist", Vector3.new(1.35, 0.75, 1.3), Vector3.new(1.58, 1.05, -0.08), VOID)
+local fist = deco(rFore, "Fist", Vector3.new(1.35, 0.75, 1.3), Vector3.new(1.58, 1.05, -0.08), VOID)
+-- a dark violet smoke trail behind the fist: invisible at rest, a smear of shadow when the club swings
+local trailA = Instance.new("Attachment")
+trailA.Name = "TrailTop"
+trailA.Position = Vector3.new(0, 0.3, 0)
+trailA.Parent = fist
+local trailB = Instance.new("Attachment")
+trailB.Name = "TrailBottom"
+trailB.Position = Vector3.new(0, -0.45, 0)
+trailB.Parent = fist
+local trail = Instance.new("Trail")
+trail.Name = "ShadowSmear"
+trail.Attachment0 = trailA
+trail.Attachment1 = trailB
+trail.Color = ColorSequence.new(Color3.fromRGB(110, 50, 230), Color3.fromRGB(20, 10, 36))
+trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+trail.LightEmission = 0.4
+trail.LightInfluence = 0
+trail.Lifetime = 0.22
+trail.MinLength = 0.05
+trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.3) })
+trail.FaceCamera = false
+trail.Parent = fist
 for i = 0, 3 do
 	deco(rFore, "Knuckle", Vector3.new(0.3, 0.3, 0.32), Vector3.new(1.1 + i * 0.31, 0.95, -0.7), OBSIDIAN)
 end
@@ -324,16 +346,76 @@ motes.SpreadAngle = Vector2.new(60, 60)
 motes.EmissionDirection = Enum.NormalId.Top
 motes.Parent = motesSrc
 
+-- ── Ethereal layer (set ETHEREAL = false for the plain version, commit e891592) ──
+-- 1. a ForceField shell: slightly larger violet copies of the big masses, shimmering over the black
+-- 2. dark flames licking up off the shoulders, the hump and the club
+-- 3. a faint violet fill over the whole body (on the outline Highlight below)
+local ETHEREAL = true
+if ETHEREAL then
+	local SHELL = { "Torso", "Chest", "Hump", "RightMass", "RUpperArm", "RForearm", "Fist", "ElbowMass", "Head" }
+	local SHELL_GROW = 0.12 -- studs added on every axis
+	for _, name in ipairs(SHELL) do
+		local src = model:FindFirstChild(name)
+		if src then
+			local shell = part(name .. "Shell", src.Size + Vector3.one * SHELL_GROW, src.CFrame, Color3.fromRGB(120, 60, 255), Enum.Material.ForceField)
+			shell.CastShadow = false
+			weld(src, shell)
+		end
+	end
+
+	local FIRE_TEXTURE = "rbxasset://textures/particles/fire_main.dds"
+	local function darkFlames(to, name, size, at, rate)
+		local src = deco(to, name, size, at, VOID)
+		src.Transparency = 1
+		-- black-violet tongues (unlit, so they stay dark against anything) ...
+		local f = Instance.new("ParticleEmitter")
+		f.Name = "ShadowFlames"
+		f.Texture = FIRE_TEXTURE
+		f.Color = ColorSequence.new(Color3.fromRGB(40, 16, 80), Color3.fromRGB(8, 4, 16))
+		f.LightEmission = 0
+		f.LightInfluence = 0
+		f.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 0.1) })
+		f.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 1) })
+		f.Lifetime = NumberRange.new(0.45, 0.8)
+		f.Rate = rate
+		f.Speed = NumberRange.new(1.5, 3)
+		f.Acceleration = Vector3.new(0, 2, 0)
+		f.Rotation = NumberRange.new(-15, 15)
+		f.SpreadAngle = Vector2.new(15, 15)
+		f.EmissionDirection = Enum.NormalId.Top
+		f.Parent = src
+		-- ... with a thin violet glow at their roots
+		local g = Instance.new("ParticleEmitter")
+		g.Name = "ShadowFlameGlow"
+		g.Texture = FIRE_TEXTURE
+		g.Color = ColorSequence.new(Color3.fromRGB(120, 60, 255))
+		g.LightEmission = 1
+		g.LightInfluence = 0
+		g.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0.05) })
+		g.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+		g.Lifetime = NumberRange.new(0.25, 0.45)
+		g.Rate = rate * 0.6
+		g.Speed = NumberRange.new(1, 2)
+		g.EmissionDirection = Enum.NormalId.Top
+		g.Parent = src
+	end
+	darkFlames(torso, "FlamesBack", Vector3.new(1.6, 0.3, 0.8), Vector3.new(0.2, 4.6, 0.3), 14)
+	darkFlames(torso, "FlamesShoulder", Vector3.new(0.9, 0.3, 0.9), Vector3.new(1.0, 4.45, 0), 8)
+	darkFlames(rFore, "FlamesClub", Vector3.new(1.1, 0.4, 1.0), Vector3.new(1.58, 2.3, -0.05), 8)
+end
+
 -- the shadow's edge: a faint violet outline so the black body reads against a dark scene
 local outline = Instance.new("Highlight")
 outline.Name = "ShadowOutline"
-outline.FillTransparency = 1
+outline.FillColor = Color3.fromRGB(120, 60, 255)
+outline.FillTransparency = ETHEREAL and 0.9 or 1
 outline.OutlineColor = Color3.fromRGB(150, 95, 255)
 outline.OutlineTransparency = 0.55
 outline.DepthMode = Enum.HighlightDepthMode.Occluded
 outline.Parent = model
 
 model:SetAttribute("Rig", "Procedural")
+model:SetAttribute("AttackStyle", "Slam")
 model:SetAttribute("RootHeight", 2.4)
 model:SetAttribute("Height", 5.0)
 model.Parent = models

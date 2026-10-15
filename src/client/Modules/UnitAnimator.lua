@@ -196,6 +196,27 @@ local function distanceAhead(origin, dir, maxDist)
 	return nil
 end
 
+-- AttackStyle "Slam" (the Zombie, a lopsided brute with a huge RIGHT club arm; see the Slam block in animate). Keys
+-- { t, right shoulder pitch, right shoulder roll (+ = out), right elbow, left shoulder pitch, left shoulder roll (+ = in),
+-- left elbow, waist pitch (- = lean in), waist yaw (+ = chest turns left), lift, forward (a fraction of the lunge
+-- measured to the wall: -1 = the full lunge) }. A slow, heavy overhead wind-up (the club rises, the body leans back
+-- and twists, the withered arm reaches forward as a counterweight), a hold with the coil still tightening, the drop
+-- (the whole body falls in after the club), contact at ~0.80 s (the unit def's hitDelay 0.82 lands the WallHit then)
+-- and a short freeze on the impact (two near-equal keys = a hit-stop), bent into the wall, a lurch back into the
+-- ready stance. The club's pendulum follow-through comes from its soft spring (see the block).
+local SLAM_READY = { 0.2, 0.1, 0.25, 0.1, 0, 0.4, -0.25, -0.1, -0.1, 0 }
+local SLAM = {
+	{ 0.00, table.unpack(SLAM_READY) },
+	{ 0.35, 1.6, 0.35, 0.6, -0.1, -0.2, 0.5, 0.0, -0.35, 0.0, 0.15 }, -- the club starts to rise, weight back
+	{ 0.62, 3.0, 0.25, 0.5, 0.5, 0, 0.3, 0.22, -0.3, 0.12, 0.2 }, -- overhead, leaning back
+	{ 0.70, 3.15, 0.2, 0.55, 0.6, 0, 0.25, 0.26, -0.32, 0.14, 0.22 }, -- the coil still tightens
+	{ 0.80, 1.35, -0.05, 0.05, -0.4, -0.15, 0.6, -0.6, 0.15, -0.45, -1 }, -- IMPACT
+	{ 0.88, 1.3, -0.05, 0.08, -0.38, -0.15, 0.62, -0.62, 0.16, -0.48, -1 }, -- (hit-stop)
+	{ 1.05, 1.0, -0.05, 0.15, -0.35, -0.15, 0.65, -0.62, 0.18, -0.5, -1 }, -- bent into the wall
+	{ 1.4, 0.35, 0.1, 0.35, 0.05, 0, 0.45, -0.2, -0.15, -0.05, -0.1 }, -- lurches back
+	{ 1.8, table.unpack(SLAM_READY) },
+}
+
 local function animate(model, rig, dt, now)
 	local state = model:GetAttribute("State")
 	local speed = model:GetAttribute("Speed") or 8
@@ -288,7 +309,7 @@ local function animate(model, rig, dt, now)
 				staffRot = -(1.5708 * k + rShoulder + rElbow) + 0.15 * k
 			end
 		end
-	elseif u and style ~= "Strike" and style ~= "Pounce" then
+	elseif u and style ~= "Strike" and style ~= "Pounce" and style ~= "Slam" then
 		local shoulder, elbow, lean, mouth = attackPose(u)
 		rShoulder, rElbow, waistPitch, jaw = shoulder, elbow, lean, mouth
 	end
@@ -456,6 +477,158 @@ local function animate(model, rig, dt, now)
 		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
 		local jitter = rattle * 0.015 * (1 - fw)
 		set(rig, "Root", CFrame.new((sm("lat", lat) + jitter) * scale, bob + float + rise + sm("lift", lift) * scale, sm("fwd", fwd) * scale))
+	end
+
+	-- AttackStyle "Slam" (the Zombie, build_zombie.lua): a lopsided brute; the huge club is the right arm. Layers, mixed
+	-- and then sprung (no snapping):
+	--   walk: a lurching shamble; the heavy right leg strides, the left foot drags (barely lifts), the body drops and
+	--     rolls onto each step, the head stays forward;
+	--   idle: heavy, slow breathing (the chest heaves), the head lolls, the jaw hangs, the weight sways; every ~6 s the
+	--     club jerks up and swings back down;
+	--   fight: the SLAM cycle, the lunge scaled to the wall (measured per attack: the fist should just meet the stone).
+	-- The club arm runs through a SOFT spring outside the attack, so it lags and swings like a heavy pendulum after every
+	-- lurch, twitch and the follow-through; during the blow its spring is stiff so the slam stays sharp.
+	if style == "Slam" then
+		local zb = rig.slam
+		if not zb then
+			zb = { sm = {}, fight = 0, phase = 0, lunge = 0 }
+			rig.slam = zb
+		end
+		local function mix(a, b, k)
+			return a + (b - a) * k
+		end
+		local cd = model:GetAttribute("AttackCD") or 2
+		local since = rig.lastShot and (now - rig.lastShot) or math.huge
+		local fighting = state ~= "walk" and since < cd + 1.0
+		zb.fight += ((fighting and 1 or 0) - zb.fight) * clamp01(dt * (fighting and 8 or 2))
+		local fw = zb.fight * zb.fight * (3 - 2 * zb.fight) * (1 - w)
+		local sw = 1 - w
+		zb.phase += dt * (2.2 + speed * 0.35) * w
+		local ph = zb.phase
+		local sp, cp = math.sin(ph), math.cos(ph)
+
+		-- walk: the shamble
+		local rS, rZ, rE = -sp * 0.4 * w + 0.1, 0.1, 0.3
+		local lS, lZ, lE = sp * 0.2 * w, 0.05, 0.55
+		local wp = -0.3 * w
+		local wy = sp * 0.12 * w
+		local wroll = sp * 0.14 * w
+		local np, ny, nr = 0.3 * w + math.sin(ph * 2) * 0.05 * w, 0, -sp * 0.08 * w
+		local lat = sp * 0.12 * w
+		local lift = -math.max(0, -sp) * 0.14 * w -- (drops onto the dragging left leg)
+		local fwd = 0
+		local rH, rK = sp * 0.55 * w, -math.max(0, cp) * 0.7 * w
+		local lH, lK = -sp * 0.3 * w, -math.max(0, -cp) * 0.15 * w
+		local hipZ = 0
+		local mouth = 0.25
+
+		-- idle
+		if sw > 0.001 then
+			local breath = math.sin(t * 1.3)
+			local sway = math.sin(t * 0.7)
+			local cyc = (t * 0.165) % 1
+			local twitch = cyc < 0.05 and math.sin(cyc / 0.05 * math.pi) or 0
+			rS = mix(rS, 0.06 + sway * 0.06 + twitch * 0.9, sw)
+			rZ = mix(rZ, 0.12 + twitch * 0.3, sw)
+			rE = mix(rE, 0.2 + twitch * 0.4, sw)
+			lS = mix(lS, 0.05 - sway * 0.04, sw)
+			lE = mix(lE, 0.5 + breath * 0.05, sw)
+			wp = mix(wp, -0.3 + breath * 0.06, sw)
+			wy = mix(wy, sway * 0.08, sw)
+			wroll = mix(wroll, -sway * 0.06, sw)
+			np = mix(np, 0.28 - breath * 0.04, sw)
+			ny = mix(ny, math.sin(t * 0.37) * 0.25, sw)
+			nr = mix(nr, math.sin(t * 0.5) * 0.22, sw)
+			lat = mix(lat, sway * 0.08, sw)
+			lift = mix(lift, breath * 0.03, sw)
+			rH, rK = mix(rH, 0.05, sw), mix(rK, -0.08, sw)
+			lH, lK = mix(lH, -0.05, sw), mix(lK, -0.05, sw)
+			hipZ = mix(hipZ, -lat / 2.0, sw)
+			mouth = mix(mouth, 0.25 + breath * 0.08, sw)
+		end
+
+		-- the lunge, measured once per attack: the fist (~3.9 design units ahead at the impact) should just meet the
+		-- stone at fist height, and the feet must not walk into the plinth
+		if rig.lastShot and zb.measuredShot ~= rig.lastShot then
+			zb.measuredShot = rig.lastShot
+			zb.lunge = 0
+			local hrp = model.PrimaryPart
+			if hrp then
+				local look = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+				if look.Magnitude > 0.1 then
+					look = look.Unit
+					local floorY = hrp.Position.Y - (model:GetAttribute("RootHeight") or 2.4) * scale
+					local high = distanceAhead(Vector3.new(hrp.Position.X, floorY + 2.9 * scale, hrp.Position.Z), look, 14)
+					local low = distanceAhead(Vector3.new(hrp.Position.X, floorY + 0.3 * scale, hrp.Position.Z), look, 14)
+					local studs = 1.2 * scale
+					if high then
+						studs = math.min(studs, high - 3.9 * scale)
+					end
+					if low then
+						studs = math.min(studs, low - 0.9 * scale)
+					end
+					zb.lunge = math.clamp(studs, -0.5 * scale, 1.6 * scale) / scale
+				end
+			end
+		end
+
+		-- fight
+		if fw > 0.001 then
+			local a = math.min(since, SLAM[#SLAM][1])
+			local function key(i)
+				return sampleKeys(SLAM, a, i)
+			end
+			local l = key(10)
+			rS = mix(rS, key(2), fw)
+			rZ = mix(rZ, key(3), fw)
+			rE = mix(rE, key(4), fw)
+			lS = mix(lS, key(5), fw)
+			lZ = mix(lZ, key(6), fw)
+			lE = mix(lE, key(7), fw)
+			wp = mix(wp, key(8), fw)
+			wy = mix(wy, key(9), fw)
+			wroll = mix(wroll, 0, fw)
+			np = mix(np, 0.1 - key(8) * 0.7, fw) -- the head stays on the wall while the body leans
+			ny = mix(ny, 0, fw)
+			nr = mix(nr, 0, fw)
+			lat = mix(lat, 0, fw)
+			lift = mix(lift, l, fw)
+			fwd = mix(fwd, key(11) * zb.lunge, fw) -- (key -1 = the full lunge towards the wall)
+			-- the stance: left foot forward, right foot back, the knees take the drops
+			lH = mix(lH, 0.3 - l * 0.5, fw)
+			rH = mix(rH, -0.2 - l * 0.5, fw)
+			lK = mix(lK, -0.25 + l * 1.1, fw)
+			rK = mix(rK, -0.15 + l * 1.0, fw)
+			hipZ = mix(hipZ, 0, fw)
+			-- the jaw gapes on the drop
+			mouth = mix(mouth, 0.25 + ((a > 0.6 and a < 1.2) and math.sin((a - 0.6) / 0.6 * math.pi) * 0.3 or 0), fw)
+		end
+
+		local function sm(name, x, stiffness, damping)
+			local e = zb.sm[name]
+			if not e then
+				e = { x = x, v = 0 }
+				zb.sm[name] = e
+			end
+			e.x, e.v = springStep(e.x, e.v, x, stiffness or 900, damping or 60, dt)
+			return e.x
+		end
+		-- the club: soft and swinging outside the blow, stiff during it
+		local clubK, clubD = mix(55, 900, fw), mix(6, 60, fw)
+		local wyS = sm("wy", wy)
+		set(rig, "RShoulder", ANGLES(sm("rS", rS, clubK, clubD), 0, sm("rZ", rZ, clubK, clubD)))
+		set(rig, "RElbow", ANGLES(sm("rE", rE, clubK * 1.5, clubD), 0, 0))
+		set(rig, "LShoulder", ANGLES(sm("lS", lS, 300, 25), 0, sm("lZ", lZ, 300, 25)))
+		set(rig, "LElbow", ANGLES(sm("lE", lE, 300, 25), 0, 0))
+		set(rig, "Waist", ANGLES(sm("wp", wp), wyS, sm("wroll", wroll)))
+		set(rig, "Neck", ANGLES(sm("np", np), sm("ny", ny) - wyS * 0.6, sm("nr", nr)))
+		local hz = sm("hipZ", hipZ)
+		set(rig, "LHip", ANGLES(sm("lH", lH), 0, hz))
+		set(rig, "RHip", ANGLES(sm("rH", rH), 0, hz))
+		set(rig, "LKnee", ANGLES(sm("lK", lK), 0, 0))
+		set(rig, "RKnee", ANGLES(sm("rK", rK), 0, 0))
+		set(rig, "Root", CFrame.new(sm("lat", lat) * scale, sm("lift", lift) * scale + float + rise, sm("fwd", fwd) * scale))
+		jaw = sm("mouth", mouth, 200, 20)
 	end
 
 	-- Pose "Crawler" (the Ghoul, AttackStyle "Pounce"): a starved thing on all fours (build_ghoul.lua). Every joint turns
