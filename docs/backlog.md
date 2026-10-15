@@ -42,6 +42,15 @@ the originals (`sounds/_source/`, git-ignored) and the .wav drafts in `impacts/`
    lenses (lower FOV) in the warp-in / barrage camera keys. Keep it within ~300 studs of the camera.
    **Done: `SHIP_SCALE = 0.55` (65% bigger than 1/3; measured in play: 263 studs long, was 160, ~244 from the camera) for the ship and every offset measured on it; PORTAL_BEHIND is
    ship-sized too so the stern clears the portal. The sky positions, portal and vortex stay at SKY_SCALE.**
+7. **Luck rework (noted 2026-10-15, for later):** luck (`luckFactor` in Rolling.rollRarity: +10% per luckBoost level,
+   max 20 = x3, the wheel buff x2) multiplies every rarity from Rare up by the SAME factor, so in graves without
+   Common / Uncommon (Void Sanctum, Eternal Throne, Celestial) it changes nothing, and elsewhere it never makes a top
+   rarity likelier against a Rare. Example: Malak (Celestial only, 3.071% Primordial x 4% of the pool) is ~1 in 814
+   pulls with or without max luck. Idea: luck boosts the rarities ABOVE each grave's most common one, more for rarer
+   ones (e.g. factor ^ steps above it, capped); max luck in Celestial would lift Primordial ~3% -> ~8% (Malak ~1 in 300).
+   Check it in tools/sim/economy_sim.py before choosing numbers. Decide with the user.
+8. Malak's pull is live (2026-10-15): weight 0.05, Celestial only (`graves` on the pool entry); his pull cinematic
+   `SovereignArrival` (docs/envoy.md). The rarity part of point 2 is done.
 
 ## State at the end of the 2026-10-14 / 15 session (read this first)
 
