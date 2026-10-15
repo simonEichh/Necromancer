@@ -183,6 +183,7 @@ local UNITS = {
 	},
 	-- Knell, the Mourning Bell: a rare Legendary Signature with a three-toll spectacle.
 	Knell = {
+		title = "The Mourning Bell", -- (a Signature title: the Codex shows it under the name)
 		color = BrickColor.new("Sand green"),
 		size = Vector3.new(2.8, 4, 2.8),
 		damage = 3300, -- 1,650 nominal DPS: top of Legendary, below Abyssal
@@ -253,6 +254,7 @@ local UNITS = {
 	-- a floating gas-masked child, "crucified" in the air; points a claw finger out of its sleeve and fires a thin beam
 	-- (model attribute AttackStyle = "FingerBeam"; the damage lands hitDelay seconds after the attack, with the beam)
 	Hush = {
+		title = "The Unbreathing", -- (a Signature title: the Codex shows it under the name)
 		color = BrickColor.new("Royal purple"),
 		size = Vector3.new(2.2, 4, 2.2),
 		damage = 90000, -- 45K DPS: a Signature unit is among the strongest of its rarity (but stays below the next tier)
@@ -296,6 +298,7 @@ local UNITS = {
 	-- accelerating.
 	-- DPS: 85000 / 1 s.
 	Sigilwright = {
+		title = "The Last Word", -- (a Signature title: the Codex shows it under the name)
 		color = BrickColor.new("Pastel yellow"),
 		size = Vector3.new(2.4, 2.4, 2.4),
 		damage = 85000,
@@ -467,6 +470,8 @@ end
 -- always get the star cinematic. Rules: their DPS is at the TOP of their rarity's range (one of the strongest of the tier, never into the
 -- next tier), and they ALWAYS get a very low weight in RARITY_UNITS (e.g. 0.2 against 1-4 for normal units), so they
 -- are the chase within each tier. (Planned: a "guaranteed Rare Signature" box for new players.)
+-- Only Signatures and Sovereigns get a `title` ("The Unbreathing"): the Codex shows it under the name, even before
+-- the unit is discovered (under its black silhouette).
 local SIGNATURE_COLOR = Color3.fromRGB(255, 226, 150)
 local function isSignature(unitType)
 	local def = UNITS[unitType]

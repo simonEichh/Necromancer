@@ -2,7 +2,7 @@
 -- Opened with the "Codex" tile (right HUD column) or C: the character holds the grimoire up in their left hand, it opens,
 -- the camera glides over their shoulder and zooms onto the pages, and the book UI fades in exactly over them. Closing
 -- (X, Esc or C) plays it backwards.
--- The book: one spread per rarity (Common .. Primordial), the rarity's units on the two pages: a 3D portrait, the name,
+-- The book: one spread per rarity (Common .. Primordial; a rarity with more than four units runs over onto more spreads), the rarity's units on the two pages: a 3D portrait, the name,
 -- "1 in X", base DPS and how many the player has ever pulled. Units never pulled are a black silhouette with "???".
 -- Discovered = State.codex (server PlayerData.codex, saved; counted in Digging, older saves filled from the inventory and
 -- the graves). Builds its UI when required (no init call).
@@ -142,7 +142,9 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 	portraitHolder.Position = UDim2.fromScale(0.02, 0.04)
 	portraitHolder.Parent = f
 	local portrait = UnitPortrait.attach(portraitHolder, { size = UDim2.fromScale(1, 1), zIndex = 3 })
-	local name = text(f, { size = UDim2.fromScale(0.58, 0.24), position = UDim2.fromScale(0.4, 0.08) })
+	local name = text(f, { size = UDim2.fromScale(0.58, 0.22), position = UDim2.fromScale(0.4, 0.05) })
+	-- the unit's title under its name, like a Dead by Daylight killer's ("The Envoy"; `title` in its def; also shown undiscovered)
+	local title = text(f, { size = UDim2.fromScale(0.58, 0.1), position = UDim2.fromScale(0.4, 0.26), font = Enum.Font.Garamond, color = INK_DIM })
 	local odds = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.38), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local dps = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.56), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local pulled = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.74), font = Enum.Font.GothamMedium, color = INK_DIM })
@@ -158,14 +160,22 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 		end,
 	})
 	fleet.root.Visible = false
-	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, odds = odds, dps = dps, pulled = pulled, fleet = fleet }
+	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, title = title, odds = odds, dps = dps, pulled = pulled, fleet = fleet }
 end
 
 -- page turning, bookmarks, close
+-- the spreads: four entries each, so a rarity with more units gets several ({ rarity, first = index of its first unit })
+local SPREADS = {}
+for _, rarity in ipairs(RARITY_LIST) do
+	local count = #(Units.Pools[rarity] or {})
+	for first = 1, math.max(1, count), #ENTRY_SLOTS do
+		table.insert(SPREADS, { rarity = rarity, first = first })
+	end
+end
 local spread = 1
 local paint
 local function turn(delta)
-	spread = math.clamp(spread + delta, 1, #RARITY_LIST)
+	spread = math.clamp(spread + delta, 1, #SPREADS)
 	paint()
 end
 Theme.stoneButton(book, {
@@ -180,7 +190,23 @@ Theme.stoneButton(book, {
 	text = "X", color = "red", size = UDim2.fromOffset(44, 32), position = UDim2.new(1, -54, 0, 8), zIndex = 5,
 	onClick = function() CodexPanel.close() end,
 })
+-- the bookmarks stick out above the book: a CanvasGroup cuts off what lies outside it (they could hardly be seen or
+-- clicked), so they sit in a plain frame laid over the book and fade with it
+local tabLayer = Instance.new("Frame")
+tabLayer.AnchorPoint = book.AnchorPoint
+tabLayer.Position = book.Position
+tabLayer.Size = book.Size
+tabLayer.BackgroundTransparency = 1
+tabLayer.Parent = ui
+local tabAspect = aspect:Clone()
+tabAspect.Parent = tabLayer
 local bookmarks = {}
+book:GetPropertyChangedSignal("GroupTransparency"):Connect(function()
+	for _, b in ipairs(bookmarks) do
+		b.BackgroundTransparency = book.GroupTransparency
+		b.Visible = book.GroupTransparency < 0.99
+	end
+end)
 for i, rarity in ipairs(RARITY_LIST) do
 	local b = Instance.new("TextButton")
 	b.AutoButtonColor = false
@@ -190,10 +216,17 @@ for i, rarity in ipairs(RARITY_LIST) do
 	b.AnchorPoint = Vector2.new(0.5, 1)
 	b.Size = UDim2.fromScale(0.035, 0.07)
 	b.Position = UDim2.fromScale(0.62 + (i - 1) * 0.04, 0.012)
-	b.Parent = book
+	b.BackgroundTransparency = book.GroupTransparency
+	b.Visible = false
+	b.Parent = tabLayer
 	Theme.corner(b, 4)
 	b.Activated:Connect(function()
-		spread = i
+		for k, sp in ipairs(SPREADS) do
+			if sp.rarity == rarity then
+				spread = k
+				break
+			end
+		end
 		paint()
 	end)
 	bookmarks[i] = b
@@ -201,7 +234,8 @@ end
 
 paint = function()
 	local codex = State.codex or {}
-	local rarity = RARITY_LIST[spread]
+	local rarity = SPREADS[spread].rarity
+	local first = SPREADS[spread].first
 	local pool = Units.Pools[rarity] or {}
 	local color = Rarities.Color[rarity] or INK
 	rarityTitle.Text = string.upper(rarity)
@@ -219,12 +253,12 @@ paint = function()
 	end
 	rarityCount.Text = found .. " / " .. #pool .. " discovered"
 	totalLbl.Text = "Codex  " .. all .. " / " .. TOTAL
-	pageLbl.Text = spread .. " / " .. #RARITY_LIST
+	pageLbl.Text = spread .. " / " .. #SPREADS
 	for i, b in ipairs(bookmarks) do
-		b.Size = (i == spread) and UDim2.fromScale(0.035, 0.1) or UDim2.fromScale(0.035, 0.07)
+		b.Size = (RARITY_LIST[i] == rarity) and UDim2.fromScale(0.035, 0.1) or UDim2.fromScale(0.035, 0.07)
 	end
 	for i, entry in ipairs(entries) do
-		local e = pool[i]
+		local e = pool[first + i - 1]
 		entry.frame.Visible = e ~= nil
 		if e then
 			local unitType = e.unit
@@ -237,8 +271,9 @@ paint = function()
 			if n and Units.isSignature and Units.isSignature(unitType) then
 				SignatureName.apply(entry.name, unitType)
 			end
-			entry.odds.Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
 			local def = Units.Stats[unitType]
+			entry.title.Text = def.title or "" -- (shown even before the unit is discovered: "??? / The Envoy" makes players curious)
+			entry.odds.Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
 			entry.dps.Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
 			entry.pulled.Text = n and ("Pulled  " .. n .. "x") or "Not yet discovered"
 			entry.fleet.root.Visible = n ~= nil and unitType == "Malak"
