@@ -14,6 +14,7 @@ local Drops = require(script.Parent.Drops)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local GraveRune = require(script.Parent.GraveRune)
 
 local UNITS = SharedUnits.Stats
 local UNIT_RARITY = SharedUnits.Rarity
@@ -51,7 +52,8 @@ recallUnitFromSlot = function(slotIndex, player, plotState)
 	slot.unitType = nil
 	slot.level, slot.fails, slot.locked = nil, nil, nil
 	slot.unitEntry = nil
-	slot.label.Text = "Empty"
+	slot.label.Text = ""
+	GraveRune.set(slot, nil) -- (the rune goes dark)
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"
@@ -335,6 +337,7 @@ local function placeInSlot(plotState, slotIndex, unitType, level, fails, locked)
 	slot.label.Text = graveTitle(unitType, level)
 	slot.rarityLabel.Text = rarity
 	slot.rarityLabel.TextColor3 = RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)
+	GraveRune.set(slot, RARITY_COLOR[rarity] or Color3.fromRGB(200, 200, 200)) -- (the tombstone's rune lights up)
 	slot.dpsLabel.Text = dps .. " DPS"
 	slot.prompt.ActionText = "Recall"
 	slot.prompt.ObjectText = "Grave " .. slotIndex .. " (" .. unitType .. ")"
@@ -407,7 +410,8 @@ local function clearSlot(i, plotState)
 	slot.unitType = nil
 	slot.level, slot.fails, slot.locked = nil, nil, nil
 	slot.unitEntry = nil
-	slot.label.Text = "Empty"
+	slot.label.Text = ""
+	GraveRune.set(slot, nil) -- (the rune goes dark)
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"

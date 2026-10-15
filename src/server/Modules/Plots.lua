@@ -11,6 +11,7 @@ local PlotRegistry = require(script.Parent.PlotRegistry)
 local Titans = require(script.Parent.Titans)
 local Portal = require(script.Parent.Portal)
 local PlotLook = require(script.Parent.PlotLook)
+local GraveRune = require(script.Parent.GraveRune)
 
 local playerPlots = PlotRegistry.playerPlots
 local getPlot = PlotRegistry.getPlot
@@ -99,7 +100,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	lbl.Size = UDim2.new(1, 0, 0.38, 0)
 	lbl.Position = UDim2.new(0, 0, 0, 0)
 	lbl.BackgroundTransparency = 1
-	lbl.Text = "Empty"
+	lbl.Text = "" -- (an empty grave shows no text: its rune is dark, GraveRune)
 	lbl.TextColor3 = Color3.fromRGB(160, 200, 160)
 	lbl.TextScaled = true
 	lbl.Font = Enum.Font.GothamBold
@@ -135,6 +136,7 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 		rarityLabel = rarityLbl, dpsLabel = dpsLbl,
 		prompt = prompt, occupied = false,
 	}
+	GraveRune.attach(plotState.graveSlots[i])
 
 	local idx = i
 	local spawnPoint = basePos + Vector3.new(0, 2, 0)
