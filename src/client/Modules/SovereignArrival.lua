@@ -545,10 +545,10 @@ function SovereignArrival.play(results, opts)
 	local nameLbl = Instance.new("TextLabel")
 	nameLbl.AnchorPoint = Vector2.new(0.5, 0)
 	nameLbl.Position = UDim2.fromScale(0.5, 0.13)
-	nameLbl.Size = UDim2.fromOffset(700, 54)
+	nameLbl.Size = UDim2.fromOffset(900, 72)
 	nameLbl.BackgroundTransparency = 1
 	nameLbl.Font = Enum.Font.Sarpanch
-	nameLbl.TextSize = 46
+	nameLbl.TextSize = 62
 	nameLbl.TextColor3 = GLOW_CORE
 	nameLbl.TextStrokeColor3 = Color3.new(0, 0, 0)
 	nameLbl.TextTransparency = 1
@@ -564,7 +564,7 @@ function SovereignArrival.play(results, opts)
 	classLbl.TextColor3 = GLOW
 	classLbl.Text = string.upper(best.rarity) .. "  SOVEREIGN"
 	classLbl.Parent = ui
-	nameLbl.Position = UDim2.new(0.5, 0, 0.13, 24)
+	nameLbl.Position = UDim2.new(0.5, 0, 0.13, 26)
 	-- his line: the Fleet Strike's military subtitle style (a speaker label, pale text, a dark outline)
 	local subs = Instance.new("CanvasGroup")
 	subs.AnchorPoint = Vector2.new(0.5, 1)
