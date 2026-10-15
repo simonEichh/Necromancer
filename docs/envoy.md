@@ -70,7 +70,13 @@ the keeper's raised palms, at 47.6 s it drags down the outer wall (a cooling sca
 falls (preview: hidden on this screen only, debris, dust, shake); the keeper's side is HandsAnimator's FleetStrike
 behaviour (set locally: SummonKind / SummonAt), driven back into his rifts, NOT killed. While a finisher runs the
 server moves the owner's streaming focus to the gate (Army setFinisherFocus: ReplicationFocus + RequestStreamAroundAsync),
-or far parts may not be loaded. The cutscene is 54 s. The camera is ONE continuous path through keyframes (`KEYS`, monotone
+or far parts may not be loaded. 6. (done) the ending: the drone's spire retracts and its rings unfold
+(50.4-52.4 s); after the cutscene the Absolution LINGERS (client `lingerShip`: the bow closes, the cannon goes in, the
+turrets turn home, the rings idle), after ~16 s a portal tears open behind its stern and it drifts in backwards (no turn),
+the portal snaps shut; the haze returns after it; (preview) the keeper comes back out with his Return. Idea left for
+later: if the ship ever stays longer (into the next run), his basic attack's laser and shells should come from its
+turrets (now the gate is gone during the linger, so he does not attack). The cutscene is 54 s. The camera is ONE
+continuous path through keyframes (`KEYS`, monotone
 Hermite: never overshoots); the user calls it almost perfect, small things to fix later. Next: IDEA (user, 2026-10-15): the final
 shot also strikes the realm keeper (his hands + eyes behind the gate, `HandsAnimator`). He is NOT killed: he is the
 secret world boss, so he is wounded and DRIVEN BACK (his existing Defeat: dragged into the rifts reads as a retreat).

@@ -13,7 +13,8 @@
 --      DevFleetStrike remote), every nameplate is hidden and his big attack hologram closes
 --   3. the sky tears, the portal, the warp-in (done)
 --   4. scan + barrage (done)
---   5. the main cannon, the beam strikes the realm keeper and sweeps down onto the gate, the gate falls (THIS)      5. main cannon + beam + the gate breaks
+--   5. the main cannon, the beam strikes the realm keeper and sweeps down onto the gate, the gate falls (done)
+--   6. the ending (THIS): the drone unfolds, the ship lingers over the arena and leaves backwards through a portal      5. main cannon + beam + the gate breaks
 --   6. the ending, the ship lingers and warps out  7. gameplay (trigger at 20% gate HP, gems unlock, toggle)  8. sound
 -- Nothing here touches real gameplay yet: it is started from the DEV panel (Anim: Fleet, Play).
 -- PACE must stay 1 while UnitAnimator reads the beat times off os.clock() (model attribute FleetStart).
@@ -347,7 +348,7 @@ local function transmitter(folder, malak, scale)
 		end
 		local top = droneRoot.Position + Vector3.new(0, 1.15 * scale, 0)
 		-- the spire
-		local grow = e(6.6, 7.6) * 2.6 * scale
+		local grow = e(6.6, 7.6) * (1 - e(50.4, 51.8)) * 2.6 * scale -- (back in when the drone unfolds)
 		spire.Size = Vector3.new(0.09 * scale, math.max(0.05, grow), 0.09 * scale)
 		spire.CFrame = CFrame.new(top + Vector3.new(0, grow / 2, 0))
 		spire.Transparency = grow > 0.06 and 0 or 1
@@ -1362,11 +1363,105 @@ local function finale(folder, ctx)
 				p.LocalTransparencyModifier = 0
 			end
 		end
+	end, function(comeBack)
+		-- (preview) the keeper: back to what he was doing, or (after the ship has gone) out of his rifts again
 		if keeper and keeper.Parent and saved then
-			keeper:SetAttribute("SummonKind", saved.kind)
-			keeper:SetAttribute("SummonAt", saved.at)
+			if comeBack then
+				keeper:SetAttribute("SummonKind", "Return")
+				keeper:SetAttribute("SummonAt", workspace:GetServerTimeNow())
+			else
+				keeper:SetAttribute("SummonKind", saved.kind)
+				keeper:SetAttribute("SummonAt", saved.at)
+			end
 		end
 	end
+end
+
+-- ============================================================
+-- Step 6: after the cutscene the Absolution lingers over the arena, then leaves backwards through a portal
+-- ============================================================
+local LINGER = 16 -- s it stays after the cutscene before the portal opens behind it
+local SETTLE = 3 -- s to close the bow, pull the cannon in, turn the turrets home, let the rings go
+local WARP_OUT_TEAR = 3 -- the portal tears open behind its stern ...
+local WARP_OUT_DRIFT = 10 -- ... it drifts in backwards, stern first, slowly, then faster ...
+local WARP_OUT_AFTER = 4 -- ... the portal snaps shut; then everything is cleaned up
+local RING_IDLE = { RingA = 0.12, RingB = -0.18, RingC = 0.3 }
+
+-- `ship` is the warp-in's clone (moved out of the cutscene's folder); `deferred` are the cutscene's cleanups that must
+-- wait until the ship is gone (the haze stays thin while it is in the sky); `onGone` runs at the very end.
+local function lingerShip(ship, deferred, onGone)
+	local folder = Instance.new("Folder")
+	folder.Name = "FleetStrikeLinger"
+	folder.Parent = workspace
+	ship.Parent = folder
+	local cf0 = ship.PrimaryPart.CFrame
+	local look = cf0.LookVector
+	-- the portal opens behind its stern, facing it (its own tear: rune ring, cracks, void, the snap)
+	local portal = CFrame.lookAt(cf0.Position - look * 250, cf0.Position)
+	local tearUpdate, tearCleanup = skyTear(folder, portal)
+	local joints, parts = {}, {}
+	for _, d in ipairs(ship:GetDescendants()) do
+		if d:IsA("Motor6D") then
+			table.insert(joints, { j = d, from = d.Transform, idle = RING_IDLE[d.Name] })
+		elseif d:IsA("BasePart") then
+			table.insert(parts, { part = d, hidden = false })
+		end
+	end
+	local core = ship:FindFirstChild("Core", true)
+	local coreHalo = ship:FindFirstChild("CoreHalo", true)
+	local coreSize, haloSize = core and core.Size, coreHalo and coreHalo.Size
+	local t0 = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local lt = os.clock() - t0
+		-- settle: the bow closes, the cannon slides back in, the turrets turn home, the rings unlock and turn slowly
+		local k = smooth(lt / SETTLE)
+		for _, s in ipairs(joints) do
+			if s.j.Parent then
+				local rest = s.idle and CFrame.Angles(0, lt * s.idle, 0) or CFrame.new()
+				s.j.Transform = s.from:Lerp(rest, k)
+			end
+		end
+		if core then
+			local pulse = 0.5 + 0.5 * math.sin(lt * 1.6)
+			core.Size = coreSize * (0.96 + 0.06 * pulse)
+			coreHalo.Size = haloSize * (0.94 + 0.12 * pulse)
+		end
+		-- the warp-out: the tear behind it (the warp-in's timeline, re-timed), the drift backwards, hidden past the plane
+		local wo = lt - LINGER
+		if wo > 0 then
+			local tt
+			if wo < WARP_OUT_TEAR then
+				tt = TEAR_AT + wo / WARP_OUT_TEAR * (WARP_AT - TEAR_AT)
+			elseif wo < WARP_OUT_TEAR + WARP_OUT_DRIFT then
+				tt = WARP_AT + (wo - WARP_OUT_TEAR) / WARP_OUT_DRIFT * (EMERGE_TO - WARP_AT)
+			else
+				tt = SNAP_AT + (wo - WARP_OUT_TEAR - WARP_OUT_DRIFT)
+			end
+			tearUpdate(tt)
+			local u = math.clamp((wo - WARP_OUT_TEAR) / WARP_OUT_DRIFT, 0, 1)
+			ship:PivotTo(cf0 - look * 480 * u ^ 1.7) -- (slow to start, the heavy ship gathering way)
+			local pp = portal.Position
+			for _, p in ipairs(parts) do
+				local behind = (p.part.Position - pp):Dot(look) < 0
+				if behind ~= p.hidden then
+					p.hidden = behind
+					p.part.LocalTransparencyModifier = behind and 1 or 0
+				end
+			end
+		end
+		if wo > WARP_OUT_TEAR + WARP_OUT_DRIFT + WARP_OUT_AFTER then
+			conn:Disconnect()
+			tearCleanup()
+			for _, c in ipairs(deferred) do
+				c()
+			end
+			folder:Destroy()
+			if onGone then
+				onGone()
+			end
+		end
+	end)
 end
 
 -- ============================================================
@@ -1435,7 +1530,7 @@ function FleetStrike.play(opts)
 	fxFolder.Parent = workspace
 	local tearUpdate, tearCleanup = skyTear(fxFolder, ctx.portal)
 	local warpUpdate, warpCleanup = warpIn(fxFolder, ctx.portal, ctx.shipCF, ctx)
-	local finaleUpdate, finaleCleanup = finale(fxFolder, ctx)
+	local finaleUpdate, finaleCleanup, keeperRestore = finale(fxFolder, ctx)
 	local effects = { runePanel(fxFolder, malak, scale), transmitter(fxFolder, malak, scale), tearUpdate, warpUpdate,
 		barrage(fxFolder, ctx), finaleUpdate }
 	local cleanups = { tearCleanup, warpCleanup, finaleCleanup }
@@ -1520,8 +1615,23 @@ function FleetStrike.play(opts)
 		done = true
 		RunService:UnbindFromRenderStep(BIND)
 		ui:Destroy()
-		for _, c in ipairs(cleanups) do
-			c()
+		-- once it is out of the portal the ship stays: it lingers over the arena, then leaves backwards (lingerShip);
+		-- the thin haze waits until it is gone and the keeper comes back after it
+		local ship = fxFolder:FindFirstChild("Absolution")
+		if ship and T >= EMERGE_TO then
+			for _, c in ipairs(cleanups) do
+				if c ~= tearCleanup and c ~= warpCleanup then
+					c()
+				end
+			end
+			lingerShip(ship, { tearCleanup }, function()
+				keeperRestore(true)
+			end)
+		else
+			for _, c in ipairs(cleanups) do
+				c()
+			end
+			keeperRestore(false)
 		end
 		fxFolder:Destroy()
 		if malak.Parent then

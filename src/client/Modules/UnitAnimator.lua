@@ -1924,7 +1924,7 @@ local function animate(model, rig, dt, now)
 			local neck = ANGLES(-0.42 * onRunes + (0.28 + 0.3 * fe(9.0, 10.2)) * onDrone, -0.12 * onRunes + 0.75 * onDrone, 0)
 			blend("Neck", neck, math.max(onRunes, onDrone, fe(10.7, 11.5)))
 			-- the drone becomes the transmitter (and stays one until the end of the cutscene)
-			local xf = fe(6.1, 7.3)
+			local xf = fe(6.1, 7.3) * (1 - fe(50.6, 52.4)) -- (unfolds back into the armillary at the end)
 			if xf > 0 then
 				rig.fleetSpin = (rig.fleetSpin or 0) + dt * (0.6 + 9 * fe(7.3, 9.0))
 				for i = 1, 3 do
