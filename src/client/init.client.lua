@@ -185,7 +185,6 @@ require(Modules.OutfitsPanel) -- the wardrobe: outfit items (tile + O)
 require(Modules.ArmyPanel) -- the Army screen: placing the army, families, commanders (tile + R)
 require(Modules.CapeSway) -- the equipped cape sways with walking speed
 AscendPanel = require(Modules.AscendPanel)
-require(Modules.SellPanel)
 require(Modules.ForgePanel)
 require(Modules.GemShopPanel) -- the Gem Shop (Shop tile, right) and the Remote Forge tile (left)
 require(Modules.SettingsPanel) -- the Settings tile (top right) and panel: sound volumes, saved

@@ -264,8 +264,7 @@ end
 
 -- the grave shop (plaza angle 22.5) and the Forge (202.5) have their own detailed stalls: after re-running this script,
 -- run build_grave_stall.lua and build_forge_stall.lua again
-buildStall("SellShopkeeper", "SELL", Color3.fromRGB(255, 205, 80), 142.5)
-buildStall("UpgradeShopkeeper", "UPGRADE", Color3.fromRGB(170, 120, 255), 262.5)
+-- (the old Sell and Upgrade stalls were removed on 2026-10-16: selling is in the inventory, upgrades in the HUD tile)
 
 workspace:SetAttribute("HubSpawn", Vector3.new(0, floorTop + 3, 18))
 

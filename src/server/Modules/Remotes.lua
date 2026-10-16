@@ -53,8 +53,6 @@ local EVENTS = {
 	"Notice", -- short message to show the player
 	"UpgradeResult", -- (success, unitType, newLevel, chance) after an UpgradeUnit
 	"OpenGrave",
-	"OpenSell",
-	"OpenUpgrade",
 	"QuestUpdate",
 	"RollResult",
 	"SelectGrave",

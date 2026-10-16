@@ -1,4 +1,4 @@
--- Shopkeeper prompts (Buy / Sell / Upgrade). The anchor parts in Workspace.Shops are invisible and sit on the
+-- Shopkeeper prompts (grave shop, Forge). The anchor parts in Workspace.Shops are invisible and sit on the
 -- stall counters built by tools/studio/build_hub.lua (the stalls carry their own signs).
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
@@ -38,8 +38,6 @@ if shopsFolder then
 		end)
 	end
 	wireShop("GraveShopkeeper",   Remotes.OpenGrave,   "Buy")
-	wireShop("SellShopkeeper",    Remotes.OpenSell,    "Sell")
-	wireShop("UpgradeShopkeeper", Remotes.OpenUpgrade, "Upgrade")
 	wireShop("ForgeKeeper",       Remotes.OpenForge,   "Forge") -- stall built by tools/studio/build_forge_stall.lua
 else
 	warn("Shops folder not found in Workspace")

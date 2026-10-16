@@ -1,5 +1,5 @@
 -- The Upgrades panel: everything gold makes stronger, reachable anywhere from the "Upgrades" tile in the left HUD column
--- (a badge shows how many levels you can afford right now) and from the upgrade stall in the plaza (OpenUpgrade).
+-- (a badge shows how many levels you can afford right now).
 --   Realm upgrades (Economy.REALM_UPGRADES: Army Might, Soul Harvest, Swift March, Grasping Souls): kept through the
 --   ascensions of a realm, reset with the gold when a new realm starts (BuyRealmUpgrade).
 --   Permanent: Luck Boost and Coin Boost (BuyUpgrade, the old upgrade panel's).
@@ -27,7 +27,6 @@ local UpgradesPanel = {}
 
 local buyRealmRemote = ReplicatedStorage:WaitForChild("BuyRealmUpgrade", 5)
 local buyUpgradeRemote = ReplicatedStorage:WaitForChild("BuyUpgrade", 5)
-local openUpgradeEvt = ReplicatedStorage:WaitForChild("OpenUpgrade", 5)
 
 local function fmt(n)
 	return Format.fmtGold and Format.fmtGold(n) or tostring(math.floor(n))
@@ -325,9 +324,6 @@ function UpgradesPanel.open()
 end
 
 Sync.onApplied(refresh)
-if openUpgradeEvt then
-	openUpgradeEvt.OnClientEvent:Connect(UpgradesPanel.open) -- the upgrade stall in the plaza
-end
 refresh()
 
 return UpgradesPanel
