@@ -277,10 +277,11 @@ for i = 1, 8 do
 			part("LedgerBorder", Vector3.new(4.8, 0.14, 6), at(f, lat, 0.07), BONE, Enum.Material.Limestone)
 			part("Ledger", Vector3.new(4.2, 0.2, 5.4), at(f, lat, 0.1), STONE_DARK, Enum.Material.Slate)
 			-- a faint rune: a ring with a cross through it
-			part("LedgerRune", Vector3.new(0.04, 2.6, 2.6), at(f, lat, 0.21) * UP, RUNE, Enum.Material.Neon, Enum.PartType.Cylinder)
-			part("LedgerRuneCut", Vector3.new(0.05, 2.3, 2.3), at(f, lat, 0.215) * UP, STONE_DARK, Enum.Material.Slate, Enum.PartType.Cylinder)
-			part("LedgerRuneBar", Vector3.new(0.18, 0.04, 3.4), at(f, lat, 0.22), RUNE, Enum.Material.Neon)
-			part("LedgerRuneBar", Vector3.new(2.2, 0.04, 0.18), at(f + 0.5, lat, 0.22), RUNE, Enum.Material.Neon)
+			-- (stacked clearly apart: ring 0.20-0.24, cut-out 0.25-0.29, bars 0.30-0.34; they z-fought at nearly one height)
+			part("LedgerRune", Vector3.new(0.04, 2.6, 2.6), at(f, lat, 0.22) * UP, RUNE, Enum.Material.Neon, Enum.PartType.Cylinder)
+			part("LedgerRuneCut", Vector3.new(0.04, 2.3, 2.3), at(f, lat, 0.27) * UP, STONE_DARK, Enum.Material.Slate, Enum.PartType.Cylinder)
+			part("LedgerRuneBar", Vector3.new(0.18, 0.04, 3.4), at(f, lat, 0.32), RUNE, Enum.Material.Neon)
+			part("LedgerRuneBar", Vector3.new(2.2, 0.04, 0.18), at(f + 0.5, lat, 0.32), RUNE, Enum.Material.Neon)
 		end
 	end
 	-- candles by some of the ledgers (towards the middle path)
