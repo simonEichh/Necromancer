@@ -627,6 +627,67 @@ local function basicAttack(unitType)
 	end }
 end
 
+-- ============================================================
+-- Families (TFT-style traits, Design.md "Unit families, the commander slot and placement"). Every normal unit belongs
+-- to one; Signatures and Sovereigns have none (they are commanders with a unique trait: their title). Units of a family
+-- placed on the plot activate its bonus in tiers at 2 / 4 / 6: duplicates of one unit count once, a unit in its
+-- shadow form (Economy.AWAKEN_LEVEL) counts double. The server applies the bonuses (Army); `kind` says what they do:
+--   damage  the family's own units deal more damage          gate   the whole army deals more damage to the gate
+--   gold    more gold from hits                               burst  the family's units deal more for `burstTime` s
+--   special the commanders' specials charge faster                     after a wall stands
+-- ============================================================
+local FAMILIES = {
+	Bones = { kind = "gate", tiers = { 0.10, 0.25, 0.45 }, blurb = "the siege" },
+	Flesh = { kind = "damage", tiers = { 0.10, 0.25, 0.45 }, blurb = "the horde" },
+	Spirits = { kind = "gold", tiers = { 0.10, 0.25, 0.45 }, blurb = "the harvest" },
+	Beasts = { kind = "burst", tiers = { 0.30, 0.60, 1.00 }, burstTime = 8, blurb = "the pack" },
+	Arcane = { kind = "special", tiers = { 0.10, 0.20, 0.35 }, blurb = "the rites" },
+}
+local FAMILY_THRESHOLDS = { 2, 4, 6 }
+local FAMILY_ORDER = { "Bones", "Flesh", "Spirits", "Beasts", "Arcane" }
+local FAMILY_OF = {
+	Skelly = "Bones", HollowArcher = "Bones", BaronBone = "Bones", BoneColossus = "Bones", DreadKnight = "Bones", SkeletonKing = "Bones",
+	Zombie = "Flesh", Ghoul = "Flesh", PlagueDoctor = "Flesh", AbyssalTitan = "Flesh", TheUndying = "Flesh",
+	Wraith = "Spirits", Banshee = "Spirits", SoulEater = "Spirits", ShadeLord = "Spirits", DeathReaper = "Spirits", LastLantern = "Spirits",
+	CryptSpider = "Beasts", CryptBat = "Beasts", ShadowHound = "Beasts", EldritchFiend = "Beasts",
+	LichAcolyte = "Arcane", LichLord = "Arcane", VoidWalker = "Arcane", MindShatterer = "Arcane", DeathIncarnate = "Arcane",
+}
+
+-- counts per family for a list of { unitType, level } (duplicates once: the copy with the highest level counts; a
+-- shadow-form copy counts 2), and the active bonus per family (0 below the first tier)
+local function familyCounts(list, awakenLevel)
+	local best = {}
+	for _, u in ipairs(list) do
+		if FAMILY_OF[u.unitType] then
+			best[u.unitType] = math.max(best[u.unitType] or 0, u.level or 0)
+		end
+	end
+	local counts = {}
+	for unitType, level in pairs(best) do
+		local fam = FAMILY_OF[unitType]
+		counts[fam] = (counts[fam] or 0) + ((awakenLevel and level >= awakenLevel) and 2 or 1)
+	end
+	return counts
+end
+local function familyTier(count)
+	local tier = 0
+	for i, need in ipairs(FAMILY_THRESHOLDS) do
+		if (count or 0) >= need then
+			tier = i
+		end
+	end
+	return tier
+end
+local function familyBonuses(list, awakenLevel)
+	local counts = familyCounts(list, awakenLevel)
+	local bonus = {}
+	for name, fam in pairs(FAMILIES) do
+		local tier = familyTier(counts[name])
+		bonus[name] = tier > 0 and fam.tiers[tier] or 0
+	end
+	return bonus, counts
+end
+
 -- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
 local RENAMED = {
 	Goblin = "HollowArcher",
@@ -638,6 +699,13 @@ return {
 	Abilities = ABILITIES,
 	Descriptions = DESCRIPTIONS,
 	basicAttack = basicAttack,
+	Families = FAMILIES,
+	FamilyOf = FAMILY_OF,
+	FAMILY_THRESHOLDS = FAMILY_THRESHOLDS,
+	FAMILY_ORDER = FAMILY_ORDER,
+	familyCounts = familyCounts,
+	familyTier = familyTier,
+	familyBonuses = familyBonuses,
 	RENAMED = RENAMED,
 	isSignature = isSignature,
 	isSovereign = isSovereign,

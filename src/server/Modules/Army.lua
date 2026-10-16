@@ -96,11 +96,25 @@ local function auraMultiplier(plotState)
 	return 1 + best
 end
 
+-- the family bonuses that change a unit's damage (SharedUnits.Families; plotState.famBonus is refreshed every second in
+-- update): Flesh for Flesh units, Beasts for Beasts while their burst runs after a wall stood up, Bones for the whole army
+-- against the gate
+local function familyDamageMultiplier(plotState, u)
+	local fam = plotState.famBonus
+	if not fam then return 1 end
+	local own = SharedUnits.FamilyOf[u.unitType]
+	local m = 1
+	if own == "Flesh" then m *= 1 + fam.Flesh end
+	if own == "Beasts" and plotState.beastBurst then m *= 1 + fam.Beasts end
+	if plotState.atGate then m *= 1 + fam.Bones end
+	return m
+end
+
 local function setDamageMultiplier(plotState)
 	local mult = ownerDamageMultiplier(plotState)
 	for _, u in ipairs(plotState.activeUnits) do
 		if u.baseDamage then
-			u.def.damage = u.baseDamage * mult * Economy.levelMultiplier(u.level)
+			u.def.damage = u.baseDamage * mult * Economy.levelMultiplier(u.level) * familyDamageMultiplier(plotState, u)
 			if u.dpsLbl then
 				u.dpsLbl.Text = math.floor(u.def.damage / u.def.attackCD) .. " DPS"
 			end
@@ -488,7 +502,8 @@ local function earnHitGold(plotState, u, damage)
 	if not (dps > 0 and damage > 0) then return end
 	local rank = Rarities.Rank[UNIT_RARITY[u.block.Name]] or 1
 	-- (ascension and coin boost are applied when the coins drop)
-	u.hitGold = (u.hitGold or 0) + damage / dps * Economy.hitIncome(rank, u.level, 0)
+	local spirits = 1 + (plotState.famBonus and plotState.famBonus.Spirits or 0) -- (the Spirits' harvest)
+	u.hitGold = (u.hitGold or 0) + damage / dps * Economy.hitIncome(rank, u.level, 0) * spirits
 	u.hitGoldSince = u.hitGoldSince or os.clock()
 end
 
@@ -758,9 +773,10 @@ end
 -- draws the same chains); basic attacks pause for `duration`, and the damage lands at the `hits` moments. The special
 -- deals `share` of the unit's damage per cycle and basic attacks the rest, so the unit's DPS stays damage / attackCD.
 local SPECIAL_TEST_COOLDOWN = 10 -- in Studio specials charge this fast, to test them (DEV panel: "Specials: fast / real")
-local function specialCooldown(def)
+local function specialCooldown(def, plotState)
 	local fast = game:GetService("RunService"):IsStudio() and workspace:GetAttribute("DevFastSpecials") ~= false
-	return fast and SPECIAL_TEST_COOLDOWN or def.special.cooldown
+	local arcane = plotState and plotState.famBonus and plotState.famBonus.Arcane or 0 -- (the Arcane rites)
+	return (fast and SPECIAL_TEST_COOLDOWN or def.special.cooldown) * (1 - arcane)
 end
 
 local function chargeSpecial(u, now, cooldown)
@@ -771,9 +787,9 @@ local function chargeSpecial(u, now, cooldown)
 	end
 end
 
-local function initSpecial(u, now)
+local function initSpecial(u, now, plotState)
 	-- each unit starts somewhere in its charge, so several specials do not fire at the same moment
-	local cd = specialCooldown(u.def)
+	local cd = specialCooldown(u.def, plotState)
 	local head = cd * math.random() * 0.4
 	u.specialReady = now + cd - head
 	if u.model then
@@ -844,7 +860,7 @@ end
 local function startSpecial(u, plotState, lat, now)
 	local sp = u.def.special
 	local targetWall = plotState.wall
-	local cd = specialCooldown(u.def)
+	local cd = specialCooldown(u.def, plotState)
 	local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
 	if u.model then
 		u.model:SetAttribute("SpecialKind", sp.kind)
@@ -1076,19 +1092,56 @@ local function checkFleetStrike(plotState, serverNow)
 end
 
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
+-- the plot's units for the family count: everyone fighting on it (dev units too, to test)
+local function refreshBonuses(plotState)
+	local list = {}
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.block and u.block.Parent then
+			table.insert(list, { unitType = u.unitType, level = u.level })
+		end
+	end
+	local bonus, counts = SharedUnits.familyBonuses(list, Economy.AWAKEN_LEVEL)
+	local atGate = plotState.wall ~= nil and Economy.isGate(plotState.wallLayer)
+	-- the Beasts' burst: for burstTime s after the wall being fought has finished rising
+	local burst = false
+	local m = plotState.wall and plotState.wall:FindFirstChild("WallModel")
+	local riseStart = m and m:GetAttribute("RiseStart")
+	if riseStart then
+		local stood = riseStart + (m:GetAttribute("RiseTime") or 0)
+		local t = workspace:GetServerTimeNow()
+		burst = t >= stood and t < stood + SharedUnits.Families.Beasts.burstTime
+	end
+	local aura = auraMultiplier(plotState)
+	local key = table.concat({ aura, tostring(atGate), tostring(burst), bonus.Bones, bonus.Flesh, bonus.Spirits, bonus.Beasts, bonus.Arcane }, "|")
+	if key ~= plotState.bonusKey then
+		plotState.bonusKey = key
+		plotState.auraMult = aura
+		plotState.famBonus = bonus
+		plotState.atGate = atGate
+		plotState.beastBurst = burst
+		setDamageMultiplier(plotState)
+		-- for the clients (the placement screen, later): the family counts on the plot model, e.g. "Bones=3,Spirits=2"
+		if plotState.plotModel then
+			local parts = {}
+			for name, n in pairs(counts) do
+				table.insert(parts, name .. "=" .. n)
+			end
+			table.sort(parts)
+			plotState.plotModel:SetAttribute("FamilyCounts", table.concat(parts, ","))
+		end
+	end
+end
+
 local function update(now, dt)
 	local serverNow = workspace:GetServerTimeNow()
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
 		checkFleetStrike(plotState, serverNow)
-		-- auras (Malak's +10% damage): re-apply the damage of every unit when the strongest aura changes
+		-- auras (Malak's +10% damage) and the families (SharedUnits.familyBonuses): re-apply the damage of every unit when the
+		-- strongest aura, a family tier, the gate or the Beasts' burst changes
 		if now - (plotState.auraCheckAt or 0) >= 1 then
 			plotState.auraCheckAt = now
-			local mult = auraMultiplier(plotState)
-			if mult ~= (plotState.auraMult or 1) then
-				plotState.auraMult = mult
-				setDamageMultiplier(plotState)
-			end
+			refreshBonuses(plotState)
 		end
 		if not plotState.wall or not plotState.wall.Parent then
 			-- the gate has fallen (or the lane is being rebuilt): nothing left to shoot, so everyone stands down
@@ -1218,7 +1271,7 @@ local function update(now, dt)
 				setState(u, "idle")
 				local attackStyle = u.model and u.model:GetAttribute("AttackStyle")
 				if u.def.special and not u.specialReady then
-					initSpecial(u, now)
+					initSpecial(u, now, plotState)
 				end
 				-- a companion (Malak's drone) fires its own slow volley on its own clock while the unit fights
 				if u.def.companion and plotState.wall then
