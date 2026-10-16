@@ -6,13 +6,17 @@
 --          (BuyGemItem "RemoteForge" | "WispSpeed" | "CommanderSlot")
 --   Skills unlockable skills and finishers: Malak's Fleet Strike (BuyGemItem "FleetStrike"; also sold on his Codex
 --          page); the necromancer's spells join it later
--- Opened by the Shop tile in the right HUD column (works anywhere) and by the Soul Broker stall's prompt (OpenBroker,
--- opens on Deals). The server checks everything (UnitUpgrades, GemShop, Broker); this panel only sends the requests and
+-- Opened by the Shop tile in the right HUD column (works anywhere, a plain centred panel) and at the Soul Broker stall
+-- (its prompt, OpenBroker, or a click on a portrait, via BrokerKeeper): there `openAtStall` makes it an in-world view like
+-- the Forge: the camera glides to the counter, the stall fills the left of the screen, the panel stands on the right, the
+-- character is hidden; a click on a portrait (BrokerPortraits) selects that deal's card (`select`).
+-- The server checks everything (UnitUpgrades, GemShop, Broker); this panel only sends the requests and
 -- paints what DataSync brings back.
 -- Also owns the "Forge" tile on the left HUD column that appears once the Remote Forge is bought.
 -- Planned: the stall's in-world view (portraits painted with the deals, the wares as real objects on the counter) and a
 -- "Get Gems" section with Robux gem packs (Developer Products).
 -- Builds its UI when required (no init call).
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -21,6 +25,7 @@ local State = require(script.Parent.State)
 local Sync = require(script.Parent.Sync)
 local screenGui = require(script.Parent.Gui)
 local ForgePanel = require(script.Parent.ForgePanel)
+local WorldView = require(script.Parent.WorldView)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local BrokerDeals = require(ReplicatedStorage.Shared.BrokerDeals)
 
@@ -36,7 +41,14 @@ local buyDealRemote = ReplicatedStorage:WaitForChild("BuyBrokerDeal", 5)
 -- ============================================================
 -- Frame
 -- ============================================================
-local themed = Theme.panel(screenGui, { title = "Gem Shop", size = UDim2.fromOffset(600, 600), zIndex = Z })
+-- (its own ScreenGui: the in-world view at the stall switches every other one off)
+local shopGui = Instance.new("ScreenGui")
+shopGui.Name = "GemShopUI"
+shopGui.ResetOnSpawn = false
+shopGui.DisplayOrder = 5
+shopGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+local PANEL_W, PANEL_H = 600, 600
+local themed = Theme.panel(shopGui, { title = "Gem Shop", size = UDim2.fromOffset(PANEL_W, PANEL_H), zIndex = Z })
 local panel = themed.frame
 panel.Name = "GemShopPanel"
 panel.Visible = false
@@ -87,7 +99,7 @@ local function card(page, i, title, icon, y0)
 	f.Size = UDim2.new(1, -24, 0, CARD_H)
 	f.ZIndex = Z + 2
 	Theme.corner(f, Theme.Radius.Small)
-	Theme.stroke(f, C.Border, 1)
+	local stroke = Theme.stroke(f, C.Border, 1)
 	f.Parent = page
 	local textX = 14
 	if icon then
@@ -108,7 +120,7 @@ local function card(page, i, title, icon, y0)
 	d.TextWrapped = true
 	d.TextYAlignment = Enum.TextYAlignment.Top
 	d.ZIndex = Z + 3
-	return { frame = f, title = t, desc = d }
+	return { frame = f, title = t, desc = d, stroke = stroke }
 end
 local function buyButton(c, onClick)
 	c.button = Theme.stoneButton(c.frame, {
@@ -332,12 +344,103 @@ panel:GetPropertyChangedSignal("Visible"):Connect(function()
 		paint()
 	end
 end)
-local openBroker = ReplicatedStorage:WaitForChild("OpenBroker", 5)
-if openBroker then
-	openBroker.OnClientEvent:Connect(function()
-		GemShopPanel.open("deals") -- the Soul Broker stall's prompt
-	end)
+function GemShopPanel.isOpen()
+	return panel.Visible
 end
+
+-- a deal picked at the stall (a click on its portrait): its card lights up gold
+local selectedDeal
+function GemShopPanel.select(index)
+	selectedDeal = index
+	for i, c in ipairs(dealCards) do
+		c.stroke.Color = i == index and Color3.fromRGB(232, 196, 120) or C.Border
+		c.stroke.Thickness = i == index and 3 or 1
+	end
+end
+
+-- ============================================================
+-- The in-world view at the Soul Broker's stall (like the Forge's)
+-- ============================================================
+local view
+local panelScale = panel:FindFirstChildOfClass("UIScale")
+local function layoutInWorld()
+	if not view then return end
+	local screen = shopGui.AbsoluteSize
+	panel.AnchorPoint = Vector2.new(1, 0.5)
+	panel.Position = UDim2.new(1, -40, 0.5, 0)
+	if panelScale and screen.X > 0 then
+		panelScale.Scale = math.clamp(math.min(screen.X * 0.42 / (PANEL_W + 56), (screen.Y - 60) / (PANEL_H + 56)), 0.4, 1)
+	end
+end
+shopGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	task.defer(layoutInWorld) -- (after Theme's own fit)
+end)
+
+local function stallPivot()
+	local decor = workspace:FindFirstChild("HubDecor")
+	local stall = decor and decor:FindFirstChild("Stall_SoulBroker")
+	return stall and stall:GetPivot()
+end
+local function hideCharacter(char, hidden)
+	if not char then return end
+	-- (every frame: the default camera scripts reset LocalTransparencyModifier)
+	for _, d in ipairs(char:GetDescendants()) do
+		if d:IsA("BasePart") or d:IsA("Decal") then
+			d.LocalTransparencyModifier = hidden and 1 or 0
+		end
+	end
+end
+
+-- the camera stands in front of the counter, a little to the right, so the stall fills the left of the screen
+local CAM_POS = Vector3.new(-16.5, 8.6, 2.5) -- in the stall's frame (it faces -X)
+local CAM_LOOK = Vector3.new(3, 9.2, 2.5)
+local CAM_SHIFT = 4.0 -- studs to the right in camera space
+
+function GemShopPanel.openAtStall(tabName)
+	setTab(tabName or "deals")
+	if view then
+		panel.Visible = true
+		return
+	end
+	local P = stallPivot()
+	if not P then
+		panel.Visible = true -- (no stall in this place: the plain panel)
+		return
+	end
+	view = WorldView.open({
+		keep = { shopGui },
+		openTime = 0.9,
+		fov = 50,
+		goal = function()
+			return CFrame.lookAt((P * CFrame.new(CAM_POS)).Position, (P * CFrame.new(CAM_LOOK)).Position) * CFrame.new(CAM_SHIFT, 0, 0)
+		end,
+		onStep = function(v, _, k)
+			hideCharacter(v.char, k > 0.4) -- (the character stands between the camera and the counter)
+		end,
+		onFinish = function(v)
+			hideCharacter(v.char, false)
+			if view == v then view = nil end
+			panel.Visible = false
+			GemShopPanel.select(nil)
+			-- back to the plain centred panel: nudging the size makes Theme's fit place and scale it again
+			panel.AnchorPoint = Vector2.new(0.5, 0.5)
+			panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H + 1)
+			panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
+		end,
+	})
+	panel.Visible = true
+	layoutInWorld()
+end
+function GemShopPanel.atStall()
+	return view ~= nil
+end
+panel:GetPropertyChangedSignal("Visible"):Connect(function()
+	if not panel.Visible and view then
+		view:close()
+	end
+end)
+-- (the Soul Broker stall's prompt, OpenBroker, is handled by BrokerKeeper: the broker walks to his counter first and
+-- then opens the shop on Deals)
 
 Sync.onApplied(function()
 	forgeTile.root.Visible = State.remoteForge == true

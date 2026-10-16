@@ -4,8 +4,9 @@
 -- other deals as their painted icons swaying in a soft glow; the deal's name and the stock left along the bottom, a gem
 -- price badge top right, a red "-20%" ribbon top left when the deal is cheaper than its worth (BrokerDeals.discount),
 -- and a SOLD OUT stamp once this player's stock is used (State.broker from DataSync). Repaints on DataSync, when the hour
--- turns and when the stall streams in. The SurfaceGuis live in PlayerGui (Adornee = the canvas) so they can take clicks
--- later (step 3b: the in-world view).
+-- turns and when the stall streams in. The SurfaceGuis live in PlayerGui (Adornee = the canvas) so they take clicks:
+-- hovering a portrait gives it a gold rim, a click calls `BrokerPortraits.onPick(index)` (set by BrokerKeeper: opens the
+-- Gem Shop's view at the stall and selects that deal).
 -- Builds itself when required (no init call).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -189,6 +190,28 @@ local function build(index, canvas)
 	stroke(stamp, Color3.fromRGB(196, 40, 52), 3)
 	text(stamp, { position = UDim2.fromScale(0.15, 0.1), size = UDim2.fromScale(0.7, 0.8), color = Color3.fromRGB(230, 70, 80), zIndex = 8 }).Text = "SOLD OUT"
 	s.soldOut = stamp
+
+	-- hover rim and click (the whole canvas is the button)
+	local rimFrame = Instance.new("Frame") -- (inset: a stroke on the full canvas would fall outside it)
+	rimFrame.BackgroundTransparency = 1
+	rimFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	rimFrame.Position = UDim2.fromScale(0.5, 0.5)
+	rimFrame.Size = UDim2.new(1, -12, 1, -12)
+	rimFrame.ZIndex = 9
+	rimFrame.Parent = bg
+	local rim = stroke(rimFrame, Color3.fromRGB(255, 214, 140), 6)
+	rim.Enabled = false
+	local button = Instance.new("TextButton")
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Size = UDim2.fromScale(1, 1)
+	button.ZIndex = 10
+	button.Parent = bg
+	button.MouseEnter:Connect(function() rim.Enabled = true end)
+	button.MouseLeave:Connect(function() rim.Enabled = false end)
+	button.Activated:Connect(function()
+		if BrokerPortraits.onPick then BrokerPortraits.onPick(index) end
+	end)
 
 	slots[index] = s
 	return s
