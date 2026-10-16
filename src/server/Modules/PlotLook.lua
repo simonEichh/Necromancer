@@ -219,6 +219,18 @@ function PlotLook.apply(plotState)
 			end
 		end
 	end
+	-- the empty plot's own look (Style.Neutral, tools/studio/style_plots.lua) goes entirely: parts, lights, mist, signs
+	local neutral = style and style:FindFirstChild("Neutral")
+	for _, d in ipairs(neutral and neutral:GetDescendants() or {}) do
+		if d:IsA("BasePart") then
+			table.insert(look.hidden, { inst = d, transparency = d.Transparency, canCollide = d.CanCollide })
+			d.Transparency = 1
+			d.CanCollide = false
+		elseif (d:IsA("Light") or d:IsA("ParticleEmitter") or d:IsA("SurfaceGui")) and d.Enabled then
+			table.insert(look.hidden, { inst = d })
+			d.Enabled = false
+		end
+	end
 	base.Color = template:GetAttribute("FloorColor") or base.Color
 	local mat = template:GetAttribute("FloorMaterial")
 	if mat then
