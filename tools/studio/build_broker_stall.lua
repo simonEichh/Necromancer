@@ -3,8 +3,8 @@
 -- Potion right) and the Curio portrait on an easel by the counter, a velvet canopy, lanterns, gem chests, potion shelves)
 -- and the invisible interaction anchor Workspace.Shops.SoulBroker (with its ProximityPrompt; the server wires it in
 -- ShopNpcs). Design.md "The Soul Broker". Theme: violet velvet, gold and gem cyan (the grave shop is red, the Forge green).
--- Each portrait's canvas is a part named "Canvas" with the attribute Portrait = 1..4 (BrokerDeals.PORTRAITS order) and
--- a brass "PricePlate" with the same attribute: the in-world view paints the offers onto them later.
+-- Each portrait's canvas is a part named "Canvas" with the attribute Portrait = 1..4 (BrokerDeals.PORTRAITS order): the
+-- client (BrokerPortraits) paints the offers onto them, price badge and sale ribbon included.
 -- Run in Edit mode via the Studio MCP execute_luau. Safe to re-run (it replaces both).
 
 local CollectionService = game:GetService("CollectionService")
@@ -226,14 +226,6 @@ local function portrait(index, cf, w, h, grand)
 	wedge(frameModel, "CrestL", Vector3.new(0.26, 0.9, 1.4), crest * CFrame.new(0, 0, -0.7) * CFrame.Angles(0, math.pi, 0), GOLD, Enum.Material.Metal)
 	wedge(frameModel, "CrestR", Vector3.new(0.26, 0.9, 1.4), crest * CFrame.new(0, 0, 0.7), GOLD, Enum.Material.Metal)
 	gemstone(frameModel, "CrestGem", grand and 0.6 or 0.42, crest * CFrame.new(-0.25, 0.15, 0), grand and GEM or GEM_VIOLET)
-	-- brass price plate under it
-	local plateCf = cf * CFrame.new(-0.1, -h / 2 - B - 0.55, 0)
-	local plate = part(frameModel, "PricePlate", Vector3.new(0.1, 0.62, math.min(w * 0.6, 2.6)), plateCf, GOLD_DARK, Enum.Material.Metal)
-	plate:SetAttribute("Portrait", index)
-	part(frameModel, "PlateRim", Vector3.new(0.08, 0.74, math.min(w * 0.6, 2.6) + 0.12), plateCf * CFrame.new(0.03, 0, 0), BASALT, Enum.Material.Metal)
-	for _, sz in ipairs({ -1, 1 }) do
-		ball(frameModel, "PlateRivet", 0.12, plateCf * CFrame.new(-0.06, 0, sz * (math.min(w * 0.6, 2.6) / 2 - 0.15)), GOLD, Enum.Material.Metal)
-	end
 	-- a picture lamp above (warm, the canvas reads in the dark)
 	local lampCf = cf * CFrame.new(-0.7, h / 2 + B + 0.05, 0)
 	part(frameModel, "LampArm", Vector3.new(0.7, 0.08, 0.08), lampCf * CFrame.new(0.35, 0, 0), GOLD_DARK, Enum.Material.Metal)
@@ -250,7 +242,8 @@ local function portrait(index, cf, w, h, grand)
 end
 -- canvases face -X (the customer); BrokerDeals.PORTRAITS: 1 Bundle, 2 Potion, 3 Featured, 4 Curio
 local PY = TOP + 11.2
-portrait(3, at(FACE - 0.06, PY, 0), 4.6, 5.6, true) -- Featured, the big centre frame
+local FEATURED_Y = PY + 1.4 -- raised so the broker's hood never covers it
+portrait(3, at(FACE - 0.06, FEATURED_Y, 0), 4.6, 5.6, true) -- Featured, the big centre frame
 portrait(1, at(FACE - 0.06, PY - 0.4, -7.4), 3.4, 4.2) -- Bundle, the customer's left
 portrait(2, at(FACE - 0.06, PY - 0.4, 7.4), 3.4, 4.2) -- Potion, the customer's right
 
@@ -613,11 +606,12 @@ local function orbit(name, center, radius, count, speed, size)
 	om.Parent = m
 end
 orbit("GemOrbitChest", at(-4.6, TOP + 2.9, 9.2), 1.1, 5, 0.6, 0.26)
-orbit("GemOrbitGallery", at(FACE - 0.9, PY, 0) * CFrame.Angles(0, 0, math.rad(90)), 4.2, 10, -0.18, 0.3) -- upright ring round the Featured frame (its up axis faces the customer)
+orbit("GemOrbitGallery", at(FACE - 0.9, FEATURED_Y, 0) * CFrame.Angles(0, 0, math.rad(90)), 4.2, 10, -0.18, 0.3) -- upright ring round the Featured frame (its up axis faces the customer)
 
 -- ============================================================
 -- Place it on the plaza (local +X points away from the monument) and set the interaction anchor
 -- ============================================================
+m.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- always loaded: the portraits are painted on it
 m.Parent = decor
 local dir = Vector3.new(math.sin(math.rad(DEG)), 0, -math.cos(math.rad(DEG)))
 local pos = dir * RADIUS

@@ -19,16 +19,17 @@ BrokerDeals.PORTRAITS = {
 	{ key = "Curio", pool = { "GrandDust", "SeekerKit" } }, -- (exclusive cosmetics join this pool once they exist)
 }
 
--- price in Gems, stock = how many times a player can buy it per rotation
+-- price in Gems, stock = how many times a player can buy it per rotation, worth = what it would cost without the deal
+-- (shop prices; potions count 30 Gems each, dust 2.5 Gems a piece): the portraits show the saving as "-20%"
 BrokerDeals.DEALS = {
-	FortuneBundle = { name = "Fortune Bundle", price = 120, stock = 2, catalyst = "Fortune", catalystCount = 5 }, -- shop: 150
-	WardingBundle = { name = "Warding Bundle", price = 80, stock = 2, catalyst = "Warding", catalystCount = 5 }, -- shop: 100
-	DustBundle = { name = "Dust Bundle", price = 40, stock = 2, dustCount = 20 },
-	Potion1 = { name = "Luck Potion", price = 25, stock = 3, potions = 1 },
-	Potion3 = { name = "Three Luck Potions", price = 60, stock = 1, potions = 3 },
+	FortuneBundle = { name = "Fortune Bundle", price = 120, worth = 150, stock = 2, catalyst = "Fortune", catalystCount = 5 },
+	WardingBundle = { name = "Warding Bundle", price = 80, worth = 100, stock = 2, catalyst = "Warding", catalystCount = 5 },
+	DustBundle = { name = "Dust Bundle", price = 40, worth = 50, stock = 2, dustCount = 20 },
+	Potion1 = { name = "Luck Potion", price = 25, worth = 30, stock = 3, potions = 1 },
+	Potion3 = { name = "Three Luck Potions", price = 60, worth = 90, stock = 1, potions = 3 },
 	FeaturedUnit = { name = "Featured Unit", stock = 1, unit = true },
-	GrandDust = { name = "Grand Dust Hoard", price = 150, stock = 1, dustCount = 80 },
-	SeekerKit = { name = "Seeker's Kit", price = 100, stock = 1, potions = 2, catalyst = "Fortune", catalystCount = 2 },
+	GrandDust = { name = "Grand Dust Hoard", price = 150, worth = 200, stock = 1, dustCount = 80 },
+	SeekerKit = { name = "Seeker's Kit", price = 100, worth = 120, stock = 1, potions = 2, catalyst = "Fortune", catalystCount = 2 },
 }
 
 -- Gem price of the featured unit by rarity rank (Rare 3 .. Primordial 9): dearer per unit than digging, the draw is
@@ -112,6 +113,12 @@ function BrokerDeals.offer(rot, portrait, ascension)
 		o.name = unitType:gsub("(%l)(%u)", "%1 %2") -- "LichAcolyte" -> "Lich Acolyte"
 	end
 	return o
+end
+
+-- The saving in whole percent (20 for "-20%"), or nil when the deal has no normal price (the featured unit)
+function BrokerDeals.discount(o)
+	if not o.worth or o.worth <= o.price then return nil end
+	return math.floor((1 - o.price / o.worth) * 100 + 0.5)
 end
 
 -- One line of what the offer contains

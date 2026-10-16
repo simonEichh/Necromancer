@@ -186,7 +186,8 @@ local function paintDeals(gems)
 	for i, c in ipairs(dealCards) do
 		local o = BrokerDeals.offer(rot, i, State.rebirthCount or 0)
 		local left = o.stock - (bought[i] or 0)
-		c.title.Text = o.name
+		local off = BrokerDeals.discount(o)
+		c.title.Text = o.name .. (off and ("   -" .. off .. "%") or "")
 		c.desc.Text = BrokerDeals.describe(o) .. ".  " .. left .. " of " .. o.stock .. " left this hour."
 		setButton(c, left > 0 and (o.price .. " Gems") or "Sold out", left <= 0 or gems < o.price)
 	end

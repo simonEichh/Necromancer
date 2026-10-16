@@ -187,6 +187,7 @@ require(Modules.CapeSway) -- the equipped cape sways with walking speed
 AscendPanel = require(Modules.AscendPanel)
 require(Modules.ForgePanel)
 require(Modules.GemShopPanel) -- the Gem Shop (Shop tile, right) and the Remote Forge tile (left)
+require(Modules.BrokerPortraits) -- the Soul Broker stall's portraits painted with this player's deals
 require(Modules.SettingsPanel) -- the Settings tile (top right) and panel: sound volumes, saved
 require(Modules.WorldFx) -- spinning world decoration (the Forge magic circle)
 require(Modules.ReliquaryShowcase) -- the plaza's showcase pedestal: a big chase unit turning, its real odds on the plate

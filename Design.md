@@ -411,7 +411,7 @@ Replaces the old Sell stall (selling lives in the inventory only) at plaza angle
 stays empty. **The look:** a hooded merchant behind a counter and a gallery wall of four ornate gilded portrait frames
 behind him; BIGGER and MORE DETAILED than the old stalls (the user's call), at least on the level of the grave shop and
 the Forge. Each frame is a "living painting": the offer turning slowly in 3D (potion, catalyst, dust crystal, unit)
-with a brass price plate. On the hour the paintings burn away in soul fire and the new ones paint themselves in, seen by
+with a gem price badge, a red "-20%" sale ribbon (the saving against the deal's `worth`) and the stock left. On the hour the paintings burn away in soul fire and the new ones paint themselves in, seen by
 everyone in the plaza. Walking up opens a WorldView in front of the gallery (like the Forge); click a portrait to buy.
 **The Broker IS the Gem Shop** (the user's call, 2026-10-16): one shop, tabs **Deals** (the portraits), **Wares** (consumables:
 the catalysts), **Unlocks** (permanent: Remote Forge, Wisp speed, second throne) and **Skills** (unlockable skills and finishers:
@@ -429,7 +429,10 @@ Sovereign, priced by rarity (Rare 40 .. Primordial 1000 Gems) so digging stays c
 once they exist). Prices are first drafts: check them with the sim.
 
 **Order:** 1. rules + data DONE 2026-10-16; the Gem Shop panel with the Deals / Wares / Unlocks / Skills tabs DONE (Shop tile, the
-stall's prompt, DEV "Broker"); 2. the stall model with the portrait wall BUILT (`build_broker_stall.lua`, user to review); 3. the WorldView and the burn-and-paint rotation; 4. cosmetics in the Curio.
+stall's prompt, DEV "Broker"); 2. the stall model with the portrait wall BUILT (`build_broker_stall.lua`, user to review); 3a. the portraits painted per player (client `BrokerPortraits`: SurfaceGuis in PlayerGui on each `Canvas`: the featured
+unit turns in 3D, the rest show their icons; gem price badge, sale ribbon, stock line, SOLD OUT stamp; the brass plates
+were dropped for the badge, the featured frame raised above the broker's hood) DONE 2026-10-16; 3b. the WorldView (click
+portraits and the wares as real objects) and the burn-and-paint rotation; 4. cosmetics in the Curio.
 
 ## 5. Suggested order (when we get there)
 
