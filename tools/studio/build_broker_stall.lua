@@ -416,7 +416,7 @@ for _, s in ipairs({ -1, 1 }) do
 end
 local CT = TOP + CH + 0.24 -- counter top surface
 
--- on the counter: the brass soul scale, an open ledger, gem piles, coins, potions, candles
+-- on the counter: the brass soul scale, the open ledger between the broker's hands, and the WARES (below)
 do
 	local sz = -4.4
 	part(m, "ScaleBase", Vector3.new(0.9, 0.16, 0.9), at(CX, CT + 0.08, sz), GOLD_DARK, Enum.Material.Metal)
@@ -430,32 +430,67 @@ do
 	end
 	gemstone(m, "ScaleGem", 0.2, at(CX, CT + 0.95 + 0.11, sz - 0.92), GEM)
 	ball(m, "ScaleSoul", 0.22, at(CX, CT + 1.18 - 0.11, sz + 0.92), Color3.fromRGB(200, 240, 255), Enum.Material.Neon)
-	-- the open ledger with a quill
-	part(m, "LedgerOpenL", Vector3.new(0.9, 0.08, 0.7), at(CX - 0.1, CT + 0.06, -2.2) * CFrame.Angles(0.08, 0, 0), BONE, Enum.Material.SmoothPlastic)
-	part(m, "LedgerOpenR", Vector3.new(0.9, 0.08, 0.7), at(CX - 0.1, CT + 0.06, -1.5) * CFrame.Angles(-0.08, 0, 0), BONE, Enum.Material.SmoothPlastic)
-	part(m, "LedgerCover", Vector3.new(0.98, 0.05, 1.5), at(CX - 0.1, CT + 0.02, -1.85), VELVET, Enum.Material.Fabric)
+	-- the open ledger with a quill, in the middle between the broker's hands
+	part(m, "LedgerOpenL", Vector3.new(0.9, 0.08, 0.7), at(CX - 0.1, CT + 0.06, -0.35) * CFrame.Angles(0.08, 0, 0), BONE, Enum.Material.SmoothPlastic)
+	part(m, "LedgerOpenR", Vector3.new(0.9, 0.08, 0.7), at(CX - 0.1, CT + 0.06, 0.35) * CFrame.Angles(-0.08, 0, 0), BONE, Enum.Material.SmoothPlastic)
+	part(m, "LedgerCover", Vector3.new(0.98, 0.05, 1.5), at(CX - 0.1, CT + 0.02, 0), VELVET, Enum.Material.Fabric)
 	for i = 0, 3 do
-		part(m, "LedgerLine", Vector3.new(0.6, 0.02, 0.04), at(CX - 0.1, CT + 0.11, -2.4 + i * 0.12), Color3.fromRGB(60, 50, 60), Enum.Material.SmoothPlastic)
+		part(m, "LedgerLine", Vector3.new(0.6, 0.02, 0.04), at(CX - 0.1, CT + 0.11, -0.55 + i * 0.12), Color3.fromRGB(60, 50, 60), Enum.Material.SmoothPlastic)
 	end
-	part(m, "Quill", Vector3.new(0.05, 0.05, 1.0), at(CX - 0.2, CT + 0.35, -1.3) * CFrame.Angles(0.6, 0.4, 0), Color3.fromRGB(240, 240, 250), Enum.Material.SmoothPlastic)
-	part(m, "Inkwell", Vector3.new(0.22, 0.3, 0.3), at(CX + 0.3, CT + 0.11, -1.0) * UPRIGHT, BASALT, Enum.Material.Glass, Enum.PartType.Cylinder)
-	-- gem piles and coin stacks
+	part(m, "Quill", Vector3.new(0.05, 0.05, 1.0), at(CX - 0.2, CT + 0.35, 0.55) * CFrame.Angles(0.6, 0.4, 0), Color3.fromRGB(240, 240, 250), Enum.Material.SmoothPlastic)
+	part(m, "Inkwell", Vector3.new(0.22, 0.3, 0.3), at(CX + 0.3, CT + 0.11, 0.85) * UPRIGHT, BASALT, Enum.Material.Glass, Enum.PartType.Cylinder)
+end
+
+-- ============================================================
+-- The wares: the Gem Shop's items you buy again and again (the two catalysts; one-time unlocks stay in the panel) as
+-- real objects on the counter. Each is a model "Ware_<key>" with the
+-- attribute Ware (GemShopPanel's card key) and an invisible "Hit" box with a ClickDetector: the client (BrokerWares)
+-- outlines it on hover and a click opens the stall view on that item's card.
+-- ============================================================
+local function ware(key, z)
+	local w = Instance.new("Model")
+	w.Name = "Ware_" .. key
+	w:SetAttribute("Ware", key)
+	w.Parent = m
+	return w, at(CX - 0.1, CT, z)
+end
+local function wareHit(w, base, size)
+	local hit = part(w, "Hit", size, base * CFrame.new(0, size.Y / 2, 0), GOLD, Enum.Material.SmoothPlastic)
+	hit.Transparency = 1
+	local cd = Instance.new("ClickDetector")
+	cd.MaxActivationDistance = 40
+	cd.Parent = hit
+end
+-- a glass catalyst jar with a glowing swirl inside and a gold lid
+local function jar(key, z, glow)
+	local w, b = ware(key, z)
+	disc(w, "JarBase", 0.42, 0.08, b * CFrame.new(0, 0.04, 0), GOLD_DARK, Enum.Material.Metal)
+	local glass = disc(w, "JarGlass", 0.38, 0.9, b * CFrame.new(0, 0.53, 0), Color3.fromRGB(200, 220, 235), Enum.Material.Glass)
+	glass.Transparency = 0.55
+	local core = ball(w, "JarSwirl", 0.5, b * CFrame.new(0, 0.5, 0), glow, Enum.Material.Neon)
+	light(core, glow, 6, 0.8)
+	ball(w, "JarSwirl", 0.28, b * CFrame.new(0.08, 0.8, 0.05), glow, Enum.Material.Neon)
+	disc(w, "JarBand", 0.4, 0.1, b * CFrame.new(0, 0.6, 0), GOLD, Enum.Material.Metal)
+	disc(w, "JarLid", 0.42, 0.12, b * CFrame.new(0, 1.04, 0), GOLD, Enum.Material.Metal)
+	ball(w, "JarKnob", 0.2, b * CFrame.new(0, 1.16, 0), GOLD, Enum.Material.Metal)
+	wareHit(w, b, Vector3.new(1.0, 1.3, 1.0))
+	return w, b
+end
+jar("Fortune", -2.6, Color3.fromRGB(200, 236, 90))
+do
+	local w, b = jar("Warding", 2.6, Color3.fromRGB(90, 170, 255))
+	for k = 0, 5 do -- runes round the glass
+		local a = k / 6 * 2 * math.pi
+		part(w, "JarRune", Vector3.new(0.04, 0.16, 0.08), b * CFrame.new(math.cos(a) * 0.39, 0.32, math.sin(a) * 0.39) * CFrame.Angles(0, -a, 0), Color3.fromRGB(150, 210, 255), Enum.Material.Neon)
+	end
+end
+-- the rest of the counter: a gem pile and candles
+do
 	local rng = Random.new(7)
-	for i = 1, 12 do
-		local z = 2.6 + rng:NextNumber(-0.6, 0.6)
-		local x = CX + rng:NextNumber(-0.6, 0.6)
+	for i = 1, 10 do
+		local z = 4.6 + rng:NextNumber(-0.5, 0.5)
+		local x = CX + rng:NextNumber(-0.5, 0.5)
 		gemstone(m, "PileGem", rng:NextNumber(0.16, 0.3), at(x, CT + 0.12 + rng:NextNumber(0, 0.25), z) * CFrame.Angles(rng:NextNumber(0, 1), rng:NextNumber(0, 6), 0), (i % 3 == 0) and GEM_VIOLET or GEM)
-	end
-	for i = 0, 2 do
-		local h = 0.2 + i * 0.12
-		disc(m, "CoinStack", 0.2, h, at(CX + 0.5, CT + h / 2, 3.6 + i * 0.4), GOLD, Enum.Material.Metal)
-	end
-	for i = 0, 2 do
-		local z = 4.6 + i * 0.5
-		local b = part(m, "CounterPotion", Vector3.new(0.6, 0.38, 0.38), at(CX - 0.2, CT + 0.3, z) * UPRIGHT, POTION, Enum.Material.Neon, Enum.PartType.Cylinder)
-		b.Transparency = 0.15
-		part(m, "CounterPotionNeck", Vector3.new(0.2, 0.14, 0.14), at(CX - 0.2, CT + 0.7, z) * UPRIGHT, Color3.fromRGB(200, 220, 230), Enum.Material.Glass, Enum.PartType.Cylinder)
-		part(m, "CounterPotionCork", Vector3.new(0.12, 0.16, 0.16), at(CX - 0.2, CT + 0.86, z) * UPRIGHT, WOOD, Enum.Material.Wood, Enum.PartType.Cylinder)
 	end
 	for _, z in ipairs({ -6.0, 6.0 }) do
 		part(m, "CandleDish", Vector3.new(0.5, 0.08, 0.5), at(CX, CT + 0.04, z), GOLD_DARK, Enum.Material.Metal)

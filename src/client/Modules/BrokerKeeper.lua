@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 
 local GemShopPanel = require(script.Parent.GemShopPanel)
 local BrokerPortraits = require(script.Parent.BrokerPortraits)
+local BrokerWares = require(script.Parent.BrokerWares)
 
 local player = Players.LocalPlayer
 
@@ -446,6 +447,11 @@ end
 BrokerPortraits.onPick = function(index)
 	serve()
 	GemShopPanel.select(index)
+end
+-- a click on a ware on the counter (a catalyst jar): the same, on its card in Wares
+BrokerWares.onPick = function(key)
+	serve()
+	GemShopPanel.selectWare(key)
 end
 
 return BrokerKeeper

@@ -348,13 +348,24 @@ function GemShopPanel.isOpen()
 	return panel.Visible
 end
 
--- a deal picked at the stall (a click on its portrait): its card lights up gold
-local selectedDeal
-function GemShopPanel.select(index)
-	selectedDeal = index
-	for i, c in ipairs(dealCards) do
-		c.stroke.Color = i == index and Color3.fromRGB(232, 196, 120) or C.Border
-		c.stroke.Thickness = i == index and 3 or 1
+-- an item picked at the stall (a click on its portrait or ware): its card lights up gold
+local allCards = {}
+for _, c in ipairs(dealCards) do table.insert(allCards, c) end
+for _, c in pairs(catalystCards) do table.insert(allCards, c) end
+local function highlight(card)
+	for _, c in ipairs(allCards) do
+		c.stroke.Color = c == card and Color3.fromRGB(232, 196, 120) or C.Border
+		c.stroke.Thickness = c == card and 3 or 1
+	end
+end
+function GemShopPanel.select(index) -- a deal (portrait 1..4), nil clears
+	highlight(index and dealCards[index])
+end
+function GemShopPanel.selectWare(key) -- a ware on the counter: "Fortune" | "Warding"
+	local c = catalystCards[key]
+	if c then
+		setTab("wares")
+		highlight(c)
 	end
 end
 
