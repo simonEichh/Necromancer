@@ -47,7 +47,7 @@ The world (plots, shops, walls, lane, titan, lava, the altar islands, every mode
 
 ## Next (details in `docs/backlog.md`, which starts with the latest session's state)
 
-A balance pass with the economy simulator (families, commander traits and Malak's swarm were added on top of the old pacing), then necromancer spells (design WITH the user; the necromancer's own basic attack must always damage the wall, the fix for the no-units softlock), the Signatures' specials as seconds of army DPS, a better start, a pacing playtest. **Animation rule:** smooth, momentum-driven motion that never snaps back to rest (Knell's block in `UnitAnimator` is the reference); use the `roblox-animation` / `roblox-vfx` skills.
+Necromancer spells (design WITH the user; the necromancer's own basic attack must always damage the wall, the fix for the no-units softlock), the Signatures' specials as seconds of army DPS, the gem sim (Broker / outfit prices; families and traits are not in the sim yet), a better start, a pacing playtest (the 2026-10-16 balance pass retuned grave prices and wall HP). **Animation rule:** smooth, momentum-driven motion that never snaps back to rest (Knell's block in `UnitAnimator` is the reference); use the `roblox-animation` / `roblox-vfx` skills.
 
 ## Plot geometry (never assume an axis)
 

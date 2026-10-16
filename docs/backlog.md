@@ -5,13 +5,28 @@ and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `
 
 ## State at the end of the 2026-10-16 session (read this first)
 
-**Wheel rewards follow-up (implemented, uncommitted):** all seven approved rewards are live in code and the place
-wheel was rebuilt: scaled Gold Chest, stored Luck Potion, 75 Gems, highest-tier Grave Hoard, unlocked-tier Dust Cache,
-three Fortune Catalysts and the Spectral Crown unlock (repeat = 250 Gems). Potion buttons in both grave
-views; potion count and active time persist, offline time pauses the buff. Full rules/odds: `docs/features.md`.
-1,233 isolated Studio checks pass, plus a live UI/replication/rejection smoke check and Play screenshot review.
-**Next for this feature:** save the rebuilt wheel in the place file; manual successful-spin/potion clicks and pacing
-playtest. **Crown modelling explicitly deferred by the user**: ownership works now, equipping waits for its model.
+**Second 2026-10-16 session (all committed):**
+- **Lucky Wheel rewards** reworked (with Codex): Gold Chest = 10 minutes of the army's hit income (was 3x the top grave's
+  price, which outgrew late income), stored Luck Potion (used in the grave views only), 75 Gems, Grave Hoard (3 graves
+  of the top tier since the balance pass), Dust Cache, Fortune Catalysts, Spectral Crown unlock (model deferred by the
+  user). Dev "+10 Spins" button. Sim: `--wheel`.
+- **Plaza**: the Sell and Upgrade stalls are gone (`ServerStorage.RetiredPlaza`); selling lives in the inventory.
+- **The Soul Broker** (Design.md "The Soul Broker"): the gem stall at plaza angle 157.5 (`build_broker_stall.lua`) IS
+  the Gem Shop (tabs Deals / Wares / Unlocks / Outfit / Skills; the Shop tile opens it anywhere). Hourly global deals
+  in four painted portraits (`BrokerDeals`, server `Broker`, client `BrokerPortraits`: featured unit in 3D, gem badge,
+  sale ribbon, stock, SOLD OUT), clickable; the catalyst jars on the counter are clickable wares (`BrokerWares`); the
+  broker is rigged and walks round doing comic bits, then serves at the counter (`BrokerKeeper`); "Talk" opens an
+  in-world view like the Forge (`GemShopPanel.openAtStall`).
+- **Outfit of the Day**: one set (Head + Back + Hand) a day for everyone (`OutfitSets`, server `OutfitOfTheDay`), worn
+  by a mannequin on a pedestal at the stall, Outfit tab (pieces or the set at 80 %), the camera pans to it. The
+  collection is empty: add sets to `OutfitSets.SETS` (Studio offers a test set of the starter pieces meanwhile).
+- **Balance pass** (docs/economy.md): late grave prices flattened (Abyssal 40M .. Celestial 120B), wall HP steps
+  retuned (14, 10, 3, 14, 4, 5.5, 6.5, 6, 5): every stage within target in the sim, all nine ~35 h with the wheel.
+
+**Untested / to check (second session):** the new HP steps and grave prices in a real playtest (the first wall after
+ascensions 1 and 4 is x14 tougher); buying a deal / ware / outfit piece with real clicks; the outfit camera framing
+(pulled back after the last screenshot); the broker's comic bits one by one; a real outfit set (only the test set,
+which everyone owns). **Save the place file** (the stall rebuilds, retired stalls, pedestal).
 
 **Built and committed today:**
 - **Ascension cinematic** reworked: the rite happens at the fallen gate, the grimoire draws the army in (like a pull),
@@ -43,19 +58,20 @@ playtest. **Crown modelling explicitly deferred by the user**: ownership works n
 - **Save the place file** after the Studio changes (plots, rose windows, gate doors, `Malak_Shadow`, retired lamp posts).
 
 **Next steps (agreed order):**
-1. **Balance pass with the economy simulator** (`tools/sim/economy_sim.py`, docs/economy.md): today stacked a lot of
-   damage on the army (families up to +45%, Malak's swarm + aura, four commander traits); wall HP and pacing were tuned
-   without them. Model the new bonuses, compare run times, adjust the numbers (family tiers, traits, swarm, wall HP).
-2. **Necromancer spells** (design WITH the user): the necromancer's own basic attack always damages the wall (also the
+1. **Necromancer spells** (design WITH the user): the necromancer's own basic attack always damages the wall (also the
    fix for the no-units softlock), then 3-4 spells with cooldowns (ideas: Raise Dead, Curse, Soul Surge), upgraded with
    gold on a growing cost curve. Design.md "Making the player matter".
-3. Polish from today: a grander commander throne, a real Army tile icon (now the Graves icon), multi-family units for
-   the rarer units later (noted in Design.md).
-4. The Signatures' specials still deal a share of their OWN damage; the rule (Design.md "Signature value") says seconds
-   of the ARMY's DPS like the Requisition. Rework Knell / Hush / Sigilwright with the balance pass.
+2. The Signatures' specials still deal a share of their OWN damage; the rule (Design.md "Signature value") says seconds
+   of the ARMY's DPS like the Requisition. Rework Knell / Hush / Sigilwright.
+3. **Gem sim** (the user parked it): model gem income (wheel, quests) and the Broker / featured unit / outfit prices.
+   The sim also does not model families, commander traits or Malak's swarm yet (the balance pass tuned grave prices
+   and wall HP without them).
+4. A better start, a pacing playtest. Polish: a grander commander throne, a real Army tile icon.
 
 ## Agreed for later
 
+- **Soul Broker later**: the burn-and-paint rotation on the hour, outfit pieces as Curio deals, a real outfit
+  collection, maybe a small warship for Fleet Strike.
 - **Soul Well reactions** to rare pulls / ascensions on the plaza (the `RarePull` remote exists now), **leaderboard
   obelisks**, plaza ambient sounds (need files).
 - **Luck rework**: luck (`luckFactor` in `Rolling.rollRarity`, up to x3) multiplies every rarity from Rare up by the same
