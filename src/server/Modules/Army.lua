@@ -27,9 +27,24 @@ local breakWall = Walls.breakWall
 
 local modelsFolder = ServerStorage:FindFirstChild("Models")
 
+-- A slot by its index: graves 1..10 (plotState.graveSlots), commander thrones 101, 102 (plotState.commanderSlots, built
+-- by Plots: only Signatures and Sovereigns may stand on them, and only there; Design.md "the commander slot")
+local COMMANDER_BASE = 100
+local function getSlot(plotState, slotIndex)
+	if type(slotIndex) ~= "number" then return nil end
+	if slotIndex > COMMANDER_BASE then
+		local slot = plotState.commanderSlots and plotState.commanderSlots[slotIndex - COMMANDER_BASE]
+		return slot and not slot.sealed and slot or nil
+	end
+	return plotState.graveSlots[slotIndex]
+end
+local function isCommanderUnit(unitType)
+	return SharedUnits.isSignature(unitType) or SharedUnits.isSovereign(unitType)
+end
+
 local recallUnitFromSlot
 recallUnitFromSlot = function(slotIndex, player, plotState)
-	local slot = plotState.graveSlots[slotIndex]
+	local slot = getSlot(plotState, slotIndex)
 	if not slot or not slot.occupied then return end
 	-- Refuse (and keep the unit on the grave) when there is nowhere to put it
 	if not PlayerData.hasFreeSlot(player) then
@@ -348,12 +363,17 @@ end
 -- Spawns a unit on a grave slot and updates the slot's labels/prompt.
 -- Returns false if the slot is missing or already occupied. `locked` travels with the unit (see Inventory: ToggleLock).
 local function placeInSlot(plotState, slotIndex, unitType, level, fails, locked)
-	local slot = plotState.graveSlots[slotIndex]
+	local slot = getSlot(plotState, slotIndex)
 	local graveSpot = plotState.plotModel:FindFirstChild("GraveSpot" .. tostring(slotIndex))
-	if not slot or slot.occupied or not graveSpot or not UNITS[unitType] then
+	local spawnPos = slot and (slot.spawnPos or (graveSpot and graveSpot.Position + Vector3.new(0, 2, 0)))
+	if not slot or slot.occupied or not spawnPos or not UNITS[unitType] then
 		return false
 	end
-	spawnUnit(unitType, graveSpot.Position + Vector3.new(0, 2, 0), plotState, level)
+	-- commanders (Signatures / Sovereigns) on the thrones, everyone else on the graves
+	if (slot.commander == true) ~= isCommanderUnit(unitType) then
+		return false, slot.commander and "Only Signatures and Sovereigns can sit on the commander throne." or "Signatures and Sovereigns lead from the commander throne."
+	end
+	spawnUnit(unitType, spawnPos, plotState, level)
 	slot.occupied = true
 	slot.unitType = unitType
 	slot.level = level or 0
@@ -374,7 +394,7 @@ end
 
 -- Sets the level (and the failed-upgrade streak) of the unit standing on a grave: its damage, DPS labels and model attribute.
 local function setUnitLevel(plotState, slotIndex, level, fails)
-	local slot = plotState.graveSlots[slotIndex]
+	local slot = getSlot(plotState, slotIndex)
 	if not slot or not slot.occupied then return false end
 	slot.level, slot.fails = level, fails or 0
 	local u = slot.unitEntry
@@ -393,34 +413,46 @@ local function setUnitLevel(plotState, slotIndex, level, fails)
 end
 
 -- The units standing on the graves of a player's plot, for the data snapshot (PlayerData.snapshot): { slot, unitType, level, fails, locked }
+-- every unit standing on a grave or a throne: { slot, unitType, level, fails, locked } (for the snapshot and saving)
+local function placedList(plotState)
+	local list = {}
+	local function add(slotIndex, slot)
+		if slot.occupied and slot.unitType then
+			table.insert(list, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0, locked = slot.locked == true })
+		end
+	end
+	for slotIndex, slot in pairs(plotState.graveSlots) do
+		add(slotIndex, slot)
+	end
+	for k, slot in pairs(plotState.commanderSlots or {}) do
+		add(COMMANDER_BASE + k, slot)
+	end
+	table.sort(list, function(a, b) return a.slot < b.slot end)
+	return list
+end
 PlayerData.placedProvider = function(player)
 	local plotState = getPlot(player)
-	local list = {}
-	if plotState then
-		for slotIndex, slot in pairs(plotState.graveSlots) do
-			if slot.occupied and slot.unitType then
-				table.insert(list, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0, locked = slot.locked == true })
-			end
-		end
-		table.sort(list, function(a, b) return a.slot < b.slot end)
-	end
-	return list
+	return plotState and placedList(plotState) or {}
 end
 
 -- Client asks to place the unit from inventory slot `invIndex` on grave slot `slotIndex`.
 Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, invIndex, slotIndex)
 	local plotState = getPlot(player)
 	if not plotState or type(slotIndex) ~= "number" then return end
-	local slot = plotState.graveSlots[slotIndex]
+	local slot = getSlot(plotState, slotIndex)
 	local unit = PlayerData.getUnit(player, invIndex)
 	if not slot or slot.occupied or not unit then return end
-	if not placeInSlot(plotState, slotIndex, unit.unitType, unit.level, unit.fails, unit.locked) then return end
+	local ok, why = placeInSlot(plotState, slotIndex, unit.unitType, unit.level, unit.fails, unit.locked)
+	if not ok then
+		if why then Remotes.Notice:FireClient(player, why) end
+		return
+	end
 	PlayerData.takeUnit(player, invIndex)
 	print("🪦 " .. player.Name .. " placed " .. unit.unitType .. " at grave " .. slotIndex)
 end)
 
 local function clearSlot(i, plotState)
-	local slot = plotState.graveSlots[i]
+	local slot = getSlot(plotState, i)
 	if not slot or not slot.occupied then return nil end
 	local unitType, level, fails, locked = slot.unitType, slot.level, slot.fails, slot.locked
 	if slot.unitEntry then
@@ -443,7 +475,7 @@ local function clearSlot(i, plotState)
 	slot.rarityLabel.Text = ""
 	slot.dpsLabel.Text = ""
 	slot.prompt.ActionText = "Place Unit"
-	slot.prompt.ObjectText = "Grave " .. i
+	slot.prompt.ObjectText = slot.commander and "Commander Throne" or ("Grave " .. i)
 	return { unitType = unitType, oneIn = getBaseOneIn(unitType), level = level, fails = fails, locked = locked }
 end
 
@@ -456,6 +488,10 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 		local item = clearSlot(i, plotState)
 		if item then table.insert(pool, item) end
 	end
+	for k in pairs(plotState.commanderSlots or {}) do
+		local item = clearSlot(COMMANDER_BASE + k, plotState)
+		if item then table.insert(pool, item) end
+	end
 	for _, item in ipairs(PlayerData.inventoryList(player)) do
 		table.insert(pool, { unitType = item.unitType, oneIn = item.oneIn, level = item.level, fails = item.fails, locked = item.locked })
 	end
@@ -464,11 +500,26 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 		local dB = UNITS[b.unitType] and (UNITS[b.unitType].damage / UNITS[b.unitType].attackCD * Economy.levelMultiplier(b.level)) or 0
 		return dA > dB
 	end)
+	-- the strongest commanders onto the open thrones, the strongest of the rest onto the graves
+	local thrones = {}
+	for k, slot in pairs(plotState.commanderSlots or {}) do
+		if not slot.sealed then table.insert(thrones, COMMANDER_BASE + k) end
+	end
+	table.sort(thrones)
 	local slotCount = #plotState.graveSlots
 	local remaining = {}
 	local deployed = 0
-	for i, item in ipairs(pool) do
-		if i <= slotCount and placeInSlot(plotState, i, item.unitType, item.level, item.fails, item.locked) then
+	local nextGrave, nextThrone = 1, 1
+	for _, item in ipairs(pool) do
+		local target
+		if isCommanderUnit(item.unitType) then
+			target = thrones[nextThrone]
+			if target then nextThrone += 1 end
+		elseif nextGrave <= slotCount then
+			target = nextGrave
+			nextGrave += 1
+		end
+		if target and placeInSlot(plotState, target, item.unitType, item.level, item.fails, item.locked) then
 			deployed += 1
 		else
 			table.insert(remaining, item)
@@ -1386,6 +1437,10 @@ return {
 	recallUnitFromSlot = recallUnitFromSlot,
 	startFinisher = startFinisher, -- (plotState, unit entry, fleeAt, length, on) a finisher cutscene: see update
 	placeInSlot = placeInSlot,
+	getSlot = getSlot,
+	placedList = placedList,
+	isCommanderUnit = isCommanderUnit,
+	COMMANDER_BASE = COMMANDER_BASE,
 	spawnUnit = spawnUnit,
 	setDamageMultiplier = setDamageMultiplier,
 	setUnitLevel = setUnitLevel,

@@ -103,7 +103,7 @@ Remotes.UpgradeUnit.OnServerEvent:Connect(function(player, kind, index, useFortu
 		unitType, level, fails = invUnit.unitType, invUnit.level or 0, invUnit.fails or 0
 	elseif kind == "grave" then
 		plotState = PlotRegistry.getPlot(player)
-		local slot = plotState and plotState.graveSlots[index]
+		local slot = plotState and Army.getSlot(plotState, index)
 		if not slot or not slot.occupied then return end
 		unitType, level, fails = slot.unitType, slot.level or 0, slot.fails or 0
 	else

@@ -47,10 +47,8 @@ local function collect(player, profile)
 	local placed = {}
 	local plotState = PlotRegistry.getPlot(player)
 	if plotState then
-		for slotIndex, slot in pairs(plotState.graveSlots) do
-			if slot.occupied and slot.unitType then
-				table.insert(placed, { slot = slotIndex, unitType = slot.unitType, level = slot.level or 0, fails = slot.fails or 0, locked = slot.locked == true })
-			end
+		for _, entry in ipairs(Army.placedList(plotState)) do
+			table.insert(placed, entry)
 		end
 	end
 	local snapshot = PlayerData.snapshot(profile)
@@ -73,6 +71,7 @@ local function collect(player, profile)
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
+		commanderSlots = profile.commanderSlots,
 		settings = profile.settings,
 		placed = placed,
 		pity = Rolling.exportPity(player),
@@ -155,7 +154,13 @@ function Persistence.restorePlaced(player)
 	for _, entry in ipairs(placed) do
 		if type(entry) == "table" and type(entry.slot) == "number" then
 			local level = math.clamp(math.floor(tonumber(entry.level) or 0), 0, Economy.MAX_UNIT_LEVEL)
-			Army.placeInSlot(plotState, entry.slot, entry.unitType, level, math.max(0, math.floor(tonumber(entry.fails) or 0)), entry.locked == true)
+			local fails = math.max(0, math.floor(tonumber(entry.fails) or 0))
+			if not Army.placeInSlot(plotState, entry.slot, entry.unitType, level, fails, entry.locked == true) then
+				-- (no such slot any more, or a commander on a grave / a normal unit on a throne: back to the inventory)
+				if Units.Stats[entry.unitType] then
+					PlayerData.addUnit(player, entry.unitType, Units.getBaseOneIn(entry.unitType), level, fails, entry.locked == true)
+				end
+			end
 		end
 	end
 end

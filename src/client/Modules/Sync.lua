@@ -36,6 +36,7 @@ local function apply(snap)
 	State.wispLevel = snap.wispLevel or 0
 	State.remoteForge = snap.remoteForge == true
 	State.fleetStrike = snap.fleetStrike == true
+	State.commanderSlots = snap.commanderSlots or 1 -- (commander thrones owned: Design.md "the commander slot")
 	State.settings = snap.settings
 	State.goldMultiplier = snap.goldMultiplier
 	State.luckBoostLevel = snap.luckBoostLevel

@@ -53,6 +53,7 @@ function PlayerData.create(player, saved)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
 		remoteForge = false, -- bought the Remote Forge (Gem Shop): the Forge works anywhere
 		fleetStrike = false, -- bought Malak's Fleet Strike finisher (Gem Shop / Codex)
+		commanderSlots = 1, -- commander thrones (Signatures / Sovereigns); the second is bought with gems (GemShop)
 		settings = { master = 1, effects = 1, music = 1 }, -- the Settings panel: volumes 0..1 (saved)
 		saved = saved, -- raw saved data, for modules that restore their own state
 		syncQueued = false,
@@ -69,6 +70,7 @@ function PlayerData.create(player, saved)
 		profile.wispLevel = math.floor(clampNumber(saved.wispLevel, 0, 0))
 		profile.remoteForge = saved.remoteForge == true
 		profile.fleetStrike = saved.fleetStrike == true
+		profile.commanderSlots = math.clamp(math.floor(clampNumber(saved.commanderSlots, 1, 1)), 1, 2)
 		if type(saved.settings) == "table" then
 			for key in pairs(profile.settings) do
 				local v = saved.settings[key]
@@ -286,6 +288,7 @@ function PlayerData.snapshot(profile)
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
+		commanderSlots = profile.commanderSlots,
 		settings = profile.settings,
 		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}

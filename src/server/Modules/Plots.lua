@@ -12,6 +12,7 @@ local Titans = require(script.Parent.Titans)
 local Portal = require(script.Parent.Portal)
 local PlotLook = require(script.Parent.PlotLook)
 local GraveRune = require(script.Parent.GraveRune)
+local GemShop = require(script.Parent.GemShop)
 
 local playerPlots = PlotRegistry.playerPlots
 local getPlot = PlotRegistry.getPlot
@@ -150,6 +151,142 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	end)
 end
 
+-- ============================================================
+-- The commander thrones (Design.md "the commander slot"): at the head of the graves, where the lane begins, a raised
+-- round dais with a gold rim and an ornate tombstone; only Signatures and Sovereigns stand here (Army.getSlot, slot
+-- index Army.COMMANDER_BASE + k). The first is open for everyone; the second stands sealed (dark, no tombstone, "Unlock
+-- Throne") until it is bought with gems (GemShop "CommanderSlot").
+-- ============================================================
+local THRONE_FWD = 19
+local THRONE_LAT = { -4.8, 4.8 }
+local THRONE_STONE = Color3.fromRGB(40, 37, 44)
+local THRONE_TOP = Color3.fromRGB(58, 54, 62)
+local THRONE_GOLD = Color3.fromRGB(226, 186, 92)
+local THRONE_SEALED = Color3.fromRGB(70, 66, 76)
+
+local function buildThrone(k, plotState, ownerId, sealed)
+	local old = plotState.commanderSlots[k]
+	if old and old.model then
+		old.model:Destroy()
+	end
+	local floor = PlotFrame.toWorld(plotState, THRONE_LAT[k], THRONE_FWD)
+	local facePlaza = PlotFrame.rotation(plotState) * CFrame.Angles(0, -math.pi / 2, 0) -- (the tombstone model faces +X)
+	local model = Instance.new("Model")
+	model.Name = "CommanderThrone_" .. k
+	local function part(name, size, cf, color, material, shape)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.CFrame = cf
+		p.Color = color
+		p.Material = material or Enum.Material.Slate
+		if shape then p.Shape = shape end
+		p.Anchored = true
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.CollisionGroup = Collision.GRAVES
+		p.Parent = model
+		return p
+	end
+	local up = CFrame.Angles(0, 0, math.pi / 2) -- (a cylinder's axis up)
+	part("Dais", Vector3.new(1, 7.5, 7.5), CFrame.new(floor + Vector3.new(0, 0.5, 0)) * up, THRONE_STONE, nil, Enum.PartType.Cylinder)
+	local rim = part("DaisRim", Vector3.new(0.14, 7.8, 7.8), CFrame.new(floor + Vector3.new(0, 0.98, 0)) * up, sealed and THRONE_SEALED or THRONE_GOLD,
+		sealed and Enum.Material.Slate or Enum.Material.Neon, Enum.PartType.Cylinder)
+	local top = part("DaisTop", Vector3.new(0.3, 6.6, 6.6), CFrame.new(floor + Vector3.new(0, 1.1, 0)) * up, THRONE_TOP, nil, Enum.PartType.Cylinder)
+	if not sealed then
+		local light = Instance.new("PointLight")
+		light.Color = THRONE_GOLD
+		light.Range = 14
+		light.Brightness = 0.8
+		light.Shadows = false
+		light.Parent = rim
+	end
+	local stone
+	if not sealed and tombstoneTemplate then
+		stone = tombstoneTemplate:Clone()
+		for _, p in ipairs(stone:GetDescendants()) do
+			if p:IsA("BasePart") then
+				p.Anchored = true
+				p.CollisionGroup = Collision.GRAVES
+			end
+		end
+		stone:ScaleTo(1.25)
+		stone.Parent = model
+		-- at the back of the dais (towards the lane), facing the plaza
+		stone:PivotTo(CFrame.new(floor + Vector3.new(0, 1.25, 0) + plotState.frame.LookVector * 1.6) * facePlaza)
+	end
+	model.Parent = workspace
+
+	local gui = Instance.new("BillboardGui", top)
+	gui.Size = UDim2.new(0, 160, 0, 72)
+	gui.StudsOffset = Vector3.new(0, 7, 0)
+	gui.AlwaysOnTop = true
+	local function label(name, y, h, font, color)
+		local l = Instance.new("TextLabel", gui)
+		l.Name = name
+		l.Size = UDim2.new(1, 0, h, 0)
+		l.Position = UDim2.new(0, 0, y, 0)
+		l.BackgroundTransparency = 1
+		l.Text = ""
+		l.TextColor3 = color
+		l.TextScaled = true
+		l.Font = font
+		return l
+	end
+	local lbl = label("Title", 0, 0.38, Enum.Font.GothamBold, THRONE_GOLD)
+	local rarityLbl = label("RarityLabel", 0.38, 0.31, Enum.Font.Gotham, Color3.fromRGB(200, 200, 200))
+	local dpsLbl = label("DpsLabel", 0.69, 0.31, Enum.Font.GothamBold, Color3.fromRGB(100, 255, 130))
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = sealed and "Unlock Throne" or "Place Commander"
+	prompt.ObjectText = sealed and (Economy.COMMANDER_SLOT_PRICE .. " Gems") or "Commander Throne"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.MaxActivationDistance = 9
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = top
+
+	local slot = {
+		slab = top, stone = stone, label = lbl, rarityLabel = rarityLbl, dpsLabel = dpsLbl, prompt = prompt,
+		occupied = false, commander = true, sealed = sealed or nil, model = model,
+		spawnPos = floor + Vector3.new(0, 3.2, 0),
+	}
+	plotState.commanderSlots[k] = slot
+	if stone then
+		GraveRune.attach(slot)
+	end
+	local index = Army.COMMANDER_BASE + k
+	prompt.Triggered:Connect(function(player)
+		if tostring(player.UserId) ~= ownerId then return end
+		if slot.sealed then
+			GemShop.buy(player, "CommanderSlot")
+		elseif slot.occupied then
+			recallUnitFromSlot(index, player, plotState)
+		else
+			Remotes.SelectGrave:FireClient(player, slot.spawnPos, index)
+		end
+	end)
+end
+
+-- the thrones for a player's plot: as many open as they own (PlayerData commanderSlots), the rest sealed
+local function buildThrones(plotState, player)
+	local profile = PlayerData.get(player)
+	local owned = profile and profile.commanderSlots or 1
+	for k = 1, Economy.MAX_COMMANDER_SLOTS do
+		local slot = plotState.commanderSlots[k]
+		local sealed = k > owned
+		if not slot or (slot.sealed and not sealed) then
+			buildThrone(k, plotState, tostring(player.UserId), sealed)
+		end
+	end
+end
+-- (GemShop: the second throne was bought: unseal it)
+PlayerData.onCommanderSlots = function(player)
+	local plotState = getPlot(player)
+	if plotState then
+		buildThrones(plotState, player)
+	end
+end
+
 initPlotForPlayer = function(player)
 	local plotModel, plotIndex = claimPlot()
 	if not plotModel then
@@ -189,6 +326,7 @@ initPlotForPlayer = function(player)
 		wallTargetFwd    = 0,
 		wallFaceFwd      = 0,
 		graveSlots       = {},
+		commanderSlots   = {}, -- the commander thrones (buildThrones; Army.getSlot index 101, 102)
 		activeUnits      = {},
 		groundExtensions = {},
 	}
@@ -204,6 +342,7 @@ initPlotForPlayer = function(player)
 			addGraveSlot(i, graveSpot.Position, plotState, tostring(player.UserId))
 		end
 	end
+	buildThrones(plotState, player)
 	playerPlots[tostring(player.UserId)] = plotState
 	plotModel:SetAttribute("OwnerId", player.UserId) -- (the client finds its own plot by this: the ascension cinematic)
 	Portal.open(plotState, player, true) -- the run's portal stands sealed behind the gate
@@ -287,6 +426,9 @@ local function releasePlot(player)
 		for _, slot in ipairs(plotState.graveSlots) do
 			if slot.stone and slot.stone.Parent then slot.stone:Destroy() end
 			if slot.slab and slot.slab.Parent then slot.slab:Destroy() end
+		end
+		for _, slot in pairs(plotState.commanderSlots or {}) do
+			if slot.model and slot.model.Parent then slot.model:Destroy() end
 		end
 		plotOccupied[plotState.plotIndex] = false
 		if plotState.plotModel then
