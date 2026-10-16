@@ -77,6 +77,13 @@ Remotes.DevClearUnits.OnServerEvent:Connect(function(player)
 end)
 
 -- ============================================================
+-- The Codex: every unit discovered
+-- ============================================================
+Remotes.DevUnlockCodex.OnServerEvent:Connect(function(player)
+	PlayerData.unlockCodex(player)
+end)
+
+-- ============================================================
 -- Gems
 -- ============================================================
 Remotes.DevGiveGems.OnServerEvent:Connect(function(player, amount)

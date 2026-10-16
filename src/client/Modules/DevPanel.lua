@@ -337,9 +337,18 @@ breakAllBtn.MouseButton1Click:Connect(function()
 	if r then r:FireServer() end
 end)
 
+-- every Codex entry discovered (your save; to test the Codex)
+local codexBtn = makeButton(panel, "Unlock Codex", Color3.fromRGB(200, 170, 255))
+codexBtn.Size = UDim2.new(0.4, -8, 0, 28)
+codexBtn.Position = UDim2.fromOffset(8, 236)
+codexBtn.MouseButton1Click:Connect(function()
+	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevUnlockCodex")
+	if r then r:FireServer() end
+end)
+
 local list = Instance.new("ScrollingFrame")
-list.Size = UDim2.new(1, -16, 1, -244)
-list.Position = UDim2.fromOffset(8, 238)
+list.Size = UDim2.new(1, -16, 1, -278)
+list.Position = UDim2.fromOffset(8, 272)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
 list.ScrollBarThickness = 6

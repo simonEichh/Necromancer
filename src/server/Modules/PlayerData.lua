@@ -227,6 +227,16 @@ function PlayerData.get(player)
 	return profiles[player.UserId]
 end
 
+-- (DEV) every unit discovered in the Codex
+function PlayerData.unlockCodex(player)
+	local profile = profiles[player.UserId]
+	if not profile then return end
+	for unitType in pairs(Units.Stats) do
+		profile.codex[unitType] = math.max(1, profile.codex[unitType] or 0)
+	end
+	PlayerData.changed(player)
+end
+
 function PlayerData.remove(player)
 	profiles[player.UserId] = nil
 end
