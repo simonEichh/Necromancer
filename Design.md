@@ -308,7 +308,7 @@ rarities) and gets sold. Decision:
   would break pacing: stacked Signatures would fell any wall in a fixed time) and not of its current HP (too weak).
 - **A small passive aura per Signature,** percentage based (e.g. Knell: +8% attack speed while the bell tolls; Hush: wall
   regeneration halved; Sigilwright: +10% damage to the gate).
-- **A cap:** only the strongest few Signatures placed on graves count (e.g. 3), so stacking ten cannot snowball.
+- **A cap:** only the strongest few Signatures placed on graves count (e.g. 3), so stacking ten cannot snowball. (2026-10-16: replaced by the commander slot, see "Unit families, the commander slot and placement".)
 - Later, on top: a commander slot (one Signature whose aura leads the army), Mastery (below). Rebalance the existing
   Signatures (Knell, Hush, Sigilwright, Malak's specials) with the economy simulator when we get to it.
 
@@ -325,6 +325,70 @@ From the user's "general ideas.txt" (switching to a star / banner system with fe
 - **Mastery:** maxing a unit (Lv 10, the shadow form) leaves a small permanent account buff (stacks, fits the Codex).
   If Forge success chances are lowered, failures should build progress (fragments towards a guaranteed success)
   rather than simply removing the pity.
+
+### Unit families, the commander slot and placement (proposed 2026-10-16; families OK'd by the user, numbers open; nothing built)
+
+Problem: DPS is the only reason to pick a unit, and Place Best makes even that choice for the player. Goal: a reason to
+keep, level and place weaker units, and a real decision when building the army, without forcing anyone to micromanage.
+Model: **Teamfight Tactics traits** (Riot): shared traits that grow in tiers, plus unique traits for the special units.
+
+**Families (TFT traits).** Every normal unit belongs to one family. Placing units of a family on graves activates its
+bonus in tiers at **2 / 4 / 6**. Rules (decided by the user):
+- **Duplicates count once** (two Skellys = one Bones), like TFT: it rewards collecting different units.
+- **A unit in its shadow form (Lv 10) counts double**: a reason to level, and three shadow units can reach the top tier.
+- With 5-10 grave slots: two small sets, or one big one plus singles.
+
+| Family | Units |
+|---|---|
+| **Bones** | Skelly, Hollow Archer, Baron Bone, Bone Colossus, Dread Knight, Skeleton King |
+| **Flesh** | Zombie, Ghoul, Plague Doctor, Abyssal Titan, The Undying |
+| **Spirits** | Wraith, Banshee, Soul Eater, Shade Lord, Death Reaper, Last Lantern |
+| **Beasts** | Crypt Spider, Crypt Bat, Shadow Hound, Eldritch Fiend |
+| **Arcane** | Lich Acolyte, Lich Lord, Void Walker, Mind Shatterer, Death Incarnate |
+
+**Family bonuses (first numbers, to tune with the simulator):** only ONE family is plain damage; the others are
+SITUATIONAL, so a perfect Place Best (which scores DPS) gives a good all-round army and a thinking player does better.
+
+| Family | 2 | 4 | 6 | Kind |
+|---|---|---|---|---|
+| **Flesh**: the horde | Flesh units +10% damage | +25% | +45% | plain DPS (Place Best counts it) |
+| **Bones**: the siege | +10% damage to the gate (whole army) | +25% | +45% | the run's end |
+| **Spirits**: the harvest | +10% gold from hits | +25% | +45% | economy, not DPS |
+| **Beasts**: the pack | Beasts +30% damage for 8 s after a wall stands | +60% | +100% | burst on every fresh wall |
+| **Arcane**: the rites | the commanders' specials charge 10% faster | 20% | 35% | commander synergy |
+
+**The commander slot (Signatures and Sovereigns).** Signatures and Sovereigns have NO family. They go only into a
+**commander slot**: one slot for everyone, a second one bought with gems (price open; maybe a third later from realm
+progress). The commander slot is a grave of its own, clearly set apart on the plot (a raised throne-grave / dais with
+its own glow, at the head of the graves). This replaces the old "only the strongest 3 Signatures count" cap.
+
+**Unique traits (TFT unique traits).** Each Signature / Sovereign carries its own trait, named after its TITLE (decided by
+the user: no extra names), shown like a family, with its own effect (it is the unit's passive on the Codex page; the
+passive card is then named after the title too, e.g. Malak's "Envoy's Command" becomes "The Envoy"). Proposals:
+
+| Unit | Unique trait | Effect (proposal) |
+|---|---|---|
+| **Malak** | **The Envoy** | his drone fires its own volley; the whole army +10% damage (built) |
+| **Knell** | **The Mourning Bell** | while its bell tolls (its special), the whole army attacks 10% faster |
+| **Hush** | **The Unbreathing** | the army deals +15% damage to walls below half HP |
+| **Sigilwright** | **The Last Word** | its Verdict marks the wall: the army deals +20% damage to it for 10 s after the Verdict |
+
+(Hush's planned "wall regeneration halved" is dropped: wall regeneration is 2-8 HP/s against millions of HP, it does
+nothing. The Sigilwright's planned "+10% damage to the gate" is dropped: the Bones own the gate.)
+
+**Place Best stays** (idle players, mobile), but becomes family-aware: it fills the commander slot(s) with the best
+Signature / Sovereign and the graves with the lineup of the best total DPS, counting Flesh and the Beasts' average (10
+slots and 5 families is small enough to try the sensible combinations). It ignores gold, gate and specials on purpose:
+that is the room left for the player ("I am about to push the gate: swap in Bones").
+
+**A placement screen** (in-world, like the Codex / Outfits): the camera rises over the plot, the graves and the commander
+throne light up, the inventory slides in; tap or drag a unit onto a grave; the active family tiers show live like TFT's
+trait list ("Spirits 4 / 6: +25% gold"). Place Best is a button on it. The Codex unit page shows the unit's family (or
+unique trait) and its tiers.
+
+**Still open:** the bonus numbers, the second commander slot's price, the unique traits' effects, how the commander
+throne looks. **Suggested order:** (2) family + trait data in Units.lua, the bonuses and the commander slot on the server
+(saving it), (3) family-aware Place Best, (4) the placement screen and the commander throne on the plot, the Codex line.
 
 ### Content / depth (already in the backlog)
 
