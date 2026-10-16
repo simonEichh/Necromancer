@@ -174,7 +174,7 @@ local function paint()
 end
 
 -- ============================================================
--- HUD tiles: Shop (right column, third) and Forge (left column, under Upgrades, once the Remote Forge is owned)
+-- HUD tiles: Shop (right column, third) and Forge (left column, sixth, under Army, once the Remote Forge is owned)
 -- ============================================================
 Theme.iconTile(screenGui, {
 	icon = Theme.Image.Icon.Gems, text = "Shop",
@@ -185,7 +185,7 @@ Theme.iconTile(screenGui, {
 })
 local forgeTile = Theme.iconTile(screenGui, {
 	icon = Theme.Image.Dust.Gold, text = "Forge",
-	position = UDim2.new(0, 16, 0.5, -200 + 4 * 84), zIndex = 5, -- (under the Upgrades tile)
+	position = UDim2.new(0, 16, 0.5, -200 + 5 * 84), zIndex = 5, -- sixth slot, below Army
 	onClick = function()
 		ForgePanel.toggle()
 	end,
