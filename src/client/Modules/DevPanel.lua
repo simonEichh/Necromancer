@@ -355,12 +355,12 @@ wheelSpinsBtn.MouseButton1Click:Connect(function()
 	wheelSpinsEvent:FireServer()
 end)
 
--- the Soul Broker's deals as a plain panel, until the gem stall is built
+-- the Gem Shop on its Deals tab (the Soul Broker's hourly deals)
 local brokerBtn = makeButton(panel, "Broker", Color3.fromRGB(140, 200, 255))
 brokerBtn.Size = UDim2.new(0.3, -8, 0, 28)
 brokerBtn.Position = UDim2.new(0.7, 4, 0, 236)
 brokerBtn.MouseButton1Click:Connect(function()
-	require(script.Parent.BrokerPanel).toggle()
+	require(script.Parent.GemShopPanel).open("deals")
 end)
 
 local list = Instance.new("ScrollingFrame")

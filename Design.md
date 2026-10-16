@@ -413,7 +413,11 @@ behind him; BIGGER and MORE DETAILED than the old stalls (the user's call), at l
 the Forge. Each frame is a "living painting": the offer turning slowly in 3D (potion, catalyst, dust crystal, unit)
 with a brass price plate. On the hour the paintings burn away in soul fire and the new ones paint themselves in, seen by
 everyone in the plaza. Walking up opens a WorldView in front of the gallery (like the Forge); click a portrait to buy.
-The Gem Shop tile keeps the permanent items; the rotating deals exist only at the stall (a reason to visit the plaza).
+**The Broker IS the Gem Shop** (the user's call, 2026-10-16): one shop, tabs **Deals** (the portraits), **Wares** (consumables:
+the catalysts), **Unlocks** (permanent: Remote Forge, Wisp speed, second throne) and **Skills** (unlockable skills and finishers:
+Fleet Strike now, the necromancer's spells later). At the stall the wares stand as REAL OBJECTS on the counter and
+shelves (catalyst jars, a little anvil for the Remote Forge, a caged soul for the Wisp, ...), clicked in the in-world
+view; the Shop tile opens the same shop as a plain panel anywhere.
 
 **Rules** (shared `BrokerDeals`, server `Broker`): global rotation every hour (every server computes the same deals from
 the clock, amounts / tiers scale to the player like the wheel); stock per player per rotation, depending on the deal,
@@ -424,8 +428,8 @@ Sovereign, priced by rarity (Rare 40 .. Primordial 1000 Gems) so digging stays c
 **Curio** (Grand Dust Hoard 80 dust for 150 / Seeker's Kit 2 potions + 2 Fortune for 100; exclusive cosmetics join it
 once they exist). Prices are first drafts: check them with the sim.
 
-**Order:** 1. rules + data + a plain test panel (DEV "Broker" button) DONE 2026-10-16; 2. the stall model with the
-portrait wall (user approves the look); 3. the WorldView and the burn-and-paint rotation; 4. cosmetics in the Curio.
+**Order:** 1. rules + data DONE 2026-10-16; the Gem Shop panel with the Deals / Wares / Unlocks / Skills tabs DONE (Shop tile, the
+stall's prompt, DEV "Broker"); 2. the stall model with the portrait wall BUILT (`build_broker_stall.lua`, user to review); 3. the WorldView and the burn-and-paint rotation; 4. cosmetics in the Curio.
 
 ## 5. Suggested order (when we get there)
 
