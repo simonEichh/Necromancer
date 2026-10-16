@@ -47,7 +47,7 @@ exists. The server also rejects equipping items without models, preserving the c
 **Potions:** `profile.luckPotions` and the active buff's remaining duration are saved. `UseLuckPotion` consumes one on
 the server (0.5 s request throttle), adds 300 seconds to existing time, and keeps strength at 2x. Offline time does
 not consume the buff. `Digging` uses `profile.luckBuffEnd` with `GetServerTimeNow`; snapshots carry the end timestamp
-and potion count, applied only by `Sync`. The reusable `LuckPotionButton` appears in the wheel, grave scene and plain
+and potion count, applied only by `Sync`. The reusable `LuckPotionButton` appears in the grave scene and plain
 grave list; it shows the saved count and active countdown. It has no dependency on Sync (GravesDock is a Sync dependency).
 
 The seven physical slices remain proportional to their odds (Gold 108 degrees, Crown 3.6 degrees). Shared

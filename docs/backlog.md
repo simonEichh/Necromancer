@@ -7,7 +7,7 @@ and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `
 
 **Wheel rewards follow-up (implemented, uncommitted):** all seven approved rewards are live in code and the place
 wheel was rebuilt: scaled Gold Chest, stored Luck Potion, 75 Gems, highest-tier Grave Hoard, unlocked-tier Dust Cache,
-three Fortune Catalysts and the Spectral Crown unlock (repeat = 250 Gems). Potion buttons in the wheel and both grave
+three Fortune Catalysts and the Spectral Crown unlock (repeat = 250 Gems). Potion buttons in both grave
 views; potion count and active time persist, offline time pauses the buff. Full rules/odds: `docs/features.md`.
 1,233 isolated Studio checks pass, plus a live UI/replication/rejection smoke check and Play screenshot review.
 **Next for this feature:** save the rebuilt wheel in the place file; manual successful-spin/potion clicks and pacing

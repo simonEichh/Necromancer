@@ -28,7 +28,7 @@ gui.DisplayOrder = 20
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
 local themed = Theme.panel(gui, {
-	title = "Lucky Wheel", size = UDim2.fromOffset(400, 660),
+	title = "Lucky Wheel", size = UDim2.fromOffset(400, 614),
 	anchor = Vector2.new(1, 0.5), position = UDim2.new(1, -70, 0.5, 0), zIndex = Z,
 })
 local panel = themed.frame
@@ -118,10 +118,6 @@ spinButton = Theme.stoneButton(body, {
 		refresh()
 		wheelSpinRemote:FireServer()
 	end,
-})
-require(script.Parent.LuckPotionButton).create(body, {
-	size = UDim2.fromOffset(300, 36), position = UDim2.new(0.5, 0, 0, 538),
-	anchor = Vector2.new(0.5, 0), zIndex = Z + 3,
 })
 
 function WheelPanel.open()
