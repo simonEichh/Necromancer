@@ -10,6 +10,7 @@ end
 
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
+local Wheel = require(script.Parent.Wheel)
 local Army = require(script.Parent.Army)
 local PlotRegistry = require(script.Parent.PlotRegistry)
 local PlotFrame = require(script.Parent.PlotFrame)
@@ -81,6 +82,19 @@ end)
 -- ============================================================
 Remotes.DevUnlockCodex.OnServerEvent:Connect(function(player)
 	PlayerData.unlockCodex(player)
+end)
+
+-- ============================================================
+-- Wheel charges (fixed amount; never trust a client-supplied quantity)
+-- ============================================================
+Remotes.DevGiveWheelSpins.OnServerEvent:Connect(function(player)
+	local profile = PlayerData.get(player)
+	if not profile then return end
+	local wd = Wheel.getWheelData(player)
+	Wheel.setSpins(player, wd.spins + 10)
+	profile.dirty = true
+	local secondsUntilNext = math.max(0, math.floor(900 - (tick() - wd.lastGrantTime)))
+	Remotes.WheelSpinsUpdate:FireClient(player, wd.spins, secondsUntilNext)
 end)
 
 -- ============================================================

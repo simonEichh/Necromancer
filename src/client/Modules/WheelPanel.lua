@@ -8,6 +8,8 @@ local HUD = require(script.Parent.HUD)
 local Sync = require(script.Parent.Sync)
 local WheelScene = require(script.Parent.WheelScene)
 local Rewards = require(ReplicatedStorage.Shared.WheelRewards)
+local WheelPrizes = require(ReplicatedStorage.Shared.WheelPrizes)
+local Format = require(script.Parent.Format)
 local C, Z = Theme.Color, 60
 local player = Players.LocalPlayer
 local WheelPanel = {}
@@ -26,7 +28,7 @@ gui.DisplayOrder = 20
 gui.Enabled = false
 gui.Parent = player:WaitForChild("PlayerGui")
 local themed = Theme.panel(gui, {
-	title = "Lucky Wheel", size = UDim2.fromOffset(380, 540),
+	title = "Lucky Wheel", size = UDim2.fromOffset(400, 660),
 	anchor = Vector2.new(1, 0.5), position = UDim2.new(1, -70, 0.5, 0), zIndex = Z,
 })
 local panel = themed.frame
@@ -37,7 +39,7 @@ local body = themed.body
 local scale = Instance.new("UIScale", panel)
 local function fit()
 	local size = gui.AbsoluteSize
-	if size.Y > 0 then scale.Scale = math.clamp(math.min((size.Y - 100) / 596, size.X * 0.4 / 436), 0.4, 1) end
+	if size.Y > 0 then scale.Scale = math.clamp(math.min((size.Y - 100) / 716, size.X * 0.4 / 456), 0.4, 1) end
 end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 fit()
@@ -60,24 +62,34 @@ local rewardRows = {}
 for i, outcome in ipairs(Rewards) do
 	local row = Instance.new("Frame", body)
 	row.Name = "Outcome" .. i
-	row.Size = UDim2.new(1, 0, 0, 28)
-	row.Position = UDim2.fromOffset(0, 138 + (i - 1) * 32)
+	row.Size = UDim2.new(1, 0, 0, 44)
+	row.Position = UDim2.fromOffset(0, 138 + (i - 1) * 48)
 	row.BackgroundColor3 = C.StoneRaised
 	row.BorderSizePixel = 0
 	row.ZIndex = Z + 2
 	Theme.corner(row, Theme.Radius.Small)
 	local border = Theme.stroke(row, C.Border)
-	local name = Theme.label(row, { text = outcome.label, color = C.Bone, frameSize = UDim2.new(1, -66, 1, 0) })
-	name.Position = UDim2.fromOffset(8, 0)
+	local name = Theme.label(row, { text = outcome.label, color = C.Bone, frameSize = UDim2.new(1, -66, 0, 22) })
+	name.Position = UDim2.fromOffset(8, 1)
 	name.ZIndex = Z + 3
+	local detail = Theme.label(row, { text = "", size = "Small", color = C.BoneDim, frameSize = UDim2.new(1, -16, 0, 20) })
+	detail.Position = UDim2.fromOffset(8, 22)
+	detail.ZIndex = Z + 3
 	local chance = Theme.label(row, { text = outcome.weight .. "%", color = C.Gold,
 		align = Enum.TextXAlignment.Right, frameSize = UDim2.new(0, 48, 1, 0) })
 	chance.Position = UDim2.new(1, -56, 0, 0)
 	chance.ZIndex = Z + 3
-	rewardRows[i] = { frame = row, border = border }
+	rewardRows[i] = { frame = row, border = border, detail = detail }
 end
 local spinButton
 local function refresh()
+	local crownOwned = table.find(State.items, "SpectralCrown") ~= nil
+	local income = WheelPrizes.armyIncome(State.placed, State.rebirthCount, State.coinBoostLevel, State.realmUpgrades.harvest)
+	for i, outcome in ipairs(Rewards) do
+		local prize = WheelPrizes.resolve(outcome, State.rebirthCount, income, crownOwned)
+		rewardRows[i].detail.Text = prize.itemKey and not prize.duplicate and "Unlock Spectral Crown"
+			or WheelPrizes.describe(prize, Format.fmtGold)
+	end
 	countLabel.Text = "Spins available: " .. State.wheelSpins
 	local seconds = math.max(0, math.floor(State.wheelCountdownSecs))
 	countdown.Text = string.format("Next spin in: %d:%02d", math.floor(seconds / 60), seconds % 60)
@@ -96,7 +108,7 @@ Theme.stoneButton(panel, {
 })
 spinButton = Theme.stoneButton(body, {
 	text = "Spin", color = "gold", size = UDim2.fromOffset(200, 44),
-	position = UDim2.new(0.5, 0, 0, 384), anchor = Vector2.new(0.5, 0), zIndex = Z + 3,
+	position = UDim2.new(0.5, 0, 0, 482), anchor = Vector2.new(0.5, 0), zIndex = Z + 3,
 	onClick = function()
 		if spinning or pendingSpin or State.wheelSpins <= 0 or WheelScene.busy() then return end
 		pendingSpin, pendingAt = true, os.clock()
@@ -106,6 +118,10 @@ spinButton = Theme.stoneButton(body, {
 		refresh()
 		wheelSpinRemote:FireServer()
 	end,
+})
+require(script.Parent.LuckPotionButton).create(body, {
+	size = UDim2.fromOffset(300, 36), position = UDim2.new(0.5, 0, 0, 538),
+	anchor = Vector2.new(0.5, 0), zIndex = Z + 3,
 })
 
 function WheelPanel.open()
@@ -165,9 +181,8 @@ RunService.Heartbeat:Connect(function()
 	if spinning and workspace:GetServerTimeNow() >= finishAt then
 		spinning = false
 		local outcome = Rewards[reward.outcomeIdx or 1]
-		if reward.buffDuration then State.luckBuffEnd = tick() + reward.buffDuration end
 		Sync.release()
-		resultLabel.Text = "You got: " .. (outcome and outcome.label or "a reward")
+		resultLabel.Text = "You got: " .. (reward.prize and WheelPrizes.describe(reward.prize, Format.fmtGold) or outcome.label)
 		local row = rewardRows[reward.outcomeIdx or 1]
 		if row then row.border.Color = C.Soul end
 		reward = nil
@@ -183,10 +198,11 @@ RunService.Heartbeat:Connect(function()
 	local now = tick()
 	if now - lastCountdownTick >= 1 then
 		lastCountdownTick = now
-		if State.wheelSpins == 0 then State.wheelCountdownSecs = math.max(0, State.wheelCountdownSecs - 1) end
+		State.wheelCountdownSecs = math.max(0, State.wheelCountdownSecs - 1)
 		HUD.update()
 		if panel.Visible then refresh() end
 	end
 end)
+Sync.onApplied(function() if panel.Visible then refresh() end end)
 refresh()
 return WheelPanel

@@ -5,6 +5,14 @@ and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `
 
 ## State at the end of the 2026-10-16 session (read this first)
 
+**Wheel rewards follow-up (implemented, uncommitted):** all seven approved rewards are live in code and the place
+wheel was rebuilt: scaled Gold Chest, stored Luck Potion, 75 Gems, highest-tier Grave Hoard, unlocked-tier Dust Cache,
+three Fortune Catalysts and the Spectral Crown unlock (repeat = 250 Gems). Potion buttons in the wheel and both grave
+views; potion count and active time persist, offline time pauses the buff. Full rules/odds: `docs/features.md`.
+1,233 isolated Studio checks pass, plus a live UI/replication/rejection smoke check and Play screenshot review.
+**Next for this feature:** save the rebuilt wheel in the place file; manual successful-spin/potion clicks and pacing
+playtest. **Crown modelling explicitly deferred by the user**: ownership works now, equipping waits for its model.
+
 **Built and committed today:**
 - **Ascension cinematic** reworked: the rite happens at the fallen gate, the grimoire draws the army in (like a pull),
   labels hidden, a still side shot. DEV panel: **Break all** (every wall incl. the gate), **Unlock Codex**.

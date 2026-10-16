@@ -407,6 +407,11 @@ traits are built: Knell +10% army damage while its bell tolls, Hush +15% against
 
 ## 5. Suggested order (when we get there)
 
+**Lucky Wheel rewards agreed and implemented 2026-10-16:** progression-scaled Gold Chest, Grave Hoard and Dust Cache;
+Gems; a Luck Potion the player saves and activates; Fortune Catalyst bundle; a wheel-exclusive Spectral Crown jackpot.
+Repeated crown wins convert to Gems. Crown modelling is postponed (spectral bone, slowly orbiting fragments); the
+permanent outfit unlock saves now and becomes wearable once its model is built. Full odds/rules in `docs/features.md`.
+
 1. Rare-pull broadcast, server luck (free meter first, Robux later), luck potions from wheel / quests.
 2. Friend boost, monument leaderboard, plot statues.
 3. Tutorial and gradual unlocks.

@@ -96,9 +96,13 @@ nameLbl.Position = UDim2.fromOffset(66, 12)
 nameLbl.ZIndex = Z + 1
 Theme.outlineText(nameLbl)
 local hintLbl = Theme.label(bar, { text = "", size = "Small", font = "Body", color = C.BoneDim, align = Enum.TextXAlignment.Center, frameSize = UDim2.new(0, 300, 0, 40) })
-hintLbl.Position = UDim2.fromOffset(66, 44)
+hintLbl.Position = UDim2.fromOffset(66, 38)
+hintLbl.Size = UDim2.fromOffset(300, 32)
 hintLbl.TextWrapped = true
 hintLbl.ZIndex = Z + 1
+require(script.Parent.LuckPotionButton).create(bar, {
+	size = UDim2.fromOffset(300, 30), position = UDim2.fromOffset(66, 78), zIndex = Z + 1,
+})
 
 local function stepSelection(delta) end -- (set below)
 Theme.stoneButton(bar, {

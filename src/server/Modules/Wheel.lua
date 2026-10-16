@@ -2,15 +2,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
-local Rolling = require(script.Parent.Rolling)
-local Units = require(ReplicatedStorage.Shared.Units)
-local Economy = require(ReplicatedStorage.Shared.Economy)
 local WHEEL_OUTCOMES = require(ReplicatedStorage.Shared.WheelRewards)
+local WheelPrizes = require(ReplicatedStorage.Shared.WheelPrizes)
 local SPIN_TIME = 5
 local busyUntil = 0
-
-local rollUnit = Rolling.rollUnit
-local getBaseOneIn = Units.getBaseOneIn
+local POTION_DURATION = WHEEL_OUTCOMES[2].duration
 
 -- ── WHEEL DATA ───────────────────────────────────────────────
 local playerWheelData = {}
@@ -20,11 +16,22 @@ local function getWheelData(player)
 		playerWheelData[id] = {
 			spins = 0,
 			lastGrantTime = tick(),
-			luckBuffEnd = 0,
+			lastPotionUse = 0,
 		}
 	end
 	return playerWheelData[id]
 end
+
+Remotes.UseLuckPotion.OnServerEvent:Connect(function(player)
+	if not PlayerData.get(player) then return end
+	local wd = getWheelData(player)
+	local now = os.clock()
+	if now - wd.lastPotionUse < 0.5 then return end
+	wd.lastPotionUse = now
+	if not PlayerData.useLuckPotion(player, POTION_DURATION) then
+		Remotes.Notice:FireClient(player, "You have no luck potions. Win them from the Lucky Wheel.")
+	end
+end)
 
 -- Wheel outcomes (7 segments matching the client display order)
 local WHEEL_TOTAL_WEIGHT = 0
@@ -64,6 +71,7 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player)
 	end
 	busyUntil = at + SPIN_TIME
 	wd.spins -= 1
+	profile.dirty = true
 
 	-- The server rolls the outcome; the client only animates toward the index we send.
 	local idx, outcome = rollWheelOutcome()
@@ -77,51 +85,24 @@ Remotes.WheelSpin.OnServerEvent:Connect(function(player)
 	wheel:SetAttribute("SpinOwner", player.UserId)
 	wheel:SetAttribute("SpinAt", at) -- last: clients see one consistent animation snapshot
 
-	-- Award reward (stored in PlayerData; the client sees it via DataSync)
-	local rewardData = { outcomeIdx = idx, outcome = outcome, spinAt = at, spinDuration = SPIN_TIME }
-	if outcome.id == "gold_1k" then
-		PlayerData.addGold(player, math.floor(1000 * Economy.sellGoldMultiplier(profile.upgrades.coinBoost)))
-	elseif outcome.id == "luck_buff" then
-		wd.luckBuffEnd = tick() + 300 -- 5 minutes
-		rewardData.buffDuration = 300
-	elseif outcome.id == "gems_50" then
-		PlayerData.addGems(player, 50)
-		rewardData.gems = 50
-	elseif outcome.id == "gems_100" then
-		PlayerData.addGems(player, 100)
-		rewardData.gems = 100
-	elseif outcome.id == "graves_5" then
-		PlayerData.addGraves(player, outcome.graveType, outcome.count)
-		rewardData.graveType = outcome.graveType
-		rewardData.graveCount = outcome.count
-	elseif outcome.id == "grave_rare" then
-		PlayerData.addGraves(player, outcome.graveType, outcome.count)
-		rewardData.graveType = outcome.graveType
-		rewardData.graveCount = outcome.count
-	elseif outcome.id == "lucky_box" then
-		-- Roll 3 Legendary+ units as a bonus
-		local boxUnits = {}
-		local highRarities = { "Legendary", "Abyssal", "Eldritch", "Eternal" }
-		local highWeights = { 60, 25, 10, 5 }
-		for _ = 1, 3 do
-			local rRoll = math.random(1, 100)
-			local cum2 = 0
-			local pickedRarity = "Legendary"
-			for ri, w in ipairs(highWeights) do
-				cum2 += w
-				if rRoll <= cum2 then
-					pickedRarity = highRarities[ri]
-					break
-				end
-			end
-			local unitType = rollUnit(pickedRarity)
-			local oneIn = getBaseOneIn(unitType)
-			table.insert(boxUnits, { unitType = unitType, oneIn = oneIn })
-			if not PlayerData.addUnit(player, unitType, oneIn) then
-				Remotes.Notice:FireClient(player, "Inventory full — ".. unitType .. "lost!")
-			end
-		end
-		rewardData.boxUnits = boxUnits
+	-- Resolve once at spin time, so the preview and award use the same progression rules.
+	local prize = WheelPrizes.resolve(outcome, profile.rebirthCount, WheelPrizes.armyIncome(PlayerData.placedProvider and PlayerData.placedProvider(player) or {},
+		profile.rebirthCount, profile.upgrades.coinBoost, profile.realmUpgrades.harvest), profile.items.SpectralCrown == true)
+	local rewardData = { outcomeIdx = idx, prize = prize, spinAt = at, spinDuration = SPIN_TIME }
+	if prize.gold then
+		PlayerData.addGold(player, prize.gold)
+	elseif prize.gems then
+		PlayerData.addGems(player, prize.gems)
+	elseif prize.graveType then
+		PlayerData.addGraves(player, prize.graveType, prize.count)
+	elseif prize.dust then
+		PlayerData.addMaterial(player, prize.dust, prize.count)
+	elseif prize.catalyst then
+		PlayerData.addCatalyst(player, prize.catalyst, prize.count)
+	elseif prize.itemKey then
+		PlayerData.grantItem(player, prize.itemKey)
+	else
+		PlayerData.addLuckPotions(player, prize.count)
 	end
 
 	-- Tell client the authoritative outcome index + reward payload
@@ -161,6 +142,8 @@ local function grantTick(p, now)
 	if now - wd.lastGrantTime >= 900 then
 		wd.lastGrantTime = wd.lastGrantTime + 900
 		wd.spins += 1
+		local profile = PlayerData.get(p)
+		if profile then profile.dirty = true end
 		local secondsUntilNext = math.max(0, math.floor(900 - (now - wd.lastGrantTime)))
 		Remotes.WheelSpinsUpdate:FireClient(p, wd.spins, secondsUntilNext)
 	end

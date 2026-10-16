@@ -33,6 +33,12 @@ Items.Defs = {
 		description = "Torn by the gates of the cemetery. A soul sigil is sewn into its back.",
 		order = 3,
 	},
+	SpectralCrown = {
+		slot = "Head",
+		name = "Spectral Crown",
+		description = "A crown of spectral bone, claimed from the Lucky Wheel. Its wearable appearance is coming soon; your unlock is saved.",
+		order = 4,
+	},
 }
 
 -- Every new player owns these (and wears them until they take them off).

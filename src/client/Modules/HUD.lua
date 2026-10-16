@@ -285,8 +285,8 @@ function HUD.update()
 	end
 	if luckLbl then
 		local buffEnd = getLuckBuffEnd()
-		if buffEnd and tick() < buffEnd then
-			local secs = math.ceil(buffEnd - tick())
+		if buffEnd and workspace:GetServerTimeNow() < buffEnd then
+			local secs = math.ceil(buffEnd - workspace:GetServerTimeNow())
 			luckLbl.Text = "2× Luck (" .. secs .. "s)"
 		else
 			luckLbl.Text = ""

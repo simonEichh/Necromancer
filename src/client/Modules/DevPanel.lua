@@ -15,6 +15,7 @@ local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local spawnEvent = ReplicatedStorage:WaitForChild("DevSpawnUnit")
 local clearEvent = ReplicatedStorage:WaitForChild("DevClearUnits")
 local gemsEvent = ReplicatedStorage:WaitForChild("DevGiveGems")
+local wheelSpinsEvent = ReplicatedStorage:WaitForChild("DevGiveWheelSpins")
 local goldEvent = ReplicatedStorage:WaitForChild("DevGiveGold")
 local fastSpecialsEvent = ReplicatedStorage:WaitForChild("DevFastSpecials")
 
@@ -344,6 +345,14 @@ codexBtn.Position = UDim2.fromOffset(8, 236)
 codexBtn.MouseButton1Click:Connect(function()
 	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevUnlockCodex")
 	if r then r:FireServer() end
+end)
+
+local wheelSpinsBtn = makeButton(panel, "+10 Wheel Spins", Color3.fromRGB(255, 214, 110))
+wheelSpinsBtn.Name = "DevGiveWheelSpins"
+wheelSpinsBtn.Size = UDim2.new(0.6, -12, 0, 28)
+wheelSpinsBtn.Position = UDim2.new(0.4, 4, 0, 236)
+wheelSpinsBtn.MouseButton1Click:Connect(function()
+	wheelSpinsEvent:FireServer()
 end)
 
 local list = Instance.new("ScrollingFrame")

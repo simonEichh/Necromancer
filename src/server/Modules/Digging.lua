@@ -4,13 +4,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(script.Parent.Remotes)
 local PlayerData = require(script.Parent.PlayerData)
 local Rolling = require(script.Parent.Rolling)
-local Wheel = require(script.Parent.Wheel)
 local Quests = require(script.Parent.Quests)
 local ShowcasePulls = require(script.Parent.ShowcasePulls)
 local Graves = require(ReplicatedStorage.Shared.Graves)
 local Units = require(ReplicatedStorage.Shared.Units)
 
-local getWheelData = Wheel.getWheelData
 local rollRarity = Rolling.rollRarity
 local rollUnit = Rolling.rollUnit
 local getPity = Rolling.getPity
@@ -36,9 +34,8 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 	end
 	count = math.clamp(math.floor(tonumber(count) or 1), 1, MAX_PULLS)
 
-	-- Luck: each luckBoost level = +10% and the wheel buff doubles it; it multiplies the weights of Rare and better
-	local wd = getWheelData(player)
-	local buffMult = (tick() < wd.luckBuffEnd) and 2 or 1
+	-- Luck potions double the Rare-and-better weight boost while active.
+	local buffMult = (workspace:GetServerTimeNow() < profile.luckBuffEnd) and 2 or 1
 	local boostedGrave = {
 		odds = grave.odds,
 		luckFactor = (1 + profile.upgrades.luckBoost * 0.1) * buffMult,

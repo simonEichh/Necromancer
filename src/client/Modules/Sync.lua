@@ -29,6 +29,8 @@ end
 local function apply(snap)
 	State.gold = snap.gold
 	State.gems = snap.gems
+	State.luckPotions = snap.luckPotions or 0
+	State.luckBuffEnd = snap.luckBuffEnd or 0
 	State.rebirthCount = snap.rebirthCount
 	State.gateCleared = snap.gateCleared == true
 	State.wallsBroken = snap.wallsBroken or 0

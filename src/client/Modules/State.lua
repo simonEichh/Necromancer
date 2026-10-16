@@ -43,7 +43,8 @@ local State = {
 	-- Wheel
 	wheelSpins = 0,
 	wheelCountdownSecs = 900, -- seconds until next spin grant
-	luckBuffEnd = 0, -- tick() timestamp when 2x luck buff expires
+	luckPotions = 0,
+	luckBuffEnd = 0, -- server timestamp when 2x luck expires (authoritative DataSync)
 
 	-- Constants
 	INVENTORY_MAX = Economy.INVENTORY_MAX,

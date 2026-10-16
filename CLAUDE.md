@@ -70,7 +70,7 @@ Plots point in different directions, so **never use world X/Z for lane math**. E
 ## Known issues
 
 - No session locking: a player in two servers at once could overwrite their own data.
-- Not saved: luck buff timer, shop stock rotation, current wall layer/progress, `gateCleared` (break the gate again after rejoining before ascending).
+- Not saved: shop stock rotation, current wall layer/progress, `gateCleared` (break the gate again after rejoining before ascending). Wheel luck potions and remaining buff time ARE saved (offline time pauses the buff).
 - Towers (Last Lantern) keep their firing spot while the front advances, so their beam gets very long late in a run; an idea is to let them re-rise closer every few walls.
 - The Sigilwright stands at a fixed post and never marches; `INFINITE_RANGE_POST_FWD` is a constant in `Army.lua`.
 - `regenReduction` is defined but unused. (The poison mechanic was removed with the Goblin on 2026-10-15.)

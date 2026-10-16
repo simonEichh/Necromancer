@@ -56,6 +56,8 @@ local function collect(player, profile)
 		version = SAVE_VERSION,
 		gold = profile.gold,
 		gems = profile.gems,
+		luckPotions = profile.luckPotions,
+		luckBuffRemaining = math.max(0, profile.luckBuffEnd - workspace:GetServerTimeNow()),
 		rebirthCount = profile.rebirthCount,
 		ownedGraves = snapshot.ownedGraves,
 		upgrades = { luckBoost = profile.upgrades.luckBoost, coinBoost = profile.upgrades.coinBoost },

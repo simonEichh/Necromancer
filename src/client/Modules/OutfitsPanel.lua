@@ -142,6 +142,9 @@ local function makeView(parent, key)
 	vp.ZIndex = 13
 	vp.Parent = parent
 	if not template then
+		local tag = Theme.label(vp, { text = "Coming soon", size = "Small", color = C.BoneDim,
+			align = Enum.TextXAlignment.Center, frameSize = UDim2.fromScale(1, 1) })
+		tag.ZIndex = 14
 		return
 	end
 	local model = Instance.new("Model")
@@ -280,10 +283,12 @@ local function paintDetails()
 	descLbl.Text = def.description or ""
 	local worn = State.equipped and State.equipped[currentSlot] == key
 	local owned = owns(key)
+	local models = ReplicatedStorage:FindFirstChild("ItemModels")
+	local available = models and models:FindFirstChild(key) ~= nil
 	Theme.stoneButton(actionHolder, {
-		text = (not owned) and "Not owned" or (worn and "Take off" or "Equip"),
+		text = (not owned) and "Not owned" or (not available and "Unlocked" or (worn and "Take off" or "Equip")),
 		color = worn and "red" or "green",
-		disabled = not owned,
+		disabled = not owned or (not available and not worn),
 		size = UDim2.fromOffset(170, 44), zIndex = 13,
 		onClick = function()
 			EquipItem:FireServer(currentSlot, (not worn) and key or nil)

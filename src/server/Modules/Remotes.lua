@@ -10,6 +10,7 @@ local EVENTS = {
 	"ClaimQuest",
 	"DevClearUnits", -- Studio-only dev tools (see DevTools / client DevPanel)
 	"DevGiveGems",
+	"DevGiveWheelSpins", -- Studio: add ten wheel spin charges
 	"DevGiveGold",
 	"DevFastSpecials",
 	"DevFleetStrike", -- (on) Studio: start / stop a Fleet Strike finisher on your plot (FleetStrike.lua previews it)
@@ -41,6 +42,7 @@ local EVENTS = {
 	"BuyGemItem", -- (item "RemoteForge" | "WispSpeed"): the Gem Shop, see GemShop
 	"EquipItem", -- (slot, item key | nil): wear or take off an outfit item, see Outfits
 	"WheelSpin",
+	"UseLuckPotion", -- use one saved potion for five minutes of 2x luck (time stacks)
 	-- server -> client
 	"AddGold", -- sell banner only; gold itself arrives via DataSync
 	"OpenForge", -- the Forge stall's prompt was used: open the Forge panel

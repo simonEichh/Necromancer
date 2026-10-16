@@ -37,6 +37,8 @@ function PlayerData.create(player, saved)
 		player = player,
 		gold = START_GOLD,
 		gems = 0,
+		luckPotions = 0, -- saved consumables from the wheel
+		luckBuffEnd = 0, -- server time; remaining duration is saved, offline time does not consume it
 		rebirthCount = 0,
 		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
 		materials = {}, -- [dust key from Economy.DUSTS] = amount of that upgrade dust
@@ -64,6 +66,8 @@ function PlayerData.create(player, saved)
 	if saved then
 		profile.gold = clampNumber(saved.gold, START_GOLD, 0)
 		profile.gems = clampNumber(saved.gems, 0, 0)
+		profile.luckPotions = math.floor(clampNumber(saved.luckPotions, 0, 0))
+		profile.luckBuffEnd = workspace:GetServerTimeNow() + clampNumber(saved.luckBuffRemaining, 0, 0)
 		profile.rebirthCount = math.floor(clampNumber(saved.rebirthCount, 0, 0))
 		profile.wallsBroken = math.floor(clampNumber(saved.wallsBroken, 0, 0))
 		profile.collector = saved.collector == true
@@ -199,6 +203,9 @@ function PlayerData.equipItem(player, slot, key)
 	if key ~= nil and not (profile.items[key] and Items.Defs[key].slot == slot) then
 		return false
 	end
+	-- An unlocked cosmetic can precede its model (the wheel's Spectral Crown).
+	local models = ReplicatedStorage:FindFirstChild("ItemModels")
+	if key ~= nil and not (models and models:FindFirstChild(key)) then return false end
 	if profile.equipped[slot] == key then
 		return false
 	end
@@ -270,6 +277,8 @@ function PlayerData.snapshot(profile)
 	return {
 		gold = profile.gold,
 		gems = profile.gems,
+		luckPotions = profile.luckPotions,
+		luckBuffEnd = profile.luckBuffEnd,
 		rebirthCount = profile.rebirthCount,
 		gateCleared = profile.gateCleared,
 		catalysts = catalysts,
@@ -368,6 +377,34 @@ function PlayerData.spendGems(player, amount)
 		return false
 	end
 	profile.gems -= amount
+	PlayerData.changed(player)
+	return true
+end
+
+-- ============================================================
+-- Wheel consumables and cosmetic unlocks
+-- ============================================================
+function PlayerData.addLuckPotions(player, amount)
+	local profile = profiles[player.UserId]
+	if not profile or type(amount) ~= "number" or amount ~= amount or amount <= 0 then return false end
+	profile.luckPotions = math.min(profile.luckPotions + math.floor(amount), MAX_CURRENCY)
+	PlayerData.changed(player)
+	return true
+end
+
+function PlayerData.useLuckPotion(player, duration)
+	local profile = profiles[player.UserId]
+	if not profile or profile.luckPotions < 1 then return false end
+	profile.luckPotions -= 1
+	profile.luckBuffEnd = math.max(workspace:GetServerTimeNow(), profile.luckBuffEnd) + duration
+	PlayerData.changed(player)
+	return true
+end
+
+function PlayerData.grantItem(player, key)
+	local profile = profiles[player.UserId]
+	if not profile or not Items.Defs[key] or profile.items[key] then return false end
+	profile.items[key] = true
 	PlayerData.changed(player)
 	return true
 end

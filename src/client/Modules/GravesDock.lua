@@ -160,7 +160,7 @@ local function build(screenGui)
 	local grid = Instance.new("ScrollingFrame")
 	grid.BackgroundTransparency = 1
 	grid.BorderSizePixel = 0
-	grid.Size = UDim2.new(1, 0, 1, -92)
+	grid.Size = UDim2.new(1, 0, 1, -132)
 	grid.ScrollBarThickness = 6
 	grid.ScrollBarImageColor3 = C.Verdigris
 	grid.CanvasSize = UDim2.new()
@@ -251,6 +251,10 @@ local function build(screenGui)
 	Theme.corner(bar, Theme.Radius.Small)
 	Theme.stroke(bar, C.Border, 1)
 	bar.Parent = body
+	require(script.Parent.LuckPotionButton).create(body, {
+		size = UDim2.fromOffset(300, 32), position = UDim2.new(0.5, 0, 1, -120),
+		anchor = Vector2.new(0.5, 0), zIndex = Z + 3,
+	})
 
 	hintLbl = Theme.label(bar, { text = "", size = "Body", font = "Body", color = C.BoneDim, frameSize = UDim2.new(0.42, 0, 1, 0) })
 	hintLbl.Position = UDim2.fromOffset(14, 0)
