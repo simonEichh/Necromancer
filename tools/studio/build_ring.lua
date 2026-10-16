@@ -200,7 +200,7 @@ for i = 1, 8 do
 	brazier(tower, topCentre, TOWER_TOP + 3)
 
 	-- sealed gate where the lane ends (inner face is local -Z, at radius R_IN)
-	local faceZ = -13.2 -- just in front of the inner face
+	local faceZ = -14.8 -- in front of the inner face and the plinth (which stands out 1.5)
 	local gateBase = onRing(R_TOWER, deg, floorTop) -- floor level, centred on the lane
 	part(tower, "GateFrame", Vector3.new(16, 22, 1.6), gateBase * CFrame.new(0, 11, faceZ), STONE_LIGHT, Enum.Material.Slate)
 	part(tower, "GateDoor", Vector3.new(11, 18, 1.2), gateBase * CFrame.new(0, 9, faceZ - 0.7), DOOR, Enum.Material.Slate)
@@ -208,8 +208,8 @@ for i = 1, 8 do
 
 	-- glowing emblem high on the face: ring + cross + plot number
 	-- a rose window high on the face (it was a neon ring with spokes)
-	roseWindow(tower, onRing(R_TOWER, deg, floorTop + 62) * CFrame.new(0, 0, -13), 20)
-	local sign = part(tower, "PlotSign", Vector3.new(16, 5, 0.8), onRing(R_TOWER, deg, floorTop + 40) * CFrame.new(0, 0, faceZ - 0.4), STONE_DARK, Enum.Material.Slate)
+	roseWindow(tower, onRing(R_TOWER, deg, floorTop + 57) * CFrame.new(0, 0, -13), 20) -- (top clear of the wall cornice that runs across the face)
+	local sign = part(tower, "PlotSign", Vector3.new(16, 5, 0.8), onRing(R_TOWER, deg, floorTop + 40) * CFrame.new(0, 0, -13.6), STONE_DARK, Enum.Material.Slate)
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front -- local -Z, the side facing the lane
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
