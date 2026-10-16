@@ -25,6 +25,9 @@ the spin is accepted; the reveal uses that exact prize, even if progression chan
 for normal saving, and immediately sends `WheelSpinsUpdate` to refresh the HUD and wheel view. It leaves the
 15-minute free-spin timer intact; client-supplied amounts are ignored. The panel is absent outside Studio and the
 server registers no dev handler there.
+Verified in Studio: two requests added 10 charges each (including a request with an extra client amount), the wheel
+count updated immediately without resetting its timer, and a successful spin consumed one charge and awarded dust.
+No game-script errors during the check.
 
 | Slice | Chance | Reward |
 |---|---|---|
