@@ -6,6 +6,9 @@
 -- "1 in X", base DPS and how many the player has ever pulled. Units never pulled are a black silhouette with "???".
 -- Discovered = State.codex (server PlayerData.codex, saved; counted in Digging, older saves filled from the inventory and
 -- the graves). Builds its UI when required (no init call).
+-- Pressing a unit opens its page over the spread: on the left the unit big (3D), its name, title, rarity, odds, base DPS
+-- and how often it was pulled; on the right its abilities (Units.Abilities: name, kind, a short text with the numbers
+-- highlighted; locked ones show how to unlock them, e.g. Fleet Strike for gems). Back (or Esc) returns to the spread.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -22,6 +25,7 @@ local NecroRitual = require(script.Parent.NecroRitual)
 local WorldView = require(script.Parent.WorldView)
 local Units = require(ReplicatedStorage.Shared.Units)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 
 local player = Players.LocalPlayer
 local C = Theme.Color
@@ -35,6 +39,8 @@ local PAGE = Color3.fromRGB(46, 38, 33)
 local PAGE_EDGE = Color3.fromRGB(122, 98, 62)
 local INK = Color3.fromRGB(222, 210, 182)
 local INK_DIM = Color3.fromRGB(150, 138, 116)
+local HIGHLIGHT = "#F2C46B" -- (the numbers in ability texts)
+local KIND_COLOR = { Special = Color3.fromRGB(190, 150, 255), Aura = Color3.fromRGB(120, 230, 170), Finisher = Color3.fromRGB(255, 140, 110) }
 
 local function smooth(x)
 	x = math.clamp(x, 0, 1)
@@ -148,19 +154,16 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 	local odds = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.38), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local dps = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.56), font = Enum.Font.GothamMedium, color = INK_DIM })
 	local pulled = text(f, { size = UDim2.fromScale(0.58, 0.15), position = UDim2.fromScale(0.4, 0.74), font = Enum.Font.GothamMedium, color = INK_DIM })
-	-- (Malak only, once discovered) his Fleet Strike finisher: buy it here or see that it is owned
-	local fleet = Theme.stoneButton(f, {
-		text = "", color = "blue", size = UDim2.fromScale(0.5, 0.2),
-		position = UDim2.fromScale(0.97, 0.94), anchor = Vector2.new(1, 1), zIndex = 4,
-		onClick = function()
-			local remote = ReplicatedStorage:FindFirstChild("BuyGemItem")
-			if remote and not State.fleetStrike then
-				remote:FireServer("FleetStrike")
-			end
-		end,
-	})
-	fleet.root.Visible = false
-	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, title = title, odds = odds, dps = dps, pulled = pulled, fleet = fleet }
+	-- the whole entry opens the unit's page
+	local open = Instance.new("TextButton")
+	open.BackgroundTransparency = 1
+	open.Text = ""
+	open.Size = UDim2.fromScale(1, 1)
+	open.ZIndex = 6
+	open.Parent = f
+	local hint = text(f, { size = UDim2.fromScale(0.3, 0.1), position = UDim2.fromScale(0.67, 0.86), font = Enum.Font.GothamMedium, color = INK_DIM, align = Enum.TextXAlignment.Right })
+	hint.Text = "Read more"
+	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, title = title, odds = odds, dps = dps, pulled = pulled, open = open, hint = hint }
 end
 
 -- page turning, bookmarks, close
@@ -174,8 +177,12 @@ for _, rarity in ipairs(RARITY_LIST) do
 end
 local spread = 1
 local paint
+local showDetail
 local function turn(delta)
 	spread = math.clamp(spread + delta, 1, #SPREADS)
+	if showDetail then
+		showDetail(nil)
+	end
 	paint()
 end
 Theme.stoneButton(book, {
@@ -227,12 +234,195 @@ for i, rarity in ipairs(RARITY_LIST) do
 				break
 			end
 		end
+		if showDetail then
+			showDetail(nil)
+		end
 		paint()
 	end)
 	bookmarks[i] = b
 end
 
+-- ============================================================
+-- The unit page (over the spread)
+-- ============================================================
+local detail = { unitType = nil }
+local function detailPage(pageFrame)
+	local f = Instance.new("Frame")
+	f.BackgroundColor3 = PAGE
+	f.BorderSizePixel = 0
+	f.Size = UDim2.fromScale(1, 1)
+	f.ZIndex = 10
+	f.Visible = false
+	f.Parent = pageFrame
+	Theme.corner(f, 10)
+	return f
+end
+local detailLeft, detailRight = detailPage(pages[1]), detailPage(pages[2])
+local function dtext(parent, props)
+	local l = text(parent, props)
+	l.ZIndex = 11
+	return l
+end
+local bigHolder = Instance.new("Frame")
+bigHolder.BackgroundTransparency = 1
+bigHolder.Size = UDim2.fromScale(0.84, 0.5)
+bigHolder.Position = UDim2.fromScale(0.08, 0.04)
+bigHolder.ZIndex = 11
+bigHolder.Parent = detailLeft
+local bigPortrait = UnitPortrait.attach(bigHolder, { size = UDim2.fromScale(1, 1), zIndex = 12, animate = true }) -- (plays its idle)
+local dName = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.08), position = UDim2.fromScale(0.08, 0.56), align = Enum.TextXAlignment.Center })
+local dTitle = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.045), position = UDim2.fromScale(0.08, 0.645), font = Enum.Font.Garamond, color = INK_DIM, align = Enum.TextXAlignment.Center })
+local dRarity = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.045), position = UDim2.fromScale(0.08, 0.7), font = Enum.Font.GothamBold, align = Enum.TextXAlignment.Center })
+local dStats = {}
+for k = 1, 3 do
+	dStats[k] = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.042), position = UDim2.fromScale(0.08, 0.76 + (k - 1) * 0.05), font = Enum.Font.GothamMedium, color = INK_DIM, align = Enum.TextXAlignment.Center })
+end
+local backBtn = Theme.stoneButton(detailLeft, {
+	text = "< Back", size = UDim2.fromOffset(110, 36), position = UDim2.fromScale(0.04, 0.985), anchor = Vector2.new(0, 1), zIndex = 13,
+	onClick = function() CodexPanel.back() end,
+})
+dtext(detailRight, { text = "ABILITIES", size = UDim2.fromScale(0.84, 0.07), position = UDim2.fromScale(0.08, 0.04) })
+local abilityList = Instance.new("Frame")
+abilityList.BackgroundTransparency = 1
+abilityList.Size = UDim2.fromScale(0.86, 0.84)
+abilityList.Position = UDim2.fromScale(0.07, 0.13)
+abilityList.ZIndex = 11
+abilityList.Parent = detailRight
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0.025, 0)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = abilityList
+
+-- "{25 s}" -> the number highlighted (rich text)
+local function highlight(str)
+	str = str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+	return (str:gsub("{(.-)}", '<font color="' .. HIGHLIGHT .. '"><b>%1</b></font>'))
+end
+
+local function abilityCard(order, ab, def, discovered)
+	local unlock = ab.unlock
+	local locked = unlock ~= nil and not State[unlock.state]
+	local card = Instance.new("Frame")
+	card.BackgroundColor3 = Color3.fromRGB(34, 28, 25)
+	card.BorderSizePixel = 0
+	card.Size = UDim2.fromScale(1, locked and 0.36 or 0.29)
+	card.LayoutOrder = order
+	card.ZIndex = 11
+	card.Parent = abilityList
+	Theme.corner(card, 8)
+	Theme.stroke(card, locked and PAGE_EDGE or (KIND_COLOR[ab.kind] or PAGE_EDGE), 2)
+	local kindColor = KIND_COLOR[ab.kind] or INK
+	local nameLbl = dtext(card, { text = discovered and string.upper(ab.name) or "???", size = UDim2.fromScale(0.54, 0.2), position = UDim2.fromScale(0.04, 0.06), color = locked and INK_DIM or kindColor })
+	nameLbl.ZIndex = 12
+	local tag = dtext(card, { text = string.upper(ab.kind) .. (locked and "  -  LOCKED" or ""), size = UDim2.fromScale(0.36, 0.11), position = UDim2.fromScale(0.6, 0.09), font = Enum.Font.GothamBold, color = locked and INK_DIM or kindColor, align = Enum.TextXAlignment.Right })
+	tag.ZIndex = 12
+	local body = dtext(card, { size = UDim2.fromScale(0.92, locked and 0.42 or 0.66), position = UDim2.fromScale(0.04, 0.3), font = Enum.Font.GothamMedium, color = locked and INK_DIM or INK })
+	body.ZIndex = 12
+	body.RichText = true
+	body.TextWrapped = true
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	local limit = Instance.new("UITextSizeConstraint")
+	limit.MaxTextSize = 24
+	limit.Parent = body
+	if discovered then
+		local ok, str = pcall(ab.text, def, Economy)
+		body.Text = ok and highlight(str) or ""
+	else
+		body.Text = "Discover this unit to read its abilities."
+	end
+	if locked and discovered then
+		local price = Economy[unlock.price] or 0
+		local buy = Theme.stoneButton(card, {
+			text = "Unlock  " .. price .. " Gems", color = "blue", size = UDim2.fromOffset(190, 34), -- (stone buttons need a pixel size)
+			position = UDim2.fromScale(0.96, 0.94), anchor = Vector2.new(1, 1), zIndex = 13,
+			onClick = function()
+				local remote = ReplicatedStorage:FindFirstChild("BuyGemItem")
+				if remote and not State[unlock.state] then
+					remote:FireServer(unlock.buy)
+				end
+			end,
+		})
+		buy.root:SetAttribute("Disabled", (State.gems or 0) < price)
+		local how = dtext(card, { text = "Unlockable ability", size = UDim2.fromScale(0.4, 0.1), position = UDim2.fromScale(0.04, 0.82), font = Enum.Font.GothamMedium, color = INK_DIM })
+		how.ZIndex = 12
+	end
+end
+
+local function paintDetail()
+	local unitType = detail.unitType
+	if not unitType then
+		return
+	end
+	local def = Units.Stats[unitType]
+	local n = (State.codex or {})[unitType]
+	local rarity = Units.Rarity[unitType] or "Common"
+	local color = Rarities.Color[rarity] or INK
+	bigPortrait.set(unitType)
+	bigPortrait.viewport.ImageColor3 = n and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
+	dName.Text = n and prettyName(unitType) or "???"
+	dName.TextColor3 = n and INK or INK_DIM
+	if n and Units.isSignature(unitType) then
+		SignatureName.apply(dName, unitType)
+	end
+	dTitle.Text = def.title or ""
+	dRarity.Text = string.upper(rarity) .. (Units.isSovereign(unitType) and "  SOVEREIGN" or (Units.isSignature(unitType) and "  SIGNATURE" or ""))
+	dRarity.TextColor3 = color
+	dStats[1].Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
+	dStats[2].Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
+	dStats[3].Text = n and ("Pulled  " .. n .. "x") or "Not yet discovered"
+	for _, c in ipairs(abilityList:GetChildren()) do
+		if c:IsA("GuiObject") then
+			c:Destroy()
+		end
+	end
+	local list = Units.Abilities[unitType]
+	if list then
+		-- the aura always comes first, then the rest in their order
+		local ordered = {}
+		for _, ab in ipairs(list) do
+			if ab.kind == "Aura" then
+				table.insert(ordered, ab)
+			end
+		end
+		for _, ab in ipairs(list) do
+			if ab.kind ~= "Aura" then
+				table.insert(ordered, ab)
+			end
+		end
+		for i, ab in ipairs(ordered) do
+			abilityCard(i, ab, def, n ~= nil)
+		end
+	else
+		local none = dtext(abilityList, { text = "No special abilities. It fights with its basic attack.", size = UDim2.fromScale(1, 0.08), font = Enum.Font.GothamMedium, color = INK_DIM })
+		none.TextWrapped = true
+	end
+end
+
+showDetail = function(unitType)
+	detail.unitType = unitType
+	detailLeft.Visible = unitType ~= nil
+	detailRight.Visible = unitType ~= nil
+	paintDetail()
+end
+function CodexPanel.back()
+	showDetail(nil)
+end
+-- (opens a unit's page directly, e.g. from elsewhere later; the Codex must be open)
+function CodexPanel.showUnit(unitType)
+	if Units.Stats[unitType] then
+		showDetail(unitType)
+	end
+end
+for _, entry in ipairs(entries) do
+	entry.open.Activated:Connect(function()
+		if entry.unitType then
+			showDetail(entry.unitType)
+		end
+	end)
+end
+
 paint = function()
+	paintDetail()
 	local codex = State.codex or {}
 	local rarity = SPREADS[spread].rarity
 	local first = SPREADS[spread].first
@@ -276,12 +466,7 @@ paint = function()
 			entry.odds.Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
 			entry.dps.Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
 			entry.pulled.Text = n and ("Pulled  " .. n .. "x") or "Not yet discovered"
-			entry.fleet.root.Visible = n ~= nil and unitType == "Malak"
-			if unitType == "Malak" then
-				local price = require(ReplicatedStorage.Shared.Economy).FLEET_STRIKE_PRICE
-				entry.fleet.label.Text = State.fleetStrike and "Fleet Strike: owned" or ("Fleet Strike  " .. price .. " Gems")
-				entry.fleet.root:SetAttribute("Disabled", State.fleetStrike == true or (State.gems or 0) < price)
-			end
+			entry.unitType = unitType
 		end
 	end
 end
@@ -405,7 +590,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	if key == Enum.KeyCode.C then
 		CodexPanel.toggle()
 	elseif CodexPanel.active and key == Enum.KeyCode.Escape then
-		CodexPanel.close()
+		if detail.unitType then
+			CodexPanel.back()
+		else
+			CodexPanel.close()
+		end
 	elseif CodexPanel.active and (key == Enum.KeyCode.Right or key == Enum.KeyCode.D) then
 		turn(1)
 	elseif CodexPanel.active and (key == Enum.KeyCode.Left or key == Enum.KeyCode.A) then

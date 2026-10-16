@@ -6,7 +6,12 @@
 --
 -- The models come from ReplicatedStorage.UnitModels (tools/studio/publish_unit_models.lua). A slot keeps its ViewportFrame
 -- and camera and only swaps the model when the unit type changes, so refreshing a full inventory is cheap.
+-- opts.animate (the Codex unit page's big portrait): the model stands in a WorldModel and plays its idle (tagged
+-- ProceduralUnit, so UnitAnimator moves it like a unit in the world) and turns slowly to and fro. Keep it to one or two
+-- portraits at a time. (Particles, beams and lights never show inside a ViewportFrame.)
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local UnitPortrait = {}
 
@@ -34,6 +39,19 @@ function UnitPortrait.attach(parent, opts)
 	local handle = { viewport = vp }
 	local shown = nil -- the unit type currently in the viewport
 	local model = nil
+	local holder = vp
+	local baseCF
+	if opts.animate then
+		holder = Instance.new("WorldModel") -- (joints only move models that are in a WorldModel)
+		holder.Parent = vp
+		local t0 = os.clock()
+		RunService.RenderStepped:Connect(function()
+			if model and model.Parent and baseCF and vp.Visible then
+				-- a slow turn to and fro round its middle
+				model:PivotTo(CFrame.Angles(0, math.sin((os.clock() - t0) * 0.35) * 0.35, 0) * baseCF)
+			end
+		end)
+	end
 
 	function handle.set(unitType)
 		if unitType == shown then
@@ -55,11 +73,38 @@ function UnitPortrait.attach(parent, opts)
 			return
 		end
 		model = template:Clone()
-		model.Parent = vp
+		-- (no reflectance in a viewport: there is no sky to mirror, so reflective parts came out a flat grey - Malak's
+		-- black chrome looked washed out)
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Reflectance > 0 then
+				d.Reflectance = 0
+			end
+		end
+		if opts.animate then
+			-- the idle: anchored at the root, every other part on its joints (as SovereignArrival does with its prop)
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BaseScript") then
+					d:Destroy()
+				elseif d:IsA("BasePart") then
+					d.Anchored = false
+				end
+			end
+			local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart", true)
+			if root then
+				root.Anchored = true
+			end
+			model:SetAttribute("AttackStyle", nil) -- (no attack effects: Malak's hologram would open in the world)
+			model:SetAttribute("State", "idle")
+		end
+		model.Parent = holder
 		-- centre the model's bounding box on the origin and look at it from the front
 		local boxCFrame, boxSize = model:GetBoundingBox()
 		local offset = model:GetPivot():ToObjectSpace(boxCFrame).Position
 		model:PivotTo(CFrame.Angles(0, VIEW_ANGLE, 0) * CFrame.new(-offset))
+		baseCF = model:GetPivot()
+		if opts.animate then
+			CollectionService:AddTag(model, "ProceduralUnit")
+		end
 		local radius = boxSize.Magnitude / 2
 		local dist = radius / math.tan(math.rad(FOV / 2)) * 1.0
 		cam.CFrame = CFrame.lookAt(Vector3.new(0, 0, -dist), Vector3.zero)

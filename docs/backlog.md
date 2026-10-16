@@ -1,6 +1,6 @@
 # Backlog, state and open issues
 
-## Wanted by the user (2026-10-16): the Codex unit page
+## Wanted by the user (2026-10-16): the Codex unit page (DONE the same day, see docs/features.md "The unit page")
 
 In the Codex, pressing a unit opens a detailed page for it: the unit itself (3D), its abilities by NAME (Requisition,
 Fleet Strike, Rift Chains, ...), each with a short description where the numbers are highlighted (increases, damage,

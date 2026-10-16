@@ -338,8 +338,8 @@ local UNITS = {
 		-- dispenser launches six drones that fight the wall, they fly home and the pod is beamed up. He keeps attacking
 		-- meanwhile (keepAttacking). The drones deal `swarm.armySeconds` seconds of the WHOLE ARMY's DPS, in ticks between
 		-- `swarm.from` and `swarm.to` (s after the start; must match the client's LAUNCH_FROM + T_LAUNCH and SWARM_END).
-		special = { kind = "Requisition", cooldown = 150, share = 0, duration = 40, hits = {}, keepAttacking = true,
-			swarm = { from = 8.4, to = 31.8, armySeconds = 25, tick = 0.5 } },
+		special = { kind = "Requisition", cooldown = 150, share = 0, duration = 42, hits = {}, keepAttacking = true,
+			swarm = { from = 10.4, to = 33.8, armySeconds = 25, tick = 0.5 } },
 		-- his passive aura while he is on a grave: +10% damage for the whole army (Army.auraMultiplier; auras of one kind do
 		-- not stack, the strongest counts)
 		aura = { damage = 0.10 },
@@ -492,6 +492,50 @@ local function isSovereign(unitType)
 	return def ~= nil and def.sovereign == true
 end
 
+-- ============================================================
+-- Abilities, as the Codex unit page shows them (the numbers come from the defs above, so the page and the server agree).
+-- Per unit a list of { name, kind = "Special" | "Aura" | "Finisher", text = function(def, Economy) -> string,
+-- unlock = { state = <State key that owns it>, price = <Economy key>, buy = <BuyGemItem item> } (locked until owned) }.
+-- In `text`, {braces} mark the numbers the page highlights.
+-- ============================================================
+local function ownDamageSeconds(def)
+	return math.floor(def.special.share * def.special.cooldown + 0.5)
+end
+local ABILITIES = {
+	Knell = {
+		{ name = "The Procession", kind = "Special", text = function(def)
+			return ("Every {%d s} Knell tolls the bell: pallbearers carry a chained coffin to the wall and a black-red claw rakes through it, dealing {%d s} of Knell's own damage.")
+				:format(def.special.cooldown, ownDamageSeconds(def))
+		end },
+	},
+	Hush = {
+		{ name = "Rift Chains", kind = "Special", text = function(def)
+			return ("Every {%d s} Hush tears a rift into reality: chains swarm out, bite into the wall and explode, dealing {%d s} of Hush's own damage.")
+				:format(def.special.cooldown, ownDamageSeconds(def))
+		end },
+	},
+	Sigilwright = {
+		{ name = "The Verdict", kind = "Special", text = function(def)
+			return ("Every {%d s} the Sigilwright writes a sentence of {5} runes over the wall and speaks it: every word fires a bolt of judgement, together {%d s} of its own damage.")
+				:format(def.special.cooldown, ownDamageSeconds(def))
+		end },
+	},
+	Malak = {
+		{ name = "Requisition", kind = "Special", text = function(def)
+			local sw = def.special.swarm
+			return ("Every {%d s} a supply pod drops from the Absolution. Its dispenser launches {6} drones that strafe the wall for {%d s}, dealing {%d s} of your whole army's damage. Malak keeps fighting meanwhile.")
+				:format(def.special.cooldown, math.floor(sw.to - sw.from + 1.6 + 0.5), sw.armySeconds)
+		end },
+		{ name = "Envoy's Command", kind = "Aura", text = function(def)
+			return ("While Malak stands on a grave, your whole army deals {+%d%%} damage."):format(math.floor(def.aura.damage * 100 + 0.5))
+		end },
+		{ name = "Fleet Strike", kind = "Finisher", text = function(_, Economy)
+			return ("When the gate falls below {%d%%} HP, Malak calls in the Absolution: the fleet tears out of the sky and its main cannon brings the gate down. Everyone on the server sees it.")
+				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
+		end, unlock = { state = "fleetStrike", price = "FLEET_STRIKE_PRICE", buy = "FleetStrike" } },
+	},
+}
+
 -- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
 local RENAMED = {
 	Goblin = "HollowArcher",
@@ -500,6 +544,7 @@ local RENAMED = {
 
 return {
 	Stats = UNITS,
+	Abilities = ABILITIES,
 	RENAMED = RENAMED,
 	isSignature = isSignature,
 	isSovereign = isSovereign,
