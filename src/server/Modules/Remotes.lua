@@ -13,6 +13,7 @@ local EVENTS = {
 	"DevGiveGold",
 	"DevFastSpecials",
 	"DevFleetStrike", -- (on) Studio: start / stop a Fleet Strike finisher on your plot (FleetStrike.lua previews it)
+	"RarePull", -- server -> all clients ({ userId, name, unitType, oneIn }): someone pulled a Signature / Sovereign (client RarePullBanner)
 	"DevBreakAll", -- Studio: break every wall including the gate (loot and all), so you can ascend
 	"DevGateLow", -- Studio: break walls up to the gate and set it just above 20% HP (to test the Fleet Strike trigger)
 	"SaveSettings", -- ({ master, effects, music } volumes 0..1): the Settings panel (PlayerData)

@@ -60,6 +60,10 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 		PlayerData.addUnit(player, unitType, oneIn)
 		PlayerData.recordPull(player, unitType) -- (the Codex)
 		ShowcasePulls.record(player, unitType) -- (the Reliquary's "Pulled by")
+		if Units.isSignature(unitType) or Units.isSovereign(unitType) then
+			-- every player sees a banner (the puller has the cinematic instead)
+			Remotes.RarePull:FireAllClients({ userId = player.UserId, name = player.DisplayName, unitType = unitType, oneIn = oneIn })
+		end
 
 		table.insert(results, { unitType = unitType, rarity = rarity, pity = getPity(player, graveType), oneIn = oneIn })
 		print("🪦 " .. player.Name .. " dug up: " .. unitType .. " (" .. rarity .. ")")
