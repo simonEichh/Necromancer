@@ -494,10 +494,17 @@ end
 
 -- ============================================================
 -- Abilities, as the Codex unit page shows them (the numbers come from the defs above, so the page and the server agree).
--- Per unit a list of { name, kind = "Special" | "Aura" | "Finisher", text = function(def, Economy) -> string,
+-- Per unit a list of { name, kind = "Passive" | "Special" | "Finisher", text = function(def, Economy) -> string,
 -- unlock = { state = <State key that owns it>, price = <Economy key>, buy = <BuyGemItem item> } (locked until owned) }.
 -- In `text`, {braces} mark the numbers the page highlights.
 -- ============================================================
+local function shortNumber(n)
+	n = math.floor(n + 0.5)
+	if n >= 1e9 then return ("%.1fB"):format(n / 1e9) end
+	if n >= 1e6 then return ("%.1fM"):format(n / 1e6) end
+	if n >= 1e4 then return ("%.1fK"):format(n / 1e3) end
+	return tostring(n)
+end
 local function ownDamageSeconds(def)
 	return math.floor(def.special.share * def.special.cooldown + 0.5)
 end
@@ -526,8 +533,10 @@ local ABILITIES = {
 			return ("Every {%d s} a supply pod drops from the Absolution. Its dispenser launches {6} drones that strafe the wall for {%d s}, dealing {%d s} of your whole army's damage. Malak keeps fighting meanwhile.")
 				:format(def.special.cooldown, math.floor(sw.to - sw.from + 1.6 + 0.5), sw.armySeconds)
 		end },
-		{ name = "Envoy's Command", kind = "Aura", text = function(def)
-			return ("While Malak stands on a grave, your whole army deals {+%d%%} damage."):format(math.floor(def.aura.damage * 100 + 0.5))
+		{ name = "Envoy's Command", kind = "Passive", text = function(def)
+			local c = def.companion
+			return ("His drone fires its own volley at the wall every {%s s} for {%s} damage. While Malak stands on a grave, your whole army deals {+%d%%} damage.")
+				:format(tostring(c.period), shortNumber(def.damage / def.attackCD * c.share * c.period), math.floor(def.aura.damage * 100 + 0.5))
 		end },
 		{ name = "Fleet Strike", kind = "Finisher", text = function(_, Economy)
 			return ("When the gate falls below {%d%%} HP, Malak calls in the Absolution: the fleet tears out of the sky and its main cannon brings the gate down. Everyone on the server sees it.")
@@ -535,6 +544,88 @@ local ABILITIES = {
 		end, unlock = { state = "fleetStrike", price = "FLEET_STRIKE_PRICE", buy = "FleetStrike" } },
 	},
 }
+
+-- ============================================================
+-- Descriptions for the Codex unit page: a plain line or two for the normal units, a little lore for the Signatures
+-- and Sovereigns. (First drafts, 2026-10-16: rewrite freely.)
+-- ============================================================
+local DESCRIPTIONS = {
+	Skelly = "A soldier picked clean by time, raised with a rusted blade still in hand. It does not tire, does not question, and does not stop.",
+	Zombie = "A shambling corpse with more stubbornness than sense. It batters the wall with whatever it has left.",
+	Ghoul = "A crawling grave-robber with long claws and a longer hunger. It leaps at stone as if it were flesh.",
+	CryptSpider = "A spider that made its nest inside a human skull, and never left. It spits venom that eats through mortar.",
+	HollowArcher = "A dead archer who never abandoned his post. His arrows still fly true; his eyes are long gone.",
+	Wraith = "A cold shape of grief and fog. Walls mean little to something that was never quite there.",
+	CryptBat = "A swarm-born bat of the crypts, all teeth and wings. It strikes fast and comes back for more.",
+	BaronBone = "A skeletal nobleman in a tall hat, still convinced he owns the place. He fights with the arrogance of old money.",
+	PlagueDoctor = "A masked physician who stopped trying to cure the plague and started carrying it instead.",
+	ShadowHound = "A hound stitched from shadow, loyal only to the one who called it. It hunts the wall like prey.",
+	BoneColossus = "Hundreds of bones fused into one lumbering giant. Slow to start, impossible to stop.",
+	Banshee = "A weeping spirit whose scream cracks stone. Those who hear it rarely forget it.",
+	LichAcolyte = "A student of forbidden rites, halfway to lichdom. Its spells are clumsy but its devotion is not.",
+	DreadKnight = "A knight in black plate who swore an oath to death itself. He keeps it with every swing.",
+	SkeletonKing = "A crowned skeleton who ruled a kingdom of the dead. He still expects to be obeyed.",
+	LichLord = "A master of death magic who traded his heart for eternity. His power has only grown since.",
+	DeathReaper = "The hooded collector of souls. Its scythe was made for harvests, and the wall is no exception.",
+	VoidWalker = "A traveller from the empty places between worlds. Where it steps, light forgets to follow.",
+	SoulEater = "A ravenous spirit that feeds on what remains of the dead. Every soul it takes makes it stronger.",
+	AbyssalTitan = "A colossus dragged up from the abyss. It strikes with the weight of the deep.",
+	ShadeLord = "A lord of shades who commands darkness like a court. Even other spirits keep their distance.",
+	EldritchFiend = "A thing with too many eyes and no single shape. Looking at it too long is unwise.",
+	MindShatterer = "An eldritch horror that breaks minds before it breaks walls. Its whispers echo in stone.",
+	TheUndying = "It has been killed more times than anyone can count. It always gets back up.",
+	DeathIncarnate = "Not a servant of death, but death given form. The air grows still when it arrives.",
+	LastLantern = "A colossal tower that rises from the earth far behind the army, burning the wall with a ray of captured souls.",
+	Knell = "The bell of a drowned chapel, rung once for every soul it buried. When the village was gone the bell kept tolling, and something answered. Now Knell walks, and the dead walk behind it in procession.",
+	Hush = "A child found in a sealed ward, still wearing the gas mask the nurses gave it. It never breathed again, and it never came down. It does not speak. It only points.",
+	Sigilwright = "A scribe of the old courts who wrote the sentences that kings would speak. Death took the kings; the scribe kept writing. Every verdict it writes is final, and every word of it burns.",
+	Malak = "An envoy of a High Command no one in this realm has ever seen. He arrived from a tear in the sky, aboard a warship that does not answer to the dead, and he did not come to serve. He came to negotiate, and his terms are written in orbital fire.",
+}
+
+-- The basic attack, for the Codex unit page: { name, how } per unit (`how` starts the sentence; the interval and the
+-- base damage per hit are added from the def; the damage a special or a companion takes is left out of the hit).
+local BASIC = {
+	Skelly = { "Rusted Blade", "Slashes the wall with its rusted blade" },
+	Zombie = { "Rotting Fists", "Pounds the wall with its fists" },
+	Ghoul = { "Pounce", "Leaps up and rakes the wall with its claws" },
+	CryptSpider = { "Venom Spit", "Spits a glob of venom at the wall" },
+	HollowArcher = { "Grave Arrow", "Looses an arrow at the wall" },
+	Wraith = { "Chilling Touch", "Reaches into the wall with a chilling touch" },
+	CryptBat = { "Dive", "Dives and bites at the wall" },
+	BaronBone = { "Noble Strike", "Strikes the wall" },
+	PlagueDoctor = { "Plague Strike", "Strikes the wall" },
+	ShadowHound = { "Shadow Bite", "Lunges and bites at the wall" },
+	BoneColossus = { "Bone Fist", "Smashes the wall with a fist of bone" },
+	Banshee = { "Wail", "Screams at the wall" },
+	LichAcolyte = { "Dark Bolt", "Casts a bolt of dark magic at the wall" },
+	DreadKnight = { "Cleave", "Cleaves the wall with his blade" },
+	SkeletonKing = { "Royal Strike", "Strikes the wall" },
+	LichLord = { "Death Magic", "Casts death magic at the wall" },
+	DeathReaper = { "Reap", "Reaps the wall with its scythe" },
+	VoidWalker = { "Void Strike", "Strikes the wall out of the void" },
+	Knell = { "Toll", "Tolls its bell, and the sound strikes the wall" },
+	SoulEater = { "Devour", "Tears at the wall" },
+	AbyssalTitan = { "Abyssal Slam", "Slams the wall" },
+	ShadeLord = { "Shade Strike", "Strikes the wall with darkness" },
+	EldritchFiend = { "Rend", "Rends the wall" },
+	MindShatterer = { "Shatter", "Strikes the wall" },
+	TheUndying = { "Relentless", "Strikes the wall" },
+	Hush = { "Finger Beam", "Points a claw finger and fires a thin beam at the wall" },
+	DeathIncarnate = { "Final Touch", "Strikes the wall" },
+	LastLantern = { "Soul Ray", "Burns the wall with a ray of captured souls" },
+	Sigilwright = { "Sigil Darts", "Opens sigil circles in the air and fires a stream of darts at the wall" },
+	Malak = { "Orbital Tag", "Marks the wall with a red targeting laser, and a shell from orbit strikes it" },
+}
+local function basicAttack(unitType)
+	local def = UNITS[unitType]
+	if not def then return nil end
+	local b = BASIC[unitType] or { "Basic Attack", "Strikes the wall" }
+	return { name = b[1], kind = "Basic", text = function(d)
+		local share = (d.special and d.special.share or 0) + (d.companion and d.companion.share or 0)
+		local every = d.attackCD == math.floor(d.attackCD) and tostring(d.attackCD) or ("%.1f"):format(d.attackCD)
+		return ("%s every {%s s} for {%s} damage."):format(b[2], every, shortNumber(d.damage * (1 - share)))
+	end }
+end
 
 -- Units that were replaced or renamed: old saves still hold the old key and are migrated on load (Persistence)
 local RENAMED = {
@@ -545,6 +636,8 @@ local RENAMED = {
 return {
 	Stats = UNITS,
 	Abilities = ABILITIES,
+	Descriptions = DESCRIPTIONS,
+	basicAttack = basicAttack,
 	RENAMED = RENAMED,
 	isSignature = isSignature,
 	isSovereign = isSovereign,

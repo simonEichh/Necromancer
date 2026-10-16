@@ -40,7 +40,9 @@ local PAGE_EDGE = Color3.fromRGB(122, 98, 62)
 local INK = Color3.fromRGB(222, 210, 182)
 local INK_DIM = Color3.fromRGB(150, 138, 116)
 local HIGHLIGHT = "#F2C46B" -- (the numbers in ability texts)
-local KIND_COLOR = { Special = Color3.fromRGB(190, 150, 255), Aura = Color3.fromRGB(120, 230, 170), Finisher = Color3.fromRGB(255, 140, 110) }
+local KIND_COLOR = { Passive = Color3.fromRGB(120, 230, 170), Basic = Color3.fromRGB(222, 210, 182), Special = Color3.fromRGB(190, 150, 255), Finisher = Color3.fromRGB(255, 140, 110) }
+local KIND_ORDER = { Passive = 1, Basic = 2, Special = 3, Finisher = 4 } -- (the passive always first)
+local KIND_LABEL = { Basic = "BASIC ATTACK" }
 
 local function smooth(x)
 	x = math.clamp(x, 0, 1)
@@ -265,23 +267,72 @@ local function dtext(parent, props)
 end
 local bigHolder = Instance.new("Frame")
 bigHolder.BackgroundTransparency = 1
-bigHolder.Size = UDim2.fromScale(0.84, 0.5)
-bigHolder.Position = UDim2.fromScale(0.08, 0.04)
+bigHolder.Size = UDim2.fromScale(0.84, 0.38)
+bigHolder.Position = UDim2.fromScale(0.08, 0.03)
 bigHolder.ZIndex = 11
 bigHolder.Parent = detailLeft
 local bigPortrait = UnitPortrait.attach(bigHolder, { size = UDim2.fromScale(1, 1), zIndex = 12, animate = true }) -- (plays its idle)
-local dName = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.08), position = UDim2.fromScale(0.08, 0.56), align = Enum.TextXAlignment.Center })
-local dTitle = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.045), position = UDim2.fromScale(0.08, 0.645), font = Enum.Font.Garamond, color = INK_DIM, align = Enum.TextXAlignment.Center })
-local dRarity = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.045), position = UDim2.fromScale(0.08, 0.7), font = Enum.Font.GothamBold, align = Enum.TextXAlignment.Center })
+local dName = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.07), position = UDim2.fromScale(0.08, 0.42), align = Enum.TextXAlignment.Center })
+local dTitle = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.04), position = UDim2.fromScale(0.08, 0.495), font = Enum.Font.Garamond, color = INK_DIM, align = Enum.TextXAlignment.Center })
+local dRarity = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.04), position = UDim2.fromScale(0.08, 0.54), font = Enum.Font.GothamBold, align = Enum.TextXAlignment.Center })
 local dStats = {}
 for k = 1, 3 do
-	dStats[k] = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.042), position = UDim2.fromScale(0.08, 0.76 + (k - 1) * 0.05), font = Enum.Font.GothamMedium, color = INK_DIM, align = Enum.TextXAlignment.Center })
+	dStats[k] = dtext(detailLeft, { size = UDim2.fromScale(0.27, 0.035), position = UDim2.fromScale(0.08 + (k - 1) * 0.285, 0.595), font = Enum.Font.GothamMedium, color = INK_DIM, align = Enum.TextXAlignment.Center })
 end
+-- the description (Units.Descriptions): a plain line for normal units, a little lore for Signatures and Sovereigns
+local descBox = Instance.new("Frame")
+descBox.BackgroundColor3 = Color3.fromRGB(34, 28, 25)
+descBox.BorderSizePixel = 0
+descBox.Size = UDim2.fromScale(0.84, 0.26)
+descBox.Position = UDim2.fromScale(0.08, 0.65)
+descBox.ZIndex = 11
+descBox.Parent = detailLeft
+Theme.corner(descBox, 8)
+Theme.stroke(descBox, PAGE_EDGE, 1)
+local dDesc = dtext(descBox, { size = UDim2.fromScale(0.9, 0.84), position = UDim2.fromScale(0.05, 0.08), font = Enum.Font.Garamond, color = INK })
+dDesc.ZIndex = 12
+dDesc.TextWrapped = true
+dDesc.TextYAlignment = Enum.TextYAlignment.Top
+local descLimit = Instance.new("UITextSizeConstraint")
+descLimit.MaxTextSize = 30
+descLimit.Parent = dDesc
 local backBtn = Theme.stoneButton(detailLeft, {
 	text = "< Back", size = UDim2.fromOffset(110, 36), position = UDim2.fromScale(0.04, 0.985), anchor = Vector2.new(0, 1), zIndex = 13,
 	onClick = function() CodexPanel.back() end,
 })
-dtext(detailRight, { text = "ABILITIES", size = UDim2.fromScale(0.84, 0.07), position = UDim2.fromScale(0.08, 0.04) })
+dtext(detailRight, { text = "ABILITIES", size = UDim2.fromScale(0.5, 0.07), position = UDim2.fromScale(0.08, 0.04) })
+-- base numbers (a level 0 unit, no ascension) or YOUR numbers (your ascensions, Army Might, your best copy's level and
+-- the strongest aura among your placed units: the same factors as the server's Army.ownerDamageMultiplier)
+local showYours = false
+local paintDetail
+local yoursBtn = Theme.stoneButton(detailRight, {
+	text = "Base damage", size = UDim2.fromOffset(170, 34), position = UDim2.fromScale(0.93, 0.045), anchor = Vector2.new(1, 0), zIndex = 13,
+	onClick = function()
+		showYours = not showYours
+		paintDetail()
+	end,
+})
+local function bestLevel(unitType)
+	local best
+	for _, u in pairs(State.inventory or {}) do
+		if u.unitType == unitType then best = math.max(best or 0, u.level or 0) end
+	end
+	for _, u in ipairs(State.placed or {}) do
+		if u.unitType == unitType then best = math.max(best or 0, u.level or 0) end
+	end
+	return best
+end
+local function yourMultiplier(unitType)
+	local mult = Economy.damageMultiplier(State.rebirthCount or 0)
+		* Economy.realmUpgradeEffect("might", (State.realmUpgrades or {}).might or 0)
+		* Economy.levelMultiplier(bestLevel(unitType) or 0)
+	local aura = 0
+	for _, u in ipairs(State.placed or {}) do
+		local d = Units.Stats[u.unitType]
+		if d and d.aura and d.aura.damage then aura = math.max(aura, d.aura.damage) end
+	end
+	return mult * (1 + aura)
+end
 local abilityList = Instance.new("Frame")
 abilityList.BackgroundTransparency = 1
 abilityList.Size = UDim2.fromScale(0.86, 0.84)
@@ -296,16 +347,20 @@ listLayout.Parent = abilityList
 -- "{25 s}" -> the number highlighted (rich text)
 local function highlight(str)
 	str = str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
-	return (str:gsub("{(.-)}", '<font color="' .. HIGHLIGHT .. '"><b>%1</b></font>'))
+	return (str:gsub("{(.-)}", function(num)
+		-- (a non-breaking space inside, so "4.5 s" never breaks over two lines)
+		local kept = num:gsub(" ", "\u{00A0}")
+		return '<font color="' .. HIGHLIGHT .. '"><b>' .. kept .. "</b></font>"
+	end))
 end
 
-local function abilityCard(order, ab, def, discovered)
+local function abilityCard(order, ab, def, discovered, height)
 	local unlock = ab.unlock
 	local locked = unlock ~= nil and not State[unlock.state]
 	local card = Instance.new("Frame")
 	card.BackgroundColor3 = Color3.fromRGB(34, 28, 25)
 	card.BorderSizePixel = 0
-	card.Size = UDim2.fromScale(1, locked and 0.36 or 0.29)
+	card.Size = UDim2.fromScale(1, height)
 	card.LayoutOrder = order
 	card.ZIndex = 11
 	card.Parent = abilityList
@@ -314,7 +369,7 @@ local function abilityCard(order, ab, def, discovered)
 	local kindColor = KIND_COLOR[ab.kind] or INK
 	local nameLbl = dtext(card, { text = discovered and string.upper(ab.name) or "???", size = UDim2.fromScale(0.54, 0.2), position = UDim2.fromScale(0.04, 0.06), color = locked and INK_DIM or kindColor })
 	nameLbl.ZIndex = 12
-	local tag = dtext(card, { text = string.upper(ab.kind) .. (locked and "  -  LOCKED" or ""), size = UDim2.fromScale(0.36, 0.11), position = UDim2.fromScale(0.6, 0.09), font = Enum.Font.GothamBold, color = locked and INK_DIM or kindColor, align = Enum.TextXAlignment.Right })
+	local tag = dtext(card, { text = (KIND_LABEL[ab.kind] or string.upper(ab.kind)) .. (locked and "  -  LOCKED" or ""), size = UDim2.fromScale(0.36, 0.11), position = UDim2.fromScale(0.6, 0.09), font = Enum.Font.GothamBold, color = locked and INK_DIM or kindColor, align = Enum.TextXAlignment.Right })
 	tag.ZIndex = 12
 	local body = dtext(card, { size = UDim2.fromScale(0.92, locked and 0.42 or 0.66), position = UDim2.fromScale(0.04, 0.3), font = Enum.Font.GothamMedium, color = locked and INK_DIM or INK })
 	body.ZIndex = 12
@@ -348,12 +403,19 @@ local function abilityCard(order, ab, def, discovered)
 	end
 end
 
-local function paintDetail()
+paintDetail = function()
 	local unitType = detail.unitType
 	if not unitType then
 		return
 	end
-	local def = Units.Stats[unitType]
+	local baseDef = Units.Stats[unitType]
+	local def = baseDef
+	local level = bestLevel(unitType)
+	if showYours then
+		def = table.clone(baseDef)
+		def.damage = baseDef.damage * yourMultiplier(unitType)
+	end
+	yoursBtn.label.Text = showYours and ("Your damage" .. (level and ("  Lv " .. level) or "")) or "Base damage"
 	local n = (State.codex or {})[unitType]
 	local rarity = Units.Rarity[unitType] or "Common"
 	local color = Rarities.Color[rarity] or INK
@@ -368,33 +430,37 @@ local function paintDetail()
 	dRarity.Text = string.upper(rarity) .. (Units.isSovereign(unitType) and "  SOVEREIGN" or (Units.isSignature(unitType) and "  SIGNATURE" or ""))
 	dRarity.TextColor3 = color
 	dStats[1].Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
-	dStats[2].Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
+	dStats[2].Text = n and ((showYours and "DPS  " or "Base DPS  ") .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
 	dStats[3].Text = n and ("Pulled  " .. n .. "x") or "Not yet discovered"
+	dDesc.Text = n and (Units.Descriptions[unitType] or "") or "Discover this unit to read about it."
+	dDesc.TextColor3 = n and INK or INK_DIM
 	for _, c in ipairs(abilityList:GetChildren()) do
 		if c:IsA("GuiObject") then
 			c:Destroy()
 		end
 	end
-	local list = Units.Abilities[unitType]
-	if list then
-		-- the aura always comes first, then the rest in their order
-		local ordered = {}
-		for _, ab in ipairs(list) do
-			if ab.kind == "Aura" then
-				table.insert(ordered, ab)
-			end
+	-- the passive first, then the basic attack, the special and the finisher
+	local ordered = {}
+	local basic = Units.basicAttack(unitType)
+	if basic then
+		table.insert(ordered, basic)
+	end
+	for _, ab in ipairs(Units.Abilities[unitType] or {}) do
+		table.insert(ordered, ab)
+	end
+	table.sort(ordered, function(a, b) return (KIND_ORDER[a.kind] or 9) < (KIND_ORDER[b.kind] or 9) end)
+	-- the cards share the page (a locked one is a little taller for its Unlock button); never taller than 0.29
+	local lockedCount = 0
+	for _, ab in ipairs(ordered) do
+		if ab.unlock and not State[ab.unlock.state] then
+			lockedCount += 1
 		end
-		for _, ab in ipairs(list) do
-			if ab.kind ~= "Aura" then
-				table.insert(ordered, ab)
-			end
-		end
-		for i, ab in ipairs(ordered) do
-			abilityCard(i, ab, def, n ~= nil)
-		end
-	else
-		local none = dtext(abilityList, { text = "No special abilities. It fights with its basic attack.", size = UDim2.fromScale(1, 0.08), font = Enum.Font.GothamMedium, color = INK_DIM })
-		none.TextWrapped = true
+	end
+	local gap = 0.025
+	local unit = math.min(0.29, (1 - gap * (#ordered - 1)) / (#ordered + lockedCount * 0.25))
+	for i, ab in ipairs(ordered) do
+		local locked = ab.unlock and not State[ab.unlock.state]
+		abilityCard(i, ab, def, n ~= nil, locked and unit * 1.25 or unit)
 	end
 end
 
