@@ -43,6 +43,10 @@ local HIGHLIGHT = "#F2C46B" -- (the numbers in ability texts)
 local KIND_COLOR = { Family = Color3.fromRGB(200, 175, 130), Passive = Color3.fromRGB(120, 230, 170), Basic = Color3.fromRGB(222, 210, 182), Special = Color3.fromRGB(190, 150, 255), Finisher = Color3.fromRGB(255, 140, 110) }
 local KIND_ORDER = { Passive = 1, Family = 1, Basic = 2, Special = 3, Finisher = 4 } -- (the passive / the family first)
 local KIND_LABEL = { Basic = "BASIC ATTACK", Family = "FAMILY", Passive = "UNIQUE TRAIT" }
+local FAMILY_COLOR = {
+	Bones = Color3.fromRGB(222, 210, 182), Flesh = Color3.fromRGB(196, 110, 100), Spirits = Color3.fromRGB(140, 220, 230),
+	Beasts = Color3.fromRGB(200, 160, 100), Arcane = Color3.fromRGB(180, 140, 255),
+}
 
 local function smooth(x)
 	x = math.clamp(x, 0, 1)
@@ -146,10 +150,22 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 	local stroke = Theme.stroke(f, PAGE_EDGE, 2)
 	local portraitHolder = Instance.new("Frame")
 	portraitHolder.BackgroundTransparency = 1
-	portraitHolder.Size = UDim2.fromScale(0.36, 0.92)
+	portraitHolder.Size = UDim2.fromScale(0.36, 0.74)
 	portraitHolder.Position = UDim2.fromScale(0.02, 0.04)
 	portraitHolder.Parent = f
 	local portrait = UnitPortrait.attach(portraitHolder, { size = UDim2.fromScale(1, 1), zIndex = 3 })
+	local traits = text(f, {
+		size = UDim2.fromScale(0.36, 0.13), position = UDim2.fromScale(0.02, 0.82),
+		font = Enum.Font.GothamBold, align = Enum.TextXAlignment.Center,
+	})
+	traits.Name = "TraitLabel"
+	traits.BackgroundTransparency = 0
+	traits.BackgroundColor3 = Color3.fromRGB(24, 20, 18)
+	Theme.corner(traits, 5)
+	local traitStroke = Theme.stroke(traits, PAGE_EDGE, 1)
+	local traitPadding = Instance.new("UIPadding", traits)
+	traitPadding.PaddingLeft, traitPadding.PaddingRight = UDim.new(0.04, 0), UDim.new(0.04, 0)
+	traitPadding.PaddingTop, traitPadding.PaddingBottom = UDim.new(0.12, 0), UDim.new(0.12, 0)
 	local name = text(f, { size = UDim2.fromScale(0.58, 0.22), position = UDim2.fromScale(0.4, 0.05) })
 	-- the unit's title under its name, like a Dead by Daylight killer's ("The Envoy"; `title` in its def; also shown undiscovered)
 	local title = text(f, { size = UDim2.fromScale(0.58, 0.1), position = UDim2.fromScale(0.4, 0.26), font = Enum.Font.Garamond, color = INK_DIM })
@@ -165,7 +181,7 @@ for i, slot in ipairs(ENTRY_SLOTS) do
 	open.Parent = f
 	local hint = text(f, { size = UDim2.fromScale(0.3, 0.1), position = UDim2.fromScale(0.67, 0.86), font = Enum.Font.GothamMedium, color = INK_DIM, align = Enum.TextXAlignment.Right })
 	hint.Text = "Read more"
-	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, title = title, odds = odds, dps = dps, pulled = pulled, open = open, hint = hint }
+	entries[i] = { frame = f, stroke = stroke, portrait = portrait, name = name, title = title, odds = odds, dps = dps, pulled = pulled, open = open, hint = hint, traits = traits, traitStroke = traitStroke }
 end
 
 -- page turning, bookmarks, close
@@ -272,10 +288,6 @@ bigHolder.Position = UDim2.fromScale(0.08, 0.03)
 bigHolder.ZIndex = 11
 bigHolder.Parent = detailLeft
 -- the family badge (or COMMANDER) over the portrait's corner; hovering it shows the family's tiers
-local FAMILY_COLOR = {
-	Bones = Color3.fromRGB(222, 210, 182), Flesh = Color3.fromRGB(196, 110, 100), Spirits = Color3.fromRGB(140, 220, 230),
-	Beasts = Color3.fromRGB(200, 160, 100), Arcane = Color3.fromRGB(180, 140, 255),
-}
 local badge = Instance.new("TextLabel")
 badge.Size = UDim2.fromScale(0.3, 0.05)
 badge.Position = UDim2.fromScale(0.06, 0.035)
@@ -607,6 +619,16 @@ paint = function()
 				SignatureName.apply(entry.name, unitType)
 			end
 			local def = Units.Stats[unitType]
+			local family = Units.FamilyOf[unitType]
+			local traitNames = {}
+			if family then table.insert(traitNames, string.upper(family)) end
+			for _, ability in ipairs(Units.Abilities[unitType] or {}) do
+				if ability.kind == "Passive" then table.insert(traitNames, string.upper(ability.name)) end
+			end
+			entry.traits.Text = table.concat(traitNames, " / ")
+			entry.traits.Visible = #traitNames > 0
+			entry.traits.TextColor3 = FAMILY_COLOR[family] or KIND_COLOR.Passive
+			entry.traitStroke.Color = entry.traits.TextColor3
 			entry.title.Text = def.title or "" -- (shown even before the unit is discovered: "??? / The Envoy" makes players curious)
 			entry.odds.Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
 			entry.dps.Text = n and ("Base DPS  " .. fmt(math.floor(def.damage / def.attackCD))) or "Base DPS  ???"
