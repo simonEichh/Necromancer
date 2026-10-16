@@ -1,6 +1,6 @@
 -- Builds the Soul Broker's gem stall on the plaza: Workspace.HubDecor.Stall_SoulBroker (a hooded merchant behind a
 -- carved counter, a tall gallery wall with three gilded portraits (the big Featured one in the centre, Bundle left,
--- Potion right) and the Curio portrait on an easel by the counter, a velvet canopy, lanterns, gem chests, potion shelves)
+-- Potion right) and the Curio portrait on an easel front right (where the stall view's camera sees it), a velvet canopy, lanterns, gem chests, potion shelves)
 -- and the invisible interaction anchor Workspace.Shops.SoulBroker (with its ProximityPrompt; the server wires it in
 -- ShopNpcs). Design.md "The Soul Broker". Theme: violet velvet, gold and gem cyan (the grave shop is red, the Forge green).
 -- Each portrait's canvas is a part named "Canvas" with the attribute Portrait = 1..4 (BrokerDeals.PORTRAITS order): the
@@ -472,13 +472,46 @@ do
 	local b = Instance.new("Model")
 	b.Name = "Broker"
 	b.Parent = m
-	disc(b, "RobeHem", 1.9, 0.4, at(bx, TOP + 0.2, 0), VELVET_DARK, Enum.Material.Fabric)
-	disc(b, "RobeLow", 1.75, 3.6, at(bx, TOP + 2.0, 0), VELVET_DARK, Enum.Material.Fabric)
-	disc(b, "RobeMid", 1.45, 2.4, at(bx, TOP + 4.8, 0), VELVET, Enum.Material.Fabric)
-	part(b, "Torso", Vector3.new(1.9, 2.0, 2.9), at(bx, TOP + 5.9, 0), VELVET, Enum.Material.Fabric)
-	part(b, "Shoulders", Vector3.new(2.1, 0.7, 3.7), at(bx, TOP + 6.95, 0), VELVET_DARK, Enum.Material.Fabric)
-	for _, s in ipairs({ -1, 1 }) do
-		ball(b, "Shoulder", 1.3, at(bx, TOP + 6.85, s * 1.75), VELVET_DARK, Enum.Material.Fabric)
+	-- a simple rig for the client's BrokerKeeper (it walks him round the stall): Root at his feet, the Head and the two
+	-- arms are sub-models turning round their attribute Pivot (a position relative to Root); everything else is the body
+	local root = part(b, "Root", Vector3.new(1, 1, 1), at(bx, TOP, 0), BONE)
+	root.Transparency = 1
+	b.PrimaryPart = root
+	local head = Instance.new("Model")
+	head.Name = "Head"
+	head:SetAttribute("Pivot", Vector3.new(0, 7.0, 0)) -- the neck
+	head.Parent = b
+	-- a round tube from a to b (local positions); Roblox cylinders run along X
+	local function tube(parent, name, a, b2, radius, color, material)
+		local pa, pb = origin + a, origin + b2
+		return part(parent, name, Vector3.new((pb - pa).Magnitude, radius * 2, radius * 2),
+			CFrame.lookAt((pa + pb) / 2, pb) * CFrame.Angles(0, math.rad(90), 0), color, material, Enum.PartType.Cylinder)
+	end
+	-- the robe: tapering tiers with a gold hem and a belt, soft vertical folds
+	disc(b, "RobeHem", 2.0, 0.3, at(bx, TOP + 0.15, 0), VELVET_DARK, Enum.Material.Fabric)
+	disc(b, "RobeHemTrim", 2.03, 0.08, at(bx, TOP + 0.34, 0), GOLD_DARK, Enum.Material.Metal)
+	disc(b, "RobeLow", 1.82, 1.9, at(bx, TOP + 1.25, 0), VELVET_DARK, Enum.Material.Fabric)
+	disc(b, "RobeKnee", 1.66, 1.7, at(bx, TOP + 2.95, 0), VELVET_DARK, Enum.Material.Fabric)
+	disc(b, "RobeWaist", 1.46, 1.5, at(bx, TOP + 4.45, 0), VELVET, Enum.Material.Fabric)
+	for k = 0, 11 do
+		local a = k / 12 * 2 * math.pi
+		tube(b, "RobeFold", Vector3.new(bx + math.cos(a) * 1.74, TOP + 0.35, math.sin(a) * 1.74),
+			Vector3.new(bx + math.cos(a) * 1.5, TOP + 3.9, math.sin(a) * 1.5), 0.16, VELVET, Enum.Material.Fabric)
+	end
+	disc(b, "Belt", 1.5, 0.22, at(bx, TOP + 4.55, 0), GOLD_DARK, Enum.Material.Metal)
+	gemstone(b, "BeltGem", 0.3, at(bx - 1.5, TOP + 4.55, 0), GEM_VIOLET)
+	-- chest and shoulders: round, a capelet with a beaded gold edge
+	disc(b, "Torso", 1.3, 1.6, at(bx, TOP + 5.4, 0), VELVET, Enum.Material.Fabric)
+	ball(b, "Chest", 2.7, at(bx, TOP + 5.8, 0), VELVET, Enum.Material.Fabric)
+	tube(b, "ShoulderRoll", Vector3.new(bx, TOP + 6.85, -1.7), Vector3.new(bx, TOP + 6.85, 1.7), 0.7, VELVET_DARK, Enum.Material.Fabric)
+	for _, s2 in ipairs({ -1, 1 }) do
+		ball(b, "Shoulder", 1.45, at(bx, TOP + 6.85, s2 * 1.75), VELVET_DARK, Enum.Material.Fabric)
+	end
+	disc(b, "Capelet", 1.95, 0.24, at(bx, TOP + 7.1, 0), VELVET_DARK, Enum.Material.Fabric)
+	disc(b, "CapeletDrop", 1.75, 0.5, at(bx, TOP + 6.8, 0), VELVET_DARK, Enum.Material.Fabric)
+	for k = 0, 17 do
+		local a = k / 18 * 2 * math.pi
+		ball(b, "CapeletBead", 0.2, at(bx + math.cos(a) * 1.96, TOP + 6.98, math.sin(a) * 1.96), GOLD, Enum.Material.Metal)
 	end
 	-- gold-trimmed mantle opening and a hanging gem amulet
 	part(b, "MantleTrimL", Vector3.new(0.08, 2.6, 0.16), at(bx - 0.97, TOP + 5.7, -0.35) * CFrame.Angles(0.12, 0, 0), GOLD, Enum.Material.Metal)
@@ -492,12 +525,21 @@ do
 	local amulet = part(b, "Amulet", Vector3.new(0.16, 0.38, 0.38), at(bx - 1.06, TOP + 5.85, 0) * CFrame.Angles(math.rad(45), 0, 0), GEM, Enum.Material.Neon)
 	light(amulet, GEM, 6, 0.8)
 	-- the hood: a deep cowl with a black void where the face should be
-	ball(b, "Hood", 2.5, at(bx + 0.1, TOP + 8.0, 0), VELVET_DARK, Enum.Material.Fabric)
-	wedge(b, "HoodPeak", Vector3.new(1.2, 1.2, 1.4), at(bx + 0.5, TOP + 9.2, 0) * CFrame.Angles(0, math.rad(-90), 0), VELVET_DARK, Enum.Material.Fabric)
-	part(b, "HoodRim", Vector3.new(0.3, 2.2, 2.0), at(bx - 0.9, TOP + 7.95, 0), VELVET, Enum.Material.Fabric)
-	ball(b, "Void", 1.75, at(bx - 0.45, TOP + 7.85, 0), Color3.fromRGB(4, 2, 8), Enum.Material.SmoothPlastic)
+	ball(head, "Hood", 2.6, at(bx + 0.1, TOP + 8.0, 0), VELVET_DARK, Enum.Material.Fabric)
+	ball(head, "HoodBack", 2.2, at(bx + 0.55, TOP + 7.3, 0), VELVET_DARK, Enum.Material.Fabric)
+	-- a droopy pointed tip falling back
+	ball(head, "HoodTip", 1.5, at(bx + 0.75, TOP + 8.85, 0), VELVET_DARK, Enum.Material.Fabric)
+	ball(head, "HoodTip", 1.0, at(bx + 1.25, TOP + 9.15, 0), VELVET_DARK, Enum.Material.Fabric)
+	ball(head, "HoodTip", 0.6, at(bx + 1.65, TOP + 9.1, 0), VELVET_DARK, Enum.Material.Fabric)
+	ball(head, "HoodTip", 0.34, at(bx + 1.92, TOP + 8.92, 0), GOLD, Enum.Material.Metal)
+	-- a soft ring of fabric round the face opening
+	for k = 0, 13 do
+		local a = k / 14 * 2 * math.pi
+		ball(head, "HoodRim", 0.62, at(bx - 0.95, TOP + 7.9 + math.cos(a) * 1.0, math.sin(a) * 0.95), VELVET, Enum.Material.Fabric)
+	end
+	ball(head, "Void", 1.75, at(bx - 0.45, TOP + 7.85, 0), Color3.fromRGB(4, 2, 8), Enum.Material.SmoothPlastic)
 	for _, s in ipairs({ -1, 1 }) do
-		local eye = ball(b, "Eye", 0.24, at(bx - 1.25, TOP + 8.0, s * 0.32), GEM, Enum.Material.Neon)
+		local eye = ball(head, "Eye", 0.24, at(bx - 1.25, TOP + 8.0, s * 0.32), GEM, Enum.Material.Neon)
 		if s == 1 then light(eye, GEM, 5, 1) end
 	end
 	-- sleeves from the shoulders down to the counter, skeletal hands resting on it
@@ -505,29 +547,38 @@ do
 		local sh = Vector3.new(bx - 0.2, TOP + 6.6, s * 1.8)
 		local el = Vector3.new(bx - 0.6, TOP + 4.6, s * 2.0)
 		local wr = Vector3.new(CX + 0.35, CT + 0.35, s * 1.5)
-		rod(b, "UpperSleeve", sh, el, 1.0, 1.0, VELVET_DARK, Enum.Material.Fabric)
-		rod(b, "LowerSleeve", el, wr, 0.95, 0.9, VELVET, Enum.Material.Fabric)
-		rod(b, "Cuff", wr + (el - wr).Unit * 0.25, wr, 1.15, 1.05, GOLD_DARK, Enum.Material.Metal)
+		local arm = Instance.new("Model")
+		arm.Name = s < 0 and "ArmL" or "ArmR"
+		arm:SetAttribute("Pivot", Vector3.new(sh.X - bx, sh.Y - TOP, sh.Z)) -- the shoulder
+		arm:SetAttribute("Side", s)
+		arm.Parent = b
+		-- round sleeves with an elbow and a wide bell cuff banded in gold
+		local dir = (wr - el).Unit
+		tube(arm, "UpperSleeve", sh, el, 0.5, VELVET_DARK, Enum.Material.Fabric)
+		ball(arm, "Elbow", 1.0, at(el.X, el.Y, el.Z), VELVET_DARK, Enum.Material.Fabric)
+		tube(arm, "LowerSleeve", el, wr - dir * 0.5, 0.48, VELVET, Enum.Material.Fabric)
+		tube(arm, "SleeveBell", wr - dir * 0.6, wr, 0.68, VELVET, Enum.Material.Fabric)
+		tube(arm, "Cuff", wr - dir * 0.08, wr + dir * 0.04, 0.72, GOLD_DARK, Enum.Material.Metal)
 		-- hand: palm and four long fingers drumming the counter, a thumb
 		local palm = Vector3.new(CX - 0.05, CT + 0.12, s * 1.45)
-		part(b, "Palm", Vector3.new(0.55, 0.14, 0.5), at(palm.X, palm.Y, palm.Z), BONE, Enum.Material.SmoothPlastic)
+		part(arm, "Palm", Vector3.new(0.55, 0.14, 0.5), at(palm.X, palm.Y, palm.Z), BONE, Enum.Material.SmoothPlastic)
 		for f = 0, 3 do
 			local fz = palm.Z - 0.18 + f * 0.12
 			local len = 0.42 + ((f == 1 or f == 2) and 0.08 or 0)
-			rod(b, "Finger", Vector3.new(palm.X - 0.25, palm.Y, fz), Vector3.new(palm.X - 0.25 - len, CT + 0.05, fz), 0.07, 0.07, BONE, Enum.Material.SmoothPlastic)
+			rod(arm, "Finger", Vector3.new(palm.X - 0.25, palm.Y, fz), Vector3.new(palm.X - 0.25 - len, CT + 0.05, fz), 0.07, 0.07, BONE, Enum.Material.SmoothPlastic)
 		end
-		rod(b, "Thumb", Vector3.new(palm.X - 0.1, palm.Y, palm.Z - s * 0.25), Vector3.new(palm.X - 0.35, CT + 0.05, palm.Z - s * 0.5), 0.08, 0.08, BONE, Enum.Material.SmoothPlastic)
+		rod(arm, "Thumb", Vector3.new(palm.X - 0.1, palm.Y, palm.Z - s * 0.25), Vector3.new(palm.X - 0.35, CT + 0.05, palm.Z - s * 0.5), 0.08, 0.08, BONE, Enum.Material.SmoothPlastic)
 		-- a ring on one finger
-		if s == 1 then gemstone(b, "Ring", 0.12, at(palm.X - 0.45, palm.Y + 0.05, palm.Z - 0.06), GEM_VIOLET) end
+		if s == 1 then gemstone(arm, "Ring", 0.12, at(palm.X - 0.45, palm.Y + 0.05, palm.Z - 0.06), GEM_VIOLET) end
 	end
 end
 
 -- ============================================================
--- The Curio portrait on an easel, front left of the counter, turned toward the customer
+-- The Curio portrait on an easel, front right of the counter, turned toward the customer
 -- ============================================================
 do
-	local ex, ez = -4.4, -9.0
-	local turn = CFrame.Angles(0, math.rad(-28), 0) -- faces -X, turned toward the stall's centre line
+	local ex, ez = -2.3, 9.4 -- front right, beside the counter end: the Gem Shop's stall view sees this side (its panel covers the right of the screen)
+	local turn = CFrame.Angles(0, math.rad(34), 0) -- faces -X, turned toward the stall's centre line
 	local base = at(ex, TOP, ez) * turn
 	local lean = CFrame.Angles(0, 0, math.rad(-10)) -- the canvas leans back (top toward +X)
 	for _, dz in ipairs({ -1.1, 1.1 }) do
@@ -538,7 +589,7 @@ do
 	part(m, "EaselTop", Vector3.new(0.2, 0.2, 2.6), base * CFrame.new(0.25, 5.9, 0), WOOD, Enum.Material.Wood)
 	portrait(4, base * CFrame.new(-0.25, 3.75, 0) * lean, 2.6, 3.0)
 	-- a velvet cloth draped over the easel's top corner
-	part(m, "EaselCloth", Vector3.new(0.1, 1.6, 0.9), base * CFrame.new(-0.05, 5.2, 1.25) * CFrame.Angles(0.3, 0, 0), VELVET, Enum.Material.Fabric)
+	part(m, "EaselCloth", Vector3.new(0.1, 1.6, 0.9), base * CFrame.new(-0.05, 5.2, -1.25) * CFrame.Angles(-0.3, 0, 0), VELVET, Enum.Material.Fabric)
 end
 
 -- ============================================================
@@ -566,13 +617,13 @@ local function chest(cf, scale)
 		gemstone(m, "SpilledGem", 0.2, cf * CFrame.new(-1.0 * s - rng:NextNumber(0, 0.6), 0.12, rng:NextNumber(-0.9, 0.9) * s), GEM)
 	end
 end
-chest(at(-4.6, TOP, 9.2) * CFrame.Angles(0, math.rad(20), 0), 1.0)
-chest(at(-2.8, TOP, 10.8) * CFrame.Angles(0, math.rad(-10), 0), 0.75)
+chest(at(-4.6, TOP, -9.2) * CFrame.Angles(0, math.rad(-20), 0), 1.0) -- (front left)
+chest(at(-2.8, TOP, -10.8) * CFrame.Angles(0, math.rad(10), 0), 0.75)
 -- stacked crates of bottles behind the right chest
-part(m, "Crate", Vector3.new(1.6, 1.4, 1.6), at(-0.6, TOP + 0.7, 10.6), WOOD_DARK, Enum.Material.WoodPlanks)
-part(m, "Crate", Vector3.new(1.2, 1.0, 1.2), at(-0.6, TOP + 1.9, 10.5) * CFrame.Angles(0, 0.3, 0), WOOD_DARK, Enum.Material.WoodPlanks)
+part(m, "Crate", Vector3.new(1.6, 1.4, 1.6), at(-0.6, TOP + 0.7, -10.6), WOOD_DARK, Enum.Material.WoodPlanks)
+part(m, "Crate", Vector3.new(1.2, 1.0, 1.2), at(-0.6, TOP + 1.9, -10.5) * CFrame.Angles(0, -0.3, 0), WOOD_DARK, Enum.Material.WoodPlanks)
 for i = 0, 2 do
-	local b = part(m, "CrateBottle", Vector3.new(0.5, 0.3, 0.3), at(-0.9 + i * 0.3, TOP + 1.65, 10.1) * UPRIGHT, bottleColors[i + 1], Enum.Material.Neon, Enum.PartType.Cylinder)
+	local b = part(m, "CrateBottle", Vector3.new(0.5, 0.3, 0.3), at(-0.9 + i * 0.3, TOP + 1.65, -10.1) * UPRIGHT, bottleColors[i + 1], Enum.Material.Neon, Enum.PartType.Cylinder)
 	b.Transparency = 0.15
 end
 
@@ -605,7 +656,7 @@ local function orbit(name, center, radius, count, speed, size)
 	CollectionService:AddTag(om, "SpinFx")
 	om.Parent = m
 end
-orbit("GemOrbitChest", at(-4.6, TOP + 2.9, 9.2), 1.1, 5, 0.6, 0.26)
+orbit("GemOrbitChest", at(-4.6, TOP + 2.9, -9.2), 1.1, 5, 0.6, 0.26)
 orbit("GemOrbitGallery", at(FACE - 0.9, FEATURED_Y, 0) * CFrame.Angles(0, 0, math.rad(90)), 4.2, 10, -0.18, 0.3) -- upright ring round the Featured frame (its up axis faces the customer)
 
 -- ============================================================

@@ -431,8 +431,13 @@ once they exist). Prices are first drafts: check them with the sim.
 **Order:** 1. rules + data DONE 2026-10-16; the Gem Shop panel with the Deals / Wares / Unlocks / Skills tabs DONE (Shop tile, the
 stall's prompt, DEV "Broker"); 2. the stall model with the portrait wall BUILT (`build_broker_stall.lua`, user to review); 3a. the portraits painted per player (client `BrokerPortraits`: SurfaceGuis in PlayerGui on each `Canvas`: the featured
 unit turns in 3D, the rest show their icons; gem price badge, sale ribbon, stock line, SOLD OUT stamp; the brass plates
-were dropped for the badge, the featured frame raised above the broker's hood) DONE 2026-10-16; 3b. the WorldView (click
-portraits and the wares as real objects) and the burn-and-paint rotation; 4. cosmetics in the Curio.
+were dropped for the badge, the featured frame raised above the broker's hood) DONE 2026-10-16; 3a+. the broker comes alive (client `BrokerKeeper`, the user's idea: wanders behind the counter doing comic bits:
+potion held to the light, gem polishing, playing the scale, dozing and startling awake, admiring the featured portrait,
+drumming his fingers; head follows a nearby player; the prompt calls him to the counter and the shop opens when he
+arrives) DONE 2026-10-16; 3b. the in-world view DONE 2026-10-16 (agreed with the user: like the Forge, the camera glides to the counter, the
+stall fills the left, the normal Gem Shop panel stands on the right at once while the broker walks over; hovering a
+portrait gives it a gold rim, a click opens the view if needed and highlights that deal's card; the Shop tile keeps the
+plain panel anywhere); 3c. the wares as real objects on the counter and the burn-and-paint rotation; 4. cosmetics in the Curio.
 
 ## 5. Suggested order (when we get there)
 
