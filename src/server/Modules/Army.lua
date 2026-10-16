@@ -80,6 +80,20 @@ local function ownerDamageMultiplier(plotState)
 	-- ascensions x the realm upgrade Army Might; Swift March is cached here too (read every frame by the movement)
 	plotState.marchMult = Economy.realmUpgradeEffect("march", profile.realmUpgrades.march)
 	return Economy.damageMultiplier(profile.rebirthCount) * Economy.realmUpgradeEffect("might", profile.realmUpgrades.might)
+		* (plotState.auraMult or 1)
+end
+
+-- Signature / Sovereign auras (unit def `aura`, e.g. Malak: { damage = 0.10 }): the strongest aura of each kind among
+-- the plot's units counts (they do not stack). Only "damage" exists so far.
+local function auraMultiplier(plotState)
+	local best = 0
+	for _, u in ipairs(plotState.activeUnits) do
+		local aura = u.def and u.def.aura
+		if aura and aura.damage and u.block and u.block.Parent then
+			best = math.max(best, aura.damage)
+		end
+	end
+	return 1 + best
 end
 
 local function setDamageMultiplier(plotState)
@@ -768,6 +782,65 @@ local function initSpecial(u, now)
 	end
 end
 
+-- Malak's drone swarm (special `swarm`): from `from` to `to` seconds after the start it deals `armySeconds` seconds of
+-- the whole army's current DPS (every unit on the plot, his own included), in ticks of `tick` seconds, always on the
+-- wall being fought (the drones follow the front). Cut short by a Fleet Strike or an ascension (the run restarts): the
+-- model gets SpecialCut (server time) and the client sends the drones home at once.
+local function wallRising(plotState)
+	local m = plotState.wall and plotState.wall:FindFirstChild("WallModel")
+	local riseStart = m and m:GetAttribute("RiseStart")
+	return riseStart ~= nil and workspace:GetServerTimeNow() < riseStart + (m:GetAttribute("RiseTime") or 0)
+end
+
+local function startSwarm(u, plotState, swarm)
+	local startLayer = plotState.wallLayer
+	local ticks = math.max(1, math.floor((swarm.to - swarm.from) / swarm.tick))
+	local stopped = false
+	task.spawn(function()
+		task.wait(swarm.from)
+		local dealt = 0 -- (in ticks' worth: ticks held while a wall rises are made up over the rest of the swarm)
+		for i = 1, ticks do
+			if stopped or not u.block or not u.block.Parent then
+				return
+			end
+			if plotState.finisher or (plotState.wallLayer or 0) < (startLayer or 0) then
+				if u.model then
+					u.model:SetAttribute("SpecialHold", nil)
+				end
+				stopped = true
+				if u.model then
+					u.model:SetAttribute("SpecialCut", workspace:GetServerTimeNow())
+				end
+				return
+			end
+			-- (the drones hold their fire while the next wall is still rising: SpecialHold for the clients)
+			local hold = not plotState.wall or wallRising(plotState)
+			if u.model and (u.model:GetAttribute("SpecialHold") or false) ~= hold then
+				u.model:SetAttribute("SpecialHold", hold)
+			end
+			if not hold and plotState.wallHP > 0 then
+				local armyDps = 0
+				for _, other in ipairs(plotState.activeUnits) do
+					if other.def and other.block and other.block.Parent then
+						armyDps += other.def.damage / other.def.attackCD
+					end
+				end
+				local share = (ticks - dealt) / (ticks - i + 1)
+				dealt += share
+				local dmg = armyDps * swarm.armySeconds / ticks * share
+				plotState.wallHP = math.max(0, plotState.wallHP - dmg)
+				earnHitGold(plotState, u, dmg)
+				updateWallGui(plotState)
+				if plotState.wallHP <= 0 then breakWall(plotState) end
+			end
+			task.wait(swarm.tick)
+		end
+		if u.model then
+			u.model:SetAttribute("SpecialHold", nil)
+		end
+	end)
+end
+
 local function startSpecial(u, plotState, lat, now)
 	local sp = u.def.special
 	local targetWall = plotState.wall
@@ -779,10 +852,17 @@ local function startSpecial(u, plotState, lat, now)
 		u.model:SetAttribute("SpecialSeed", math.random(1, 1e6))
 		u.model:SetAttribute("SpecialAt", workspace:GetServerTimeNow())
 	end
-	-- basic attacks resume when the special is over
-	u.lastAttack = now + sp.duration - u.def.attackCD
+	-- basic attacks resume when the special is over (a special that keepAttacking runs beside them: Malak's drones)
+	if not sp.keepAttacking then
+		u.lastAttack = now + sp.duration - u.def.attackCD
+	else
+		u.keepSpecialUntil = now + sp.duration -- (its aim follows the front meanwhile, see the update loop)
+	end
 	-- the damage of one cycle: the special's share of (DPS x cooldown)
 	local total = (u.def.damage / u.def.attackCD) * sp.share * cd
+	if sp.swarm then
+		startSwarm(u, plotState, sp.swarm)
+	end
 	for _, h in ipairs(sp.hits) do
 		task.delay(h.at, function()
 			if not plotState.wall or not u.block or not u.block.Parent then return end
@@ -1001,6 +1081,15 @@ local function update(now, dt)
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
 		checkFleetStrike(plotState, serverNow)
+		-- auras (Malak's +10% damage): re-apply the damage of every unit when the strongest aura changes
+		if now - (plotState.auraCheckAt or 0) >= 1 then
+			plotState.auraCheckAt = now
+			local mult = auraMultiplier(plotState)
+			if mult ~= (plotState.auraMult or 1) then
+				plotState.auraMult = mult
+				setDamageMultiplier(plotState)
+			end
+		end
 		if not plotState.wall or not plotState.wall.Parent then
 			-- the gate has fallen (or the lane is being rebuilt): nothing left to shoot, so everyone stands down
 			for _, u in ipairs(plotState.activeUnits) do
@@ -1108,6 +1197,18 @@ local function update(now, dt)
 			-- the arrival radius grows with speed so a fast unit cannot overshoot its slot forever)
 			local stayRadius = ((u.slotStand or 0) >= RANGED_STAND) and RANGED_STAY_RADIUS or STAY_RADIUS
 			u.arrived = dist <= (u.arrived and stayRadius or math.max(ARRIVE_RADIUS, u.def.speed * dt * 1.5))
+
+			-- a special that runs beside the attacks (Malak's drones) follows the front: its aim moves on with the wall
+			if u.keepSpecialUntil and u.model and plotState.wall then
+				if now < u.keepSpecialUntil then
+					local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
+					if (u.model:GetAttribute("SpecialAim") or aim) ~= aim then
+						u.model:SetAttribute("SpecialAim", aim)
+					end
+				else
+					u.keepSpecialUntil = nil
+				end
+			end
 
 			if u.arrived then
 				u.bv.Velocity = Vector3.new(0, 0, 0)

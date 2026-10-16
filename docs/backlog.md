@@ -1,5 +1,14 @@
 # Backlog, state and open issues
 
+## Wanted by the user (2026-10-16): the Codex unit page
+
+In the Codex, pressing a unit opens a detailed page for it: the unit itself (3D), its abilities by NAME (Requisition,
+Fleet Strike, Rift Chains, ...), each with a short description where the numbers are highlighted (increases, damage,
+durations: e.g. "25 s of your army's damage", "+10% army damage"), its passive aura, and abilities that are still locked
+shown as "unlockable" (with how, e.g. Fleet Strike = 1000 gems). Needs every Signature / Sovereign's ability data in one
+place (names, descriptions with number slots, aura, unlock rule), ideally in `src/shared/Units.lua`, so the page and the
+server read the same numbers.
+
 ## State at the end of the 2026-10-15 / 16 session (read this first)
 
 **Built and committed:** Malak's pull cinematic (`SovereignArrival`: sky tear, the Absolution's bow, the drop pod,

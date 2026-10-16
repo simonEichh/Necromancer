@@ -334,6 +334,15 @@ local UNITS = {
 		-- fights its three rings spread into a triangle, charge and fire three thin blue bolts that meet on the wall;
 		-- `share` of his damage, the shells deal the rest. hitAt must match the client's DRONE_* timings.
 		companion = { period = 4.5, share = 0.3, hitAt = 2.05, firstDelay = 2.0, hitHeight = 6 },
+		-- his special, the REQUISITION (client RequisitionFx, docs/envoy.md): a supply pod drops from the Absolution, a
+		-- dispenser launches six drones that fight the wall, they fly home and the pod is beamed up. He keeps attacking
+		-- meanwhile (keepAttacking). The drones deal `swarm.armySeconds` seconds of the WHOLE ARMY's DPS, in ticks between
+		-- `swarm.from` and `swarm.to` (s after the start; must match the client's LAUNCH_FROM + T_LAUNCH and SWARM_END).
+		special = { kind = "Requisition", cooldown = 150, share = 0, duration = 40, hits = {}, keepAttacking = true,
+			swarm = { from = 8.4, to = 31.8, armySeconds = 25, tick = 0.5 } },
+		-- his passive aura while he is on a grave: +10% damage for the whole army (Army.auraMultiplier; auras of one kind do
+		-- not stack, the strongest counts)
+		aura = { damage = 0.10 },
 	},
 }
 

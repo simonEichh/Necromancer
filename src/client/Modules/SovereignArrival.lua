@@ -40,6 +40,7 @@ local mainGui = require(script.Parent.Gui)
 local Theme = require(script.Parent.Theme)
 local GraveOpening = require(script.Parent.GraveOpening)
 local NecroRitual = require(script.Parent.NecroRitual)
+local DropPod = require(script.Parent.DropPod)
 local Sfx = require(script.Parent.Sfx)
 local FleetStrike = require(script.Parent.FleetStrike)
 local SignatureDescent = require(script.Parent.SignatureDescent)
@@ -63,10 +64,6 @@ local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
 
 -- his palette (docs/envoy.md): black chrome, silver, cold white-blue light, a hint of violet; red only for targeting
-local CHROME = Color3.fromRGB(28, 28, 36)
-local CHROME_LIGHT = Color3.fromRGB(50, 50, 62)
-local SILVER = Color3.fromRGB(176, 180, 196)
-local VIOLET = Color3.fromRGB(44, 30, 74)
 local GLOW = Color3.fromRGB(165, 180, 255)
 local GLOW_CORE = Color3.fromRGB(235, 240, 255)
 local RED = Color3.fromRGB(255, 40, 40)
@@ -84,7 +81,6 @@ local POD_PETALS = 6
 local POD_RADIUS = 4.6 -- (the base ring)
 local POD_HEIGHT = 14 -- (crown tip above the base ring)
 local POD_BASE = 1.4 -- (the base ring's height)
-local POD_OPEN = math.rad(92) -- (how far each petal folds out: down flat onto the ground, so they never stand in front of the camera)
 
 -- ── Timeline (s) ──────────────────────────────────────────
 local START_SILENCE = 2.6 -- the grave freezes
@@ -165,96 +161,10 @@ local function warpClock(T)
 end
 
 -- ============================================================
--- The drop pod (built here: it only exists in this cinematic)
+-- The drop pod (Modules/DropPod, shared with his special)
 -- ============================================================
--- Returns { parts, place(baseCF, open, glow) }: baseCF is the pod's floor centre (LookVector = its front), open 0..1
 local function buildPod(folder)
-	local pod = { parts = {}, offsets = {}, petalOf = {} }
-	local function add(p, petal, offset)
-		table.insert(pod.parts, p)
-		pod.offsets[p] = offset
-		pod.petalOf[p] = petal
-	end
-	-- the base ring: dark chrome, a silver rim, glowing thruster ports underneath
-	local base = newPart(folder, Vector3.new(POD_BASE, POD_RADIUS * 2.15, POD_RADIUS * 2.15), CFrame.new(), CHROME, Enum.Material.SmoothPlastic, Enum.PartType.Cylinder)
-	add(base, nil, CFrame.new(0, POD_BASE / 2, 0) * CFrame.Angles(0, 0, math.pi / 2))
-	local rim = newPart(folder, Vector3.new(0.35, POD_RADIUS * 2.3, POD_RADIUS * 2.3), CFrame.new(), SILVER, Enum.Material.Metal, Enum.PartType.Cylinder)
-	add(rim, nil, CFrame.new(0, POD_BASE + 0.05, 0) * CFrame.Angles(0, 0, math.pi / 2))
-	pod.ports = {}
-	for k = 0, POD_PETALS - 1 do
-		local a = (k + 0.5) / POD_PETALS * math.pi * 2
-		local port = newPart(folder, Vector3.new(0.3, 1.3, 1.3), CFrame.new(), GLOW, Enum.Material.Neon, Enum.PartType.Cylinder)
-		add(port, nil, CFrame.new(math.cos(a) * POD_RADIUS * 0.6, -0.12, math.sin(a) * POD_RADIUS * 0.6) * CFrame.Angles(0, 0, math.pi / 2))
-		table.insert(pod.ports, port)
-	end
-	-- the core light inside (seen when the petals open)
-	local inner = newPart(folder, Vector3.new(0.2, POD_RADIUS * 1.6, POD_RADIUS * 1.6), CFrame.new(), GLOW_CORE, Enum.Material.Neon, Enum.PartType.Cylinder)
-	add(inner, nil, CFrame.new(0, POD_BASE + 0.2, 0) * CFrame.Angles(0, 0, math.pi / 2))
-	pod.inner = inner
-	local light = Instance.new("PointLight")
-	light.Color = GLOW
-	light.Range = 18
-	light.Brightness = 0
-	light.Shadows = false
-	light.Parent = inner
-	pod.light = light
-
-	-- the petals: blade plates leaning in from the base ring to the crown. Each petal's parts are placed in its own
-	-- frame: origin at the hinge on the ring, +Y up the blade, +Z its outer face, X across.
-	local L = math.sqrt(POD_RADIUS ^ 2 + POD_HEIGHT ^ 2)
-	local w = 2 * POD_RADIUS * math.tan(math.pi / POD_PETALS) * 1.12 -- (a little wider than the gaps: no light shows through)
-	local t = 0.5
-	pod.lean = math.atan2(POD_RADIUS, POD_HEIGHT)
-	pod.seams = {}
-	for k = 0, POD_PETALS - 1 do
-		local petal = { angle = k / POD_PETALS * math.pi * 2 }
-		add(newPart(folder, Vector3.new(w, L, t), CFrame.new(), CHROME, Enum.Material.SmoothPlastic), petal, CFrame.new(0, L / 2, 0))
-		-- the inner violet lining (seen when it opens), the silver edges standing proud, the cold seam down the middle
-		add(newPart(folder, Vector3.new(w * 0.82, L * 0.9, 0.12), CFrame.new(), VIOLET, Enum.Material.SmoothPlastic), petal, CFrame.new(0, L * 0.46, -t / 2 - 0.04))
-		for _, s in ipairs({ -1, 1 }) do
-			add(newPart(folder, Vector3.new(0.32, L - 0.4, t + 0.16), CFrame.new(), SILVER, Enum.Material.Metal), petal, CFrame.new(s * (w / 2 + 0.04), L / 2 - 0.1, 0))
-		end
-		local seam = newPart(folder, Vector3.new(0.28, L * 0.78, 0.14), CFrame.new(), GLOW, Enum.Material.Neon)
-		add(seam, petal, CFrame.new(0, L * 0.45, t / 2 + 0.05))
-		table.insert(pod.seams, seam)
-		-- his diamond emblem low on each petal
-		add(newPart(folder, Vector3.new(1.1, 1.1, 0.2), CFrame.new(), SILVER, Enum.Material.Metal), petal, CFrame.new(0, L * 0.2, t / 2 + 0.1) * CFrame.Angles(0, 0, math.rad(45)))
-	end
-	-- the crown: a glowing spike where the tips meet (it falls away when the petals open)
-	local crown = newPart(folder, Vector3.new(0.9, 2.6, 0.9), CFrame.new(), GLOW_CORE, Enum.Material.Neon)
-	add(crown, nil, CFrame.new(0, POD_BASE + POD_HEIGHT + 0.9, 0))
-	pod.crown = crown
-
-	function pod.place(baseCF, open, glow)
-		local moveParts, moveCFrames = {}, {}
-		local floor = baseCF * CFrame.new(0, POD_BASE, 0)
-		for _, p in ipairs(pod.parts) do
-			local petal = pod.petalOf[p]
-			local cf
-			if petal then
-				-- hinge on the ring, facing out; closed it leans in, open it folds out and down (with a little overshoot
-				-- baked into `open` by the caller)
-				local hinge = floor * CFrame.Angles(0, -petal.angle, 0) * CFrame.new(0, 0, -POD_RADIUS) * CFrame.Angles(0, math.pi, 0)
-				local tilt = -pod.lean + (pod.lean + POD_OPEN) * open
-				cf = hinge * CFrame.Angles(tilt, 0, 0) * pod.offsets[p]
-			else
-				cf = baseCF * pod.offsets[p]
-			end
-			table.insert(moveParts, p)
-			table.insert(moveCFrames, cf)
-		end
-		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameChanged)
-		for _, s in ipairs(pod.seams) do
-			s.Transparency = 0.45 - 0.4 * glow
-		end
-		pod.crown.Transparency = math.clamp(open * 3, 0, 1)
-	end
-	function pod.setHidden(hidden)
-		for _, p in ipairs(pod.parts) do
-			p.LocalTransparencyModifier = hidden and 1 or 0
-		end
-	end
-	return pod
+	return DropPod.build(folder, 1) -- (the pod lives in Modules/DropPod, shared with his special)
 end
 
 -- ============================================================
