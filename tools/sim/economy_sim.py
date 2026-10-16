@@ -16,7 +16,9 @@ What is modelled: the shop (limited stock, rotation every 5 minutes), best-of-N 
 units in the grave slots (5 + 1 per ascension, max 10), walls (HP and gold per layer), ascending, the two gold upgrades and
 the planned unit upgrade system (materials of a tier per rarity, success chance with pity, no level loss on failure,
 dismantling spare units into materials). Time is ACTIVE play time (the army only fights while the player is in the game).
-Not modelled: the wheel, quests, offline rewards, ranged-unit march time, formation.
+With --wheel: the Lucky Wheel (a free spin every 15 active minutes, the rewards of src/shared/WheelRewards.lua;
+potions are drunk as soon as they are won, Fortune Catalysts are used on any attempt below 100 %).
+Not modelled: quests, offline rewards, ranged-unit march time, formation.
 """
 import argparse
 import math
@@ -194,6 +196,16 @@ STALL_SECONDS = 150  # the player ascends once the current wall would take longe
 PITY_AT = 60
 LUCK_STEP = 0.10  # +10 % per luck upgrade level (rework: multiplies the weights of Rare and better)
 
+# The Lucky Wheel (src/shared/WheelRewards.lua + WheelPrizes.lua): (id, weight, amount)
+WHEEL = [("gold_chest", 30, 0), ("luck_potion", 10, 1), ("gems", 16, 75), ("grave_hoard", 20, 5),
+         ("dust_cache", 15, 12), ("fortune_bundle", 8, 3), ("spectral_crown", 1, 250)]
+WHEEL_SPIN_SECONDS = 900  # one free spin per 15 minutes in the game
+POTION_SECONDS = 300  # 2x luck
+CHEST_MINUTES = 20  # the Gold Chest pays this many minutes of the army's hit income
+CHEST_MIN = 300
+FORTUNE_BONUS = 0.25  # Economy.CATALYSTS.Fortune
+DUST_SHOP_UNLOCK = lambda d: max(0, 2 * d - 3)  # Economy.dustShopUnlock (d = 1..5)
+
 
 # ============================================================
 # One simulated player
@@ -228,6 +240,17 @@ class Player:
         self.gold_from = {"wall": 0.0, "hit": 0.0, "sell": 0.0}
         self.realm_lv = {}  # realm upgrade levels (reset with the gold when a new realm starts)
         self.stage_from = []  # gold_from per stage (copied at every ascension)
+        self.next_spin = WHEEL_SPIN_SECONDS
+        self.luck_buff_end = 0.0
+        self.fortune = 0
+        self.crown = False
+        self.wheel_won = {k: 0 for k, _, _ in WHEEL}  # times each slice was hit
+        self.wheel_gold = 0.0
+        self.wheel_graves = 0
+        self.wheel_by = {}  # wheel graves per tier
+        self.bought = {}  # shop graves per tier
+        self.wheel_dust = 0
+        self.gems = 0
 
     # ---- helpers -------------------------------------------------
     def subs(self, layer):
@@ -322,6 +345,8 @@ class Player:
             return grave["pity"]
         if "odds_table" in grave:
             f = 1 + LUCK_STEP * self.luck_lv  # luck upgrade: every Rare-or-better weight is multiplied by f
+            if self.t < self.luck_buff_end:
+                f *= 2  # luck potion
             w = [(rar, p * (f if RANK[rar] >= 3 else 1)) for rar, p in grave["odds_table"].items()]
             pick = self.rng.random() * sum(x for _, x in w)
             acc = 0
@@ -373,10 +398,49 @@ class Player:
     def ascend_cost(self):
         return self.R["ascend_cost"](self.r)
 
+    def spin_wheel(self):
+        """One spin, rewards as WheelPrizes.resolve gives them (scaled by the highest unlocked grave / dust)."""
+        pick = self.rng.random() * sum(w for _, w, _ in WHEEL)
+        acc = 0
+        for wid, w, amount in WHEEL:
+            acc += w
+            if pick <= acc:
+                break
+        self.wheel_won[wid] += 1
+        top = max((g for g in GAME["graves"] if g["unlock"] <= self.r), key=lambda g: g["unlock"])
+        if wid == "gold_chest":
+            # WheelPrizes: CHEST_MINUTES of the army's hit income (as if every unit hits), at least CHEST_MIN gold
+            g = max(CHEST_MIN, self.hit_income() / self.R.get("hit_uptime", 1.0) * 60 * CHEST_MINUTES)
+            self.gold += g
+            self.wheel_gold += g
+        elif wid == "luck_potion":
+            self.luck_buff_end = max(self.t, self.luck_buff_end) + POTION_SECONDS
+        elif wid == "gems":
+            self.gems += amount
+        elif wid == "grave_hoard":
+            self.graves[top["key"]] += amount
+            self.wheel_graves += amount
+            self.wheel_by[top["key"]] = self.wheel_by.get(top["key"], 0) + amount
+        elif wid == "dust_cache":
+            if self.R["upgrades"] and self.R.get("mat_group") == 2:
+                d = max(d for d in range(1, 6) if DUST_SHOP_UNLOCK(d) <= self.r)
+                self.mats[d - 1] += amount
+                self.wheel_dust += amount
+        elif wid == "fortune_bundle":
+            self.fortune += amount
+        elif self.crown:
+            self.gems += amount  # repeat crown
+        else:
+            self.crown = True
+            self.log("crown", "")
+
     def manage(self):
         R = self.R
         if self.t >= self.next_restock:
             self.restock(self.t)
+        while R.get("wheel") and self.t >= self.next_spin:
+            self.next_spin += WHEEL_SPIN_SECONDS
+            self.spin_wheel()
 
         # upgrades of gold (luck / coin): buy when cheap compared with the gold in hand
         for _ in range(3):
@@ -409,6 +473,7 @@ class Player:
                 self.gold -= n * grave["cost"]
                 self.shop[key] = stock - n
                 self.graves[key] += n
+                self.bought[key] = self.bought.get(key, 0) + n
         before = {u["id"] for u in self.placed()}
         # open everything (only up to the free inventory; ignored here)
         for key, n in list(self.graves.items()):
@@ -490,6 +555,9 @@ class Player:
                 if self.mats[mat] < cost:
                     break
                 chance = min(1.0, max(0.2, 1 - 0.08 * u["level"]) + R["upgrade_pity"] * self.fail_streak.get(u["id"], 0))
+                if chance < 1.0 and self.fortune > 0:
+                    self.fortune -= 1
+                    chance = min(1.0, chance + FORTUNE_BONUS)
                 if self.rng.random() < chance:
                     self.mats[mat] -= cost
                     u["level"] += 1
@@ -674,6 +742,13 @@ def report(runs, preset, hours_per_day):
             print(f"  #{i + 1}: {gf['wall']:>12.3g} {gf['hit']:>12.3g} {gf['sell']:>12.3g}   hits {100 * gf['hit'] / tot:4.0f}%")
     print(f"longest gap without any progress event (new rarity / level up / ascension / boss wall): median {statistics.median(gaps):.1f} min")
 
+    if p.R.get("wheel"):
+        bought = sum(p.stage_from[i]["wall"] + p.stage_from[i]["hit"] + p.stage_from[i]["sell"] for i in range(len(p.stage_from)))
+        print(f"\nfirst run, Lucky Wheel ({sum(p.wheel_won.values())} spins): " + ", ".join(f"{k} {v}" for k, v in p.wheel_won.items()))
+        print(f"  gold chests {p.wheel_gold:.3g} (vs {bought:.3g} earned otherwise), {p.wheel_graves} top-tier graves, "
+              f"{p.wheel_dust} dust, {p.gems} gems, crown {'won' if p.crown else 'not won'}")
+        print("  graves per tier, wheel / shop: " + ", ".join(f"{k} {p.wheel_by.get(k, 0)}/{p.bought.get(k, 0)}" for k in p.bought))
+
     p = runs[0]
     print("\nfirst run: (total pulls, army DPS, rarities placed) at each ascension")
     for i, sn in enumerate(p.snap):
@@ -694,8 +769,9 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--hours-per-day", type=float, default=2.0)
     ap.add_argument("--max-hours", type=float, default=200)
+    ap.add_argument("--wheel", action="store_true", help="model the Lucky Wheel's free spins")
     a = ap.parse_args()
-    rules = PRESETS[a.preset]
+    rules = dict(PRESETS[a.preset], wheel=a.wheel)
     runs = [run(rules, a.seed + i, a.max_hours) for i in range(a.runs)]
     report(runs, a.preset, a.hours_per_day)
 
