@@ -39,6 +39,7 @@ function PlayerData.create(player, saved)
 		gems = 0,
 		luckPotions = 0, -- saved consumables from the wheel
 		luckBuffEnd = 0, -- server time; remaining duration is saved, offline time does not consume it
+		broker = { rot = 0, bought = { 0, 0, 0, 0 } }, -- the Soul Broker's stock this player used in rotation `rot` (Broker), saved
 		rebirthCount = 0,
 		gateCleared = false, -- session only: the gate (last wall of the run) fell, so the player may ascend
 		materials = {}, -- [dust key from Economy.DUSTS] = amount of that upgrade dust
@@ -68,6 +69,13 @@ function PlayerData.create(player, saved)
 		profile.gems = clampNumber(saved.gems, 0, 0)
 		profile.luckPotions = math.floor(clampNumber(saved.luckPotions, 0, 0))
 		profile.luckBuffEnd = workspace:GetServerTimeNow() + clampNumber(saved.luckBuffRemaining, 0, 0)
+		if type(saved.broker) == "table" and type(saved.broker.bought) == "table" then
+			local bought = {}
+			for i = 1, 4 do
+				bought[i] = math.floor(clampNumber(saved.broker.bought[i], 0, 0))
+			end
+			profile.broker = { rot = math.floor(clampNumber(saved.broker.rot, 0, 0)), bought = bought }
+		end
 		profile.rebirthCount = math.floor(clampNumber(saved.rebirthCount, 0, 0))
 		profile.wallsBroken = math.floor(clampNumber(saved.wallsBroken, 0, 0))
 		profile.collector = saved.collector == true
@@ -298,6 +306,7 @@ function PlayerData.snapshot(profile)
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
 		commanderSlots = profile.commanderSlots,
+		broker = { rot = profile.broker.rot, bought = table.clone(profile.broker.bought) },
 		settings = profile.settings,
 		placed = PlayerData.placedProvider and PlayerData.placedProvider(profile.player) or {},
 	}
@@ -459,6 +468,11 @@ function PlayerData.addUnit(player, unitType, oneIn, level, fails, locked)
 	profile.inventory[slot] = { unitType = unitType, oneIn = oneIn or Units.getBaseOneIn(unitType), level = level or 0, fails = fails or 0, locked = locked == true or nil }
 	PlayerData.changed(player)
 	return slot
+end
+
+function PlayerData.hasFreeSlot(player)
+	local profile = profiles[player.UserId]
+	return profile ~= nil and firstFreeSlot(profile) ~= nil
 end
 
 -- Removes and returns the unit in a slot (nil if the slot is invalid or empty).

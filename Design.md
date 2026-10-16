@@ -405,6 +405,28 @@ traits are built: Knell +10% army damage while its bell tolls, Hush +15% against
 | Collection index | **4** | Cheap, gives every pull meaning. |
 | New-player tutorial / gradual unlocks | **5** | Needed before any growth push. |
 
+### The Soul Broker (gem stall, agreed 2026-10-16)
+
+Replaces the old Sell stall (selling lives in the inventory only) at plaza angle 142.5; the old Upgrade stall's spot
+stays empty. **The look:** a hooded merchant behind a counter and a gallery wall of four ornate gilded portrait frames
+behind him; BIGGER and MORE DETAILED than the old stalls (the user's call), at least on the level of the grave shop and
+the Forge. Each frame is a "living painting": the offer turning slowly in 3D (potion, catalyst, dust crystal, unit)
+with a brass price plate. On the hour the paintings burn away in soul fire and the new ones paint themselves in, seen by
+everyone in the plaza. Walking up opens a WorldView in front of the gallery (like the Forge); click a portrait to buy.
+The Gem Shop tile keeps the permanent items; the rotating deals exist only at the stall (a reason to visit the plaza).
+
+**Rules** (shared `BrokerDeals`, server `Broker`): global rotation every hour (every server computes the same deals from
+the clock, amounts / tiers scale to the player like the wheel); stock per player per rotation, depending on the deal,
+saved (`profile.broker`). Portraits: **Bundle** (5 Fortune for 120 / 5 Warding for 80 / 20 top-tier dust for 40; 2 each),
+**Potion** (1 Luck Potion for 25, stock 3 / three for 60, stock 1; potions are sold only here and won on the wheel),
+**Featured** (big centre frame: a unit from your highest grave one rarity above its pity rarity, never a Signature or
+Sovereign, priced by rarity (Rare 40 .. Primordial 1000 Gems) so digging stays cheaper per unit; stock 1),
+**Curio** (Grand Dust Hoard 80 dust for 150 / Seeker's Kit 2 potions + 2 Fortune for 100; exclusive cosmetics join it
+once they exist). Prices are first drafts: check them with the sim.
+
+**Order:** 1. rules + data + a plain test panel (DEV "Broker" button) DONE 2026-10-16; 2. the stall model with the
+portrait wall (user approves the look); 3. the WorldView and the burn-and-paint rotation; 4. cosmetics in the Curio.
+
 ## 5. Suggested order (when we get there)
 
 **Lucky Wheel rewards agreed and implemented 2026-10-16:** progression-scaled Gold Chest, Grave Hoard and Dust Cache;

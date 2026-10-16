@@ -44,6 +44,7 @@ local State = {
 	wheelSpins = 0,
 	wheelCountdownSecs = 900, -- seconds until next spin grant
 	luckPotions = 0,
+	broker = { rot = 0, bought = { 0, 0, 0, 0 } }, -- the Soul Broker stock used in rotation `rot`
 	luckBuffEnd = 0, -- server timestamp when 2x luck expires (authoritative DataSync)
 
 	-- Constants

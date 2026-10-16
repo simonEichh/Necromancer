@@ -347,12 +347,20 @@ codexBtn.MouseButton1Click:Connect(function()
 	if r then r:FireServer() end
 end)
 
-local wheelSpinsBtn = makeButton(panel, "+10 Wheel Spins", Color3.fromRGB(255, 214, 110))
+local wheelSpinsBtn = makeButton(panel, "+10 Spins", Color3.fromRGB(255, 214, 110))
 wheelSpinsBtn.Name = "DevGiveWheelSpins"
-wheelSpinsBtn.Size = UDim2.new(0.6, -12, 0, 28)
+wheelSpinsBtn.Size = UDim2.new(0.3, -8, 0, 28)
 wheelSpinsBtn.Position = UDim2.new(0.4, 4, 0, 236)
 wheelSpinsBtn.MouseButton1Click:Connect(function()
 	wheelSpinsEvent:FireServer()
+end)
+
+-- the Soul Broker's deals as a plain panel, until the gem stall is built
+local brokerBtn = makeButton(panel, "Broker", Color3.fromRGB(140, 200, 255))
+brokerBtn.Size = UDim2.new(0.3, -8, 0, 28)
+brokerBtn.Position = UDim2.new(0.7, 4, 0, 236)
+brokerBtn.MouseButton1Click:Connect(function()
+	require(script.Parent.BrokerPanel).toggle()
 end)
 
 local list = Instance.new("ScrollingFrame")

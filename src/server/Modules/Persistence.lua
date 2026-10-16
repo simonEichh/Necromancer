@@ -74,6 +74,7 @@ local function collect(player, profile)
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
 		commanderSlots = profile.commanderSlots,
+		broker = profile.broker,
 		settings = profile.settings,
 		placed = placed,
 		pity = Rolling.exportPity(player),

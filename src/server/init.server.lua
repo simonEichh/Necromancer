@@ -25,6 +25,7 @@ require(Modules.Upgrades)
 require(Modules.Inventory)
 require(Modules.UnitUpgrades)
 require(Modules.GemShop)
+require(Modules.Broker)
 require(Modules.Outfits) -- outfit items on the characters
 require(Modules.ShopNpcs)
 require(Modules.Digging)
