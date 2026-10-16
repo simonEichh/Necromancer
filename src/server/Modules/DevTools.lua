@@ -108,6 +108,18 @@ Remotes.DevGateLow.OnServerEvent:Connect(function(player)
 	end
 end)
 
+-- every wall of the run including the gate (loot and all): the gate falls and ascending unlocks
+Remotes.DevBreakAll.OnServerEvent:Connect(function(player)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local guard = 0
+	while plotState.wall and guard < 10 do
+		guard += 1
+		plotState.wallHP = 0
+		Walls.breakWall(plotState)
+	end
+end)
+
 -- a Fleet Strike preview (client FleetStrike.lua): the plot's army holds, then flees, Malak stays put
 Remotes.DevFleetStrike.OnServerEvent:Connect(function(player, on)
 	local plotState = PlotRegistry.getPlot(player)

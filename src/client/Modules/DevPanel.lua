@@ -321,11 +321,19 @@ specialsBtn.MouseButton1Click:Connect(function()
 	fastSpecialsEvent:FireServer(not (workspace:GetAttribute("DevFastSpecials") ~= false))
 end)
 -- the gate at 21% HP (breaks the walls before it): to test Malak's Fleet Strike trigger
-local gateLowBtn = makeButton(panel, "Gate to 20%", Color3.fromRGB(255, 190, 160))
-gateLowBtn.Size = UDim2.new(0.4, -8, 0, 28)
+local gateLowBtn = makeButton(panel, "Gate 20%", Color3.fromRGB(255, 190, 160))
+gateLowBtn.Size = UDim2.new(0.2, -4, 0, 28)
 gateLowBtn.Position = UDim2.new(0.6, 4, 0, 202)
 gateLowBtn.MouseButton1Click:Connect(function()
 	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevGateLow")
+	if r then r:FireServer() end
+end)
+-- every wall including the gate: to test ascending
+local breakAllBtn = makeButton(panel, "Break all", Color3.fromRGB(255, 150, 150))
+breakAllBtn.Size = UDim2.new(0.2, -8, 0, 28)
+breakAllBtn.Position = UDim2.new(0.8, 4, 0, 202)
+breakAllBtn.MouseButton1Click:Connect(function()
+	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevBreakAll")
 	if r then r:FireServer() end
 end)
 

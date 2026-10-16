@@ -1,8 +1,8 @@
 -- "The Ascension": the cinematic of a normal ascension (the Ascend button; the realm's last one through the portal gets
 -- its own later). About 15 s, Skip. AscendPanel calls AscensionCinematic.play() instead of firing PlayerAscend itself.
 --
---   1. (0-4 s) On the player's plot, facing the lane: every one of their units on the lane dissolves into a soul that
---      streams back down the lane into the necromancer, who calls them with raised hands.
+--   1. (0-4 s) Before the broken gate, facing it and the front line: the necromancer opens the grimoire (as at a
+--      pull) and draws every one of their units on the lane into it, the nearest first.
 --   2. (4-7.5 s) The rite: the necromancer rises in a rune circle with one ring per ascension; "x1.5 DAMAGE" burns in
 --      the air. At ASCEND_AT the client fires PlayerAscend("cinematic"): the server ascends (the run resets, the
 --      keeper's hands return, units go back to their graves) but leaves the character where it is.
@@ -131,7 +131,16 @@ function AscensionCinematic.play(opts)
 	local forward = Vector3.new(frame.LookVector.X, 0, frame.LookVector.Z).Unit -- (the Base's -Z points down the lane)
 	local right = Vector3.new(-forward.Z, 0, forward.X)
 	local plotCentre = frame.Position
+	-- the rite happens where the run ended: just before the broken gate (the front the server fights at), the
+	-- necromancer facing the fallen gate and the front line
 	local stand = plotCentre + forward * 20
+	local okWall, wallCF = pcall(function()
+		return ReplicatedStorage:WaitForChild("GetWallPos", 2):InvokeServer()
+	end)
+	if okWall and typeof(wallCF) == "CFrame" then
+		stand = Vector3.new(wallCF.Position.X, plotCentre.Y, wallCF.Position.Z)
+	end
+	local face = forward -- (facing the gate: the melee front line stands between him and it)
 	local newCount = (State.rebirthCount or 0) + 1
 	local fxFolder = Instance.new("Folder")
 	fxFolder.Name = "AscensionFX"
@@ -243,7 +252,7 @@ function AscensionCinematic.play(opts)
 			end
 		end
 	end
-	table.sort(units, function(a, b) return (a.pos - plotCentre).Magnitude < (b.pos - plotCentre).Magnitude end)
+	table.sort(units, function(a, b) return (a.pos - stand).Magnitude < (b.pos - stand).Magnitude end) -- (the nearest first)
 	for i, u in ipairs(units) do
 		u.leaveAt = SOULS_FROM + (SOULS_TO - SOULS_FROM) * (#units > 1 and (i - 1) / (#units - 1) or 0)
 		u.parts = {}
@@ -251,6 +260,34 @@ function AscensionCinematic.play(opts)
 			if d:IsA("BasePart") or d:IsA("Decal") then
 				table.insert(u.parts, d)
 			end
+		end
+	end
+	-- every nameplate in the world (the units' name / DPS labels) is hidden for the whole cinematic
+	local hiddenBoards = {}
+	for _, d in ipairs(Workspace:GetDescendants()) do
+		if d:IsA("BillboardGui") and d.Enabled then
+			d.Enabled = false
+			table.insert(hiddenBoards, d)
+		end
+	end
+	-- shot 1 looks at the army from behind the necromancer: at the front line (the melee units), or at all of them
+	local armyLook = stand + face * 30
+	do
+		local sum, n = Vector3.zero, 0
+		for _, u in ipairs(units) do
+			if (u.pos - stand).Magnitude < 25 then
+				sum += u.pos
+				n += 1
+			end
+		end
+		if n == 0 then
+			for _, u in ipairs(units) do
+				sum += u.pos
+				n += 1
+			end
+		end
+		if n > 0 then
+			armyLook = sum / n
 		end
 	end
 	local function setUnitFade(u, f)
@@ -311,6 +348,7 @@ function AscensionCinematic.play(opts)
 
 	-- the new tombstone (the server places it when it ascends) and the new tier's model
 	local tombstone, tombRest
+	local ritualTarget
 	local tierModel
 	local tierBase
 
@@ -328,6 +366,11 @@ function AscensionCinematic.play(opts)
 		end
 		for _, u in ipairs(units) do
 			setUnitFade(u, 0)
+		end
+		for _, b in ipairs(hiddenBoards) do
+			if b.Parent then
+				b.Enabled = true
+			end
 		end
 		for _, b in ipairs(bays) do
 			if b.held then
@@ -388,12 +431,13 @@ function AscensionCinematic.play(opts)
 			-- (in the black: the character onto the plot, facing the lane)
 			placed = true
 			hrp.Anchored = true
-			hrp.CFrame = CFrame.lookAt(stand + up * 3, stand + up * 3 + forward)
+			hrp.CFrame = CFrame.lookAt(stand + up * 3, stand + up * 3 + face)
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			local feet = hrp.Position - Vector3.new(0, (hum and hum.HipHeight or 2) + hrp.Size.Y / 2, 0)
-			local target = newPart(fxFolder, Vector3.one * 0.3, CFrame.new(stand + forward * 60 + up * 8), GOLD)
+			local target = newPart(fxFolder, Vector3.one * 0.3, CFrame.new(stand + face * 60 + up * 8), GOLD)
 			target.Transparency = 1
-			ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = target, smokeAt = target, feet = feet, color = VIOLET })
+			ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = target, feet = feet, color = VIOLET })
+			ritualTarget = target
 		end
 		local barSize = 0.11 * smooth((T - FADE) / 0.5)
 		barTop.Size = UDim2.fromScale(1, barSize)
@@ -404,47 +448,82 @@ function AscensionCinematic.play(opts)
 
 		-- ── the necromancer: calls the souls, then rises in the rite ──
 		local rise = smooth((T - RITE_FROM) / 2.2) * (1 - smooth((T - REWARD_FROM - 0.4) / 1.4))
-		hrp.CFrame = CFrame.lookAt(stand + up * (3 + rise * 2.6), stand + up * (3 + rise * 2.6) + forward)
+		hrp.CFrame = CFrame.lookAt(stand + up * (3 + rise * 2.6), stand + up * (3 + rise * 2.6) + face)
 		local weight = smooth((T - 0.6) / 0.6) * (1 - smooth((T - REWARD_FROM) / 0.8))
 		ritual.update(weight, smooth((T - RITE_FROM) / 2), T < RITE_FROM and "forward" or "up")
-		ritual.look(T < RITE_FROM and (stand + forward * 50 + up * 4) or (stand + up * 30), smooth((T - 0.6) / 0.8))
+		ritual.look(T < RITE_FROM and (stand + face * 50 + up * 4) or (stand + up * 30), smooth((T - 0.6) / 0.8))
 
-		-- ── 1. the souls ──
-		local chest = hrp.Position + up * 1.2
+		-- ── 1. the souls: the grimoire opens in the left hand and draws the units in one after another (as at a pull) ──
+		local bookOpen = smooth((T - SOULS_FROM + 0.5) / 0.4) * (1 - smooth((T - RITE_FROM + 0.3) / 0.3))
+		local bookAt = ritual.placeBook(bookOpen, bookOpen)
+		if bookOpen > 0 then
+			ritual.pose(weight, weight, true, "forward")
+		end
+		local pulling
 		for _, u in ipairs(units) do
 			local f = (T - u.leaveAt) / SOUL_FLIGHT
-			if f > 0 and not u.wisp then
-				u.wisp = newPart(fxFolder, Vector3.one * 0.9, CFrame.new(u.pos + up * 3), SOUL, Enum.Material.Neon, Enum.PartType.Ball)
-				local a0 = Instance.new("Attachment")
-				a0.Position = Vector3.new(0, 0.3, 0)
-				a0.Parent = u.wisp
-				local a1 = Instance.new("Attachment")
-				a1.Position = Vector3.new(0, -0.3, 0)
-				a1.Parent = u.wisp
-				local trail = Instance.new("Trail")
-				trail.Attachment0, trail.Attachment1 = a0, a1
-				trail.Color = ColorSequence.new(SOUL, VIOLET)
-				trail.Transparency = NumberSequence.new(0.2, 1)
-				trail.Lifetime = 0.5
-				trail.LightEmission = 1
-				trail.FaceCamera = true
-				trail.Parent = u.wisp
+			if f > 0 and not u.ghost and not u.gone then
+				-- (a client copy of the unit flies, the real one is hidden: the server owns it)
+				local ok, ghost = pcall(function() return u.model:Clone() end)
+				if ok and ghost then
+					for _, d in ipairs(ghost:GetDescendants()) do
+						if d:IsA("BaseScript") or d:IsA("BillboardGui") or d:IsA("ParticleEmitter") or d:IsA("Sound") then
+							d:Destroy()
+						elseif d:IsA("BasePart") then
+							d.Anchored = true
+							d.CanCollide = false
+							d.CanQuery = false
+							d.LocalTransparencyModifier = 0
+						end
+					end
+					for _, tag in ipairs(CollectionService:GetTags(ghost)) do
+						CollectionService:RemoveTag(ghost, tag)
+					end
+					ghost.Parent = fxFolder
+					u.ghost = ghost
+					u.ghostScale = ghost:GetScale()
+					u.ghostFrom = ghost:GetPivot()
+					local sparkle = Instance.new("ParticleEmitter")
+					sparkle.Texture = SPARKLE
+					sparkle.Color = ColorSequence.new(SOUL, Color3.new(1, 1, 1))
+					sparkle.LightEmission = 1
+					sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 0) })
+					sparkle.Lifetime = NumberRange.new(0.3, 0.6)
+					sparkle.Rate = 80
+					sparkle.Speed = NumberRange.new(0.5, 2)
+					sparkle.Parent = ghost.PrimaryPart or ghost:FindFirstChildWhichIsA("BasePart", true)
+				else
+					u.gone = true
+				end
+				setUnitFade(u, 1)
 				burst(fxFolder, u.pos + up * 3, SOUL, 14, 8)
 			end
-			setUnitFade(u, smooth(f * 3)) -- (the unit fades as its soul leaves it)
-			if u.wisp then
+			if u.ghost then
 				if f >= 1 then
-					if u.wisp.Parent then
-						u.wisp:Destroy()
-					end
+					u.ghost:Destroy()
+					u.ghost = nil
+					u.gone = true
+					burst(fxFolder, bookAt, SOUL, 10, 5)
 				else
-					local from = u.pos + up * 3
-					local mid = from:Lerp(chest, 0.5) + up * (8 + (from - chest).Magnitude * 0.12)
-					local e = smooth(f) * 0.6 + f * 0.4
-					local p = from:Lerp(mid, e):Lerp(mid:Lerp(chest, e), e)
-					u.wisp.CFrame = CFrame.new(p)
+					local pull = smooth(f)
+					u.ghost:ScaleTo(math.max(0.02, u.ghostScale * (1 - 0.97 * pull)))
+					local pos = u.ghostFrom.Position:Lerp(bookAt, pull) + up * math.sin(pull * math.pi) * 3
+					u.ghost:PivotTo(CFrame.new(pos) * u.ghostFrom.Rotation * CFrame.Angles(0, pull * 8, 0))
+					pulling = pos
 				end
 			end
+		end
+
+		-- (the ritual's threads reach for the souls he is pulling in, then up into the sky for the rite)
+		if ritualTarget then
+			local aimAt
+			if T < RITE_FROM then
+				aimAt = pulling or bookAt + face * 6
+			else
+				aimAt = stand + up * 30
+			end
+			local cur = ritualTarget.Position
+			ritualTarget.CFrame = CFrame.new(cur:Lerp(aimAt, math.min(1, dt * 6)))
 		end
 
 		-- ── 2. the rite: the rune rings open round the necromancer's feet ──
@@ -553,8 +632,11 @@ function AscensionCinematic.play(opts)
 		local shot, camPos, camLook, fov
 		local laneEnd = plotCentre + forward * 308 + up * 40
 		if T < RITE_FROM then
-			-- behind and above the necromancer, looking down the lane at the army
-			shot, camPos, camLook, fov = 1, stand - forward * 14 + right * 4 + up * 10, stand + forward * 70 + up * 2, 60
+			-- behind and above the necromancer, looking back up the lane at the army
+			-- (a still, wide side shot: the necromancer and the army in front of him, drawn into the grimoire; not from
+			-- behind him, that is inside the gate's portal)
+			local mid = stand:Lerp(armyLook, 0.45)
+			shot, camPos, camLook, fov = 1, mid + right * 24 + up * 9, mid + up * 2, 66
 		elseif T < REWARD_FROM then
 			-- slowly round the rising necromancer, low
 			local a = (T - RITE_FROM) * 0.32 + 0.6
@@ -578,6 +660,10 @@ function AscensionCinematic.play(opts)
 		if shot ~= currentShot then
 			currentShot = shot
 			blendFrom = lastCamPos and { pos = lastCamPos, look = lastCamLook, fov = lastFov, at = T } or nil
+		end
+		-- (a hard cut when the new shot is far away, e.g. from the gate to the graves, instead of a long sweep)
+		if blendFrom and (camPos - blendFrom.pos).Magnitude > 120 then
+			blendFrom = nil
 		end
 		if blendFrom and shot > 1 then
 			local k = smooth((T - blendFrom.at) / 1.2)
