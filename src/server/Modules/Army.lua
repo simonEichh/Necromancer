@@ -95,7 +95,34 @@ local function ownerDamageMultiplier(plotState)
 	-- ascensions x the realm upgrade Army Might; Swift March is cached here too (read every frame by the movement)
 	plotState.marchMult = Economy.realmUpgradeEffect("march", profile.realmUpgrades.march)
 	return Economy.damageMultiplier(profile.rebirthCount) * Economy.realmUpgradeEffect("might", profile.realmUpgrades.might)
-		* (plotState.auraMult or 1)
+		* (plotState.auraMult or 1) * (plotState.traitMult or 1)
+end
+
+-- The unique traits of the commanders (unit def `trait`, Design.md "Unique traits"), for the whole army, right now:
+--   duringSpecial  while the unit's special plays (Knell: its bell tolls)
+--   lowWall        while the wall is below `below` of its HP (Hush)
+--   afterSpecial   from `from` s after its special started, for `duration` s (the Sigilwright's marked wall)
+local function traitMultiplier(plotState)
+	local m = 1
+	local t = tick() -- (the update loop's clock: u.specialStartedAt)
+	for _, u in ipairs(plotState.activeUnits) do
+		local tr = u.def and u.def.trait
+		if tr and u.block and u.block.Parent then
+			local since = u.specialStartedAt and (t - u.specialStartedAt)
+			local on = false
+			if tr.kind == "duringSpecial" then
+				on = since ~= nil and since < u.def.special.duration
+			elseif tr.kind == "lowWall" then
+				on = plotState.wall ~= nil and plotState.WALL_MAX_HP > 0 and plotState.wallHP / plotState.WALL_MAX_HP < tr.below
+			elseif tr.kind == "afterSpecial" then
+				on = since ~= nil and since >= tr.from and since < tr.from + tr.duration
+			end
+			if on then
+				m *= 1 + tr.damage
+			end
+		end
+	end
+	return m
 end
 
 -- Signature / Sovereign auras (unit def `aura`, e.g. Malak: { damage = 0.10 }): the strongest aura of each kind among
@@ -977,6 +1004,7 @@ local function startSpecial(u, plotState, lat, now)
 	local targetWall = plotState.wall
 	local cd = specialCooldown(u.def, plotState)
 	local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
+	u.specialStartedAt = now -- (the traits that hang on the special: Knell, the Sigilwright)
 	if u.model then
 		u.model:SetAttribute("SpecialKind", sp.kind)
 		u.model:SetAttribute("SpecialAim", aim)
@@ -1227,10 +1255,12 @@ local function refreshBonuses(plotState)
 		burst = t >= stood and t < stood + SharedUnits.Families.Beasts.burstTime
 	end
 	local aura = auraMultiplier(plotState)
-	local key = table.concat({ aura, tostring(atGate), tostring(burst), bonus.Bones, bonus.Flesh, bonus.Spirits, bonus.Beasts, bonus.Arcane }, "|")
+	local trait = traitMultiplier(plotState)
+	local key = table.concat({ aura, trait, tostring(atGate), tostring(burst), bonus.Bones, bonus.Flesh, bonus.Spirits, bonus.Beasts, bonus.Arcane }, "|")
 	if key ~= plotState.bonusKey then
 		plotState.bonusKey = key
 		plotState.auraMult = aura
+		plotState.traitMult = trait
 		plotState.famBonus = bonus
 		plotState.atGate = atGate
 		plotState.beastBurst = burst

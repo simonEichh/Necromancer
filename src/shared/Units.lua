@@ -195,6 +195,9 @@ local UNITS = {
 		-- (client KnellFx; the hits: the toll, the rake, the tear imploding)
 		special = { kind = "Procession", cooldown = 90, share = 0.6, duration = 11.0,
 			hits = { { at = 0.35, share = 0.08 }, { at = 7.2, share = 0.72 }, { at = 10.5, share = 0.2 } } },
+		-- its unique trait, THE MOURNING BELL (Army.traitMultiplier): while its bell tolls (its special), the whole army
+		-- deals more damage
+		trait = { kind = "duringSpecial", damage = 0.10 },
 	},
 	-- ── Abyssal ─────────────────────────────────────────────────────────
 	SoulEater = {
@@ -267,6 +270,8 @@ local UNITS = {
 		-- wall (hit 1), then explode (hit 2). `share` of the unit's damage comes from the special, the rest from basic
 		-- attacks, so its DPS is unchanged. In Studio the cooldown is SPECIAL_TEST_COOLDOWN (Army) for testing.
 		special = { kind = "RiftChains", cooldown = 90, share = 0.6, duration = 8.8, hits = { { at = 6.95, share = 0.4 }, { at = 7.6, share = 0.6 } } },
+		-- its unique trait, THE UNBREATHING (Army.traitMultiplier): the whole army deals more damage to a wall below half HP
+		trait = { kind = "lowWall", damage = 0.15, below = 0.5 },
 	},
 	DeathIncarnate = {
 		color = BrickColor.new("Really black"),
@@ -313,6 +318,9 @@ local UNITS = {
 		special = { kind = "Verdict", cooldown = 90, share = 0.6, duration = 13.0,
 			hits = { { at = 9.36, share = 0.12 }, { at = 9.96, share = 0.12 }, { at = 10.41, share = 0.12 },
 				{ at = 10.76, share = 0.12 }, { at = 11.36, share = 0.52 } } },
+		-- its unique trait, THE LAST WORD (Army.traitMultiplier): when the Verdict is spoken (its last bolt) the wall is
+		-- marked, and the whole army deals more damage to it for `duration` s
+		trait = { kind = "afterSpecial", damage = 0.20, from = 11.4, duration = 10 },
 	},
 	-- Malak, the Envoy: the first Sovereign (docs/envoy.md), pool weight 0.05 from the Celestial grave only. Basic attack, the orbital tag (model AttackStyle "OrbitalTag",
 	-- client OrbitalStrike.lua): while he fights his hologram pad opens into a big hologram in front of him; he taps it
@@ -510,18 +518,27 @@ local function ownDamageSeconds(def)
 end
 local ABILITIES = {
 	Knell = {
+		{ name = "The Mourning Bell", kind = "Passive", text = function(def)
+			return ("While its bell tolls (its special, {%s s}), your whole army deals {+%d%%} damage."):format(tostring(def.special.duration), math.floor(def.trait.damage * 100 + 0.5))
+		end },
 		{ name = "The Procession", kind = "Special", text = function(def)
 			return ("Every {%d s} Knell tolls the bell: pallbearers carry a chained coffin to the wall and a black-red claw rakes through it, dealing {%d s} of Knell's own damage.")
 				:format(def.special.cooldown, ownDamageSeconds(def))
 		end },
 	},
 	Hush = {
+		{ name = "The Unbreathing", kind = "Passive", text = function(def)
+			return ("Your whole army deals {+%d%%} damage to a wall below {%d%%} HP."):format(math.floor(def.trait.damage * 100 + 0.5), math.floor(def.trait.below * 100 + 0.5))
+		end },
 		{ name = "Rift Chains", kind = "Special", text = function(def)
 			return ("Every {%d s} Hush tears a rift into reality: chains swarm out, bite into the wall and explode, dealing {%d s} of Hush's own damage.")
 				:format(def.special.cooldown, ownDamageSeconds(def))
 		end },
 	},
 	Sigilwright = {
+		{ name = "The Last Word", kind = "Passive", text = function(def)
+			return ("When the Verdict is spoken, the wall is marked: your whole army deals {+%d%%} damage to it for {%d s}."):format(math.floor(def.trait.damage * 100 + 0.5), def.trait.duration)
+		end },
 		{ name = "The Verdict", kind = "Special", text = function(def)
 			return ("Every {%d s} the Sigilwright writes a sentence of {5} runes over the wall and speaks it: every word fires a bolt of judgement, together {%d s} of its own damage.")
 				:format(def.special.cooldown, ownDamageSeconds(def))
@@ -533,7 +550,7 @@ local ABILITIES = {
 			return ("Every {%d s} a supply pod drops from the Absolution. Its dispenser launches {6} drones that strafe the wall for {%d s}, dealing {%d s} of your whole army's damage. Malak keeps fighting meanwhile.")
 				:format(def.special.cooldown, math.floor(sw.to - sw.from + 1.6 + 0.5), sw.armySeconds)
 		end },
-		{ name = "Envoy's Command", kind = "Passive", text = function(def)
+		{ name = "The Envoy", kind = "Passive", text = function(def)
 			local c = def.companion
 			return ("His drone fires its own volley at the wall every {%s s} for {%s} damage. While Malak stands on a grave, your whole army deals {+%d%%} damage.")
 				:format(tostring(c.period), shortNumber(def.damage / def.attackCD * c.share * c.period), math.floor(def.aura.damage * 100 + 0.5))

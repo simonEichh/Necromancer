@@ -326,7 +326,7 @@ From the user's "general ideas.txt" (switching to a star / banner system with fe
   If Forge success chances are lowered, failures should build progress (fragments towards a guaranteed success)
   rather than simply removing the pity.
 
-### Unit families, the commander slot and placement (2026-10-16; families OK'd by the user, numbers open. BUILT: the family data + bonuses (server), the commander thrones (2nd for 500 gems), family-aware Place Best (`Army.bestLineup`: best DPS with Flesh and the Beasts' burst at 25% uptime, swap search). BUILT too: the Army screen (`ArmyPanel`, tile + R). TO DO: the Codex line, the unique traits of Knell / Hush / Sigilwright)
+### Unit families, the commander slot and placement (2026-10-16; families OK'd by the user, numbers open. BUILT: the family data + bonuses (server), the commander thrones (2nd for 500 gems), family-aware Place Best (`Army.bestLineup`: best DPS with Flesh and the Beasts' burst at 25% uptime, swap search). BUILT too: the Army screen (`ArmyPanel`, tile + R), the Codex family card, the unique traits of all four commanders)
 
 Problem: DPS is the only reason to pick a unit, and Place Best makes even that choice for the player. Goal: a reason to
 keep, level and place weaker units, and a real decision when building the army, without forcing anyone to micromanage.
@@ -386,8 +386,14 @@ throne light up, the inventory slides in; tap or drag a unit onto a grave; the a
 trait list ("Spirits 4 / 6: +25% gold"). Place Best is a button on it. The Codex unit page shows the unit's family (or
 unique trait) and its tiers.
 
-**Still open:** the bonus numbers, the second commander slot's price, the unique traits' effects, how the commander
-throne looks. **Suggested order:** (2) family + trait data in Units.lua, the bonuses and the commander slot on the server
+**Later (the user, 2026-10-16): units with MORE THAN ONE family, like TFT** (e.g. a Bones + Arcane lich), most likely
+for the rarer units, so a rare pull can complete two sets at once. The data allows it with little change:
+`Units.FamilyOf[unit]` becomes a list, `familyCounts` counts the unit for each of its families (duplicates still once,
+the shadow form still double), and the Army screen / Codex show one line per family.
+
+**Still open:** the bonus numbers, the second commander slot's price, how the commander throne looks. (The unique
+traits are built: Knell +10% army damage while its bell tolls, Hush +15% against walls below half HP, the Sigilwright
++20% for 10 s after the Verdict, Malak +10% and his drone.) **Suggested order:** (2) family + trait data in Units.lua, the bonuses and the commander slot on the server
 (saving it), (3) family-aware Place Best, (4) the placement screen and the commander throne on the plot, the Codex line.
 
 ### Content / depth (already in the backlog)

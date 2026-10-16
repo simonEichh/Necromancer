@@ -40,9 +40,9 @@ local PAGE_EDGE = Color3.fromRGB(122, 98, 62)
 local INK = Color3.fromRGB(222, 210, 182)
 local INK_DIM = Color3.fromRGB(150, 138, 116)
 local HIGHLIGHT = "#F2C46B" -- (the numbers in ability texts)
-local KIND_COLOR = { Passive = Color3.fromRGB(120, 230, 170), Basic = Color3.fromRGB(222, 210, 182), Special = Color3.fromRGB(190, 150, 255), Finisher = Color3.fromRGB(255, 140, 110) }
-local KIND_ORDER = { Passive = 1, Basic = 2, Special = 3, Finisher = 4 } -- (the passive always first)
-local KIND_LABEL = { Basic = "BASIC ATTACK" }
+local KIND_COLOR = { Family = Color3.fromRGB(200, 175, 130), Passive = Color3.fromRGB(120, 230, 170), Basic = Color3.fromRGB(222, 210, 182), Special = Color3.fromRGB(190, 150, 255), Finisher = Color3.fromRGB(255, 140, 110) }
+local KIND_ORDER = { Passive = 1, Family = 1, Basic = 2, Special = 3, Finisher = 4 } -- (the passive / the family first)
+local KIND_LABEL = { Basic = "BASIC ATTACK", Family = "FAMILY", Passive = "UNIQUE TRAIT" }
 
 local function smooth(x)
 	x = math.clamp(x, 0, 1)
@@ -271,6 +271,52 @@ bigHolder.Size = UDim2.fromScale(0.84, 0.38)
 bigHolder.Position = UDim2.fromScale(0.08, 0.03)
 bigHolder.ZIndex = 11
 bigHolder.Parent = detailLeft
+-- the family badge (or COMMANDER) over the portrait's corner; hovering it shows the family's tiers
+local FAMILY_COLOR = {
+	Bones = Color3.fromRGB(222, 210, 182), Flesh = Color3.fromRGB(196, 110, 100), Spirits = Color3.fromRGB(140, 220, 230),
+	Beasts = Color3.fromRGB(200, 160, 100), Arcane = Color3.fromRGB(180, 140, 255),
+}
+local badge = Instance.new("TextLabel")
+badge.Size = UDim2.fromScale(0.3, 0.05)
+badge.Position = UDim2.fromScale(0.06, 0.035)
+badge.BackgroundColor3 = Color3.fromRGB(24, 20, 18)
+badge.BorderSizePixel = 0
+badge.Font = Enum.Font.GothamBold
+badge.TextScaled = true
+badge.ZIndex = 14
+badge.Active = true
+badge.Parent = detailLeft
+Theme.corner(badge, 6)
+local badgeStroke = Theme.stroke(badge, PAGE_EDGE, 2)
+local badgePad = Instance.new("UIPadding")
+badgePad.PaddingTop, badgePad.PaddingBottom = UDim.new(0.15, 0), UDim.new(0.15, 0)
+badgePad.Parent = badge
+local badgeTip = Instance.new("TextLabel")
+badgeTip.Size = UDim2.fromScale(0.88, 0.16)
+badgeTip.Position = UDim2.fromScale(0.06, 0.095)
+badgeTip.BackgroundColor3 = Color3.fromRGB(16, 13, 12)
+badgeTip.BorderSizePixel = 0
+badgeTip.Font = Enum.Font.GothamMedium
+badgeTip.TextColor3 = INK
+badgeTip.TextScaled = true
+badgeTip.TextWrapped = true
+badgeTip.RichText = true
+badgeTip.TextXAlignment = Enum.TextXAlignment.Left
+badgeTip.Visible = false
+badgeTip.ZIndex = 15
+badgeTip.Parent = detailLeft
+Theme.corner(badgeTip, 6)
+local tipPad = Instance.new("UIPadding")
+tipPad.PaddingLeft, tipPad.PaddingRight = UDim.new(0.03, 0), UDim.new(0.03, 0)
+tipPad.PaddingTop, tipPad.PaddingBottom = UDim.new(0.08, 0), UDim.new(0.08, 0)
+tipPad.Parent = badgeTip
+badge.MouseEnter:Connect(function()
+	badgeTip.Visible = badgeTip.Text ~= ""
+end)
+badge.MouseLeave:Connect(function()
+	badgeTip.Visible = false
+end)
+
 local bigPortrait = UnitPortrait.attach(bigHolder, { size = UDim2.fromScale(1, 1), zIndex = 12, animate = true }) -- (plays its idle)
 local dName = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.07), position = UDim2.fromScale(0.08, 0.42), align = Enum.TextXAlignment.Center })
 local dTitle = dtext(detailLeft, { size = UDim2.fromScale(0.84, 0.04), position = UDim2.fromScale(0.08, 0.495), font = Enum.Font.Garamond, color = INK_DIM, align = Enum.TextXAlignment.Center })
@@ -343,6 +389,18 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0.025, 0)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = abilityList
+
+-- what a family's tier gives, in words (as on the Army screen)
+local function familyEffectText(name, value)
+	local fam = Units.Families[name]
+	local pct = math.floor(value * 100 + 0.5) .. "%"
+	if fam.kind == "damage" then return name .. " units +" .. pct .. " damage" end
+	if fam.kind == "gate" then return "+" .. pct .. " damage to the gate" end
+	if fam.kind == "gold" then return "+" .. pct .. " gold from hits" end
+	if fam.kind == "burst" then return name .. " +" .. pct .. " damage for " .. fam.burstTime .. " s after a wall stands" end
+	if fam.kind == "special" then return "specials charge " .. pct .. " faster" end
+	return ""
+end
 
 -- "{25 s}" -> the number highlighted (rich text)
 local function highlight(str)
@@ -427,6 +485,27 @@ paintDetail = function()
 		SignatureName.apply(dName, unitType)
 	end
 	dTitle.Text = def.title or ""
+	-- the badge: the family (normal units) or COMMANDER (Signatures / Sovereigns)
+	local famName = Units.FamilyOf[unitType]
+	local commander = Units.isSignature(unitType) or Units.isSovereign(unitType)
+	badge.Visible = famName ~= nil or commander
+	badgeTip.Visible = false
+	if famName then
+		local fam = Units.Families[famName]
+		badge.Text = string.upper(famName)
+		badge.TextColor3 = FAMILY_COLOR[famName] or INK
+		badgeStroke.Color = FAMILY_COLOR[famName] or PAGE_EDGE
+		local parts = { "<b>" .. string.upper(famName) .. "</b>  " .. fam.blurb }
+		for t, need in ipairs(Units.FAMILY_THRESHOLDS) do
+			table.insert(parts, '<font color="' .. HIGHLIGHT .. '"><b>' .. need .. "</b></font>:  " .. familyEffectText(famName, fam.tiers[t]))
+		end
+		badgeTip.Text = table.concat(parts, "\n")
+	elseif commander then
+		badge.Text = "COMMANDER"
+		badge.TextColor3 = Color3.fromRGB(226, 186, 92)
+		badgeStroke.Color = Color3.fromRGB(226, 186, 92)
+		badgeTip.Text = "Leads from the commander throne. Its unique trait is its title."
+	end
 	dRarity.Text = string.upper(rarity) .. (Units.isSovereign(unitType) and "  SOVEREIGN" or (Units.isSignature(unitType) and "  SIGNATURE" or ""))
 	dRarity.TextColor3 = color
 	dStats[1].Text = "1 in " .. fmt(Units.getBaseOneIn(unitType))
@@ -439,7 +518,7 @@ paintDetail = function()
 			c:Destroy()
 		end
 	end
-	-- the passive first, then the basic attack, the special and the finisher
+	-- the passive (or the family) first, then the basic attack, the special and the finisher
 	local ordered = {}
 	local basic = Units.basicAttack(unitType)
 	if basic then
