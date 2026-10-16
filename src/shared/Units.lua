@@ -314,8 +314,7 @@ local UNITS = {
 			hits = { { at = 9.36, share = 0.12 }, { at = 9.96, share = 0.12 }, { at = 10.41, share = 0.12 },
 				{ at = 10.76, share = 0.12 }, { at = 11.36, share = 0.52 } } },
 	},
-	-- Malak, the Envoy: the first Sovereign (docs/envoy.md). WORK IN PROGRESS: weight 0 in the pool, so he can only be
-	-- spawned from the DEV panel; placeholder numbers. Basic attack, the orbital tag (model AttackStyle "OrbitalTag",
+	-- Malak, the Envoy: the first Sovereign (docs/envoy.md), pool weight 0.05 from the Celestial grave only. Basic attack, the orbital tag (model AttackStyle "OrbitalTag",
 	-- client OrbitalStrike.lua): while he fights his hologram pad opens into a big hologram in front of him; he taps it
 	-- once, a red laser cuts diagonally out of the sky onto the wall, then a shell from a cannon far above hits it.
 	-- One slow, heavy hit every 6.5 s; the damage lands with the shell (hitDelay must match OrbitalStrike.IMPACT_AT).

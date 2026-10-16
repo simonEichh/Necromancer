@@ -1,7 +1,7 @@
 # Malak, the Envoy: design draft
 
 Signature unit, designed with the user on 2026-10-15. Model built and liked by the user (2026-10-15):
-`tools/studio/build_malak.lua` -> `ServerStorage.Models.Malak` (512 parts, no shadow form yet). Idle done: model
+`tools/studio/build_malak.lua` -> `ServerStorage.Models.Malak` (512 parts); his shadow form `Malak_Shadow` ("the corrupted envoy": void-black armour, violet light, the helmet slit keeps its white-blue, smoke from the heel thrusters, the usual shadow layer) is built by `tools/studio/build_malak_shadow.lua`, which copies the finished `Malak` (run it after build_malak.lua). Idle done: model
 attribute `Pose = "Envoy"` -> UnitAnimator's Envoy block (slow double hover bob, glide lean and turn banking, dangling
 legs, the 11 coat blades + tabard on spring joints `Coat...` with attribute `CoatAngle`, a glance down at the hologram
 every ~11 s, hologram pulse + flicker). `Units.lua` has a placeholder entry (Primordial pool, weight 0: DEV panel only). Order: model (screenshots for approval) ->

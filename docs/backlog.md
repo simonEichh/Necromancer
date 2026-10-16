@@ -42,8 +42,8 @@ the originals (`sounds/_source/`, git-ignored) and the .wav drafts in `impacts/`
    in FleetStrike.lua, list in sounds/README.md); second batch (missiles, bow, reactor, charge, beam,
    roar, gate, warp_out) in too; the tear in (3 files), the barrage uses cannon_far + shell_impact;
    the music in (first try, cut to 52.5 s, not fitted to the beats). Not yet heard in play by the user.**
-2. Malak still open: rarity / pool weight (now weight 0 = DEV only), real damage numbers, the Sovereign class look (name
-   style, "Sovereign" on reveal / tooltip), the rail lance skill (special), shadow form (lv 10).
+2. Malak still open (done: rarity / pool weight 0.05 from the Celestial grave, damage numbers, "Sovereign" in the
+   Codex and on the pull): the rail lance skill (special). Shadow form built 2026-10-16 (`build_malak_shadow.lua`), not yet seen in play.
 3. Signatures rework per Design.md "Signature value" (specials = seconds of army DPS, small auras, cap of 3).
 4. From "general ideas.txt" (discussed, not started): small 3D unit over a magic circle on its grave (Malak is 750
    parts: needs a simple copy), the portal visible behind the gate before it falls (remove the door), no reveal
