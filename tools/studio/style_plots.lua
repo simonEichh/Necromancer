@@ -6,7 +6,8 @@
 -- Everything is built relative to each plot's frame (floor-level centre of the Base, local -Z = lane direction,
 -- outward) into the plot's "Style" folder, so the server's named lookups (Base, WallOrigin, PlayerSpawn, GraveSpotN)
 -- are unaffected:
---   Style.Spawn*      the spawn rune (stays on claimed plots too)
+--   Style.Spawn*      the spawn point's summoning circle (stays on claimed plots too; its glyph band and hexagram
+--                     are SpinFx models that the client WorldFx turns slowly, in opposite directions)
 --   Style.Neutral     everything else: hidden (parts, lights, emitters, signs) while a player owns the plot (PlotLook)
 --     * a bone-stone border and two bone bands down the middle of the flagstone floor
 --     * low balustrades along both sides (the plaza rim's: dark plinth, diamond balusters, bone rail, an invisible wall)
@@ -79,12 +80,87 @@ for i = 1, 8 do
 		return part(name, Vector3.new(thickness, radius * 2, radius * 2), at(forward, 0, y) * UP, color, material, Enum.PartType.Cylinder, parent)
 	end
 
-	-- ── the spawn rune (kept on claimed plots) ──────────────
-	flatDisc("SpawnRing", 5.6, 0.1, 8, 0.06, SOUL_VIOLET, Enum.Material.Neon, style)
-	flatDisc("SpawnDisc", 5.2, 0.12, 8, 0.07, STONE_DARK, Enum.Material.Slate, style)
-	for k = 0, 2 do
-		part("SpawnRune", Vector3.new(9, 0.05, 0.3), at(8, 0, 0.14) * CFrame.Angles(0, math.rad(60 * k), 0), SOUL_VIOLET, Enum.Material.Neon, nil, style)
+	-- ── the spawn point: a summoning circle (kept on claimed plots) ──
+	-- a dark stone disc; two outer rings with a band of rune glyphs between them (turning slowly), a hexagram with a
+	-- glowing dot at each point (turning the other way), an inner ring and a glowing core with souls rising off it
+	local centre = at(8, 0, 0)
+	flatDisc("SpawnDisc", 5.9, 0.1, 8, 0.05, STONE_DARK, Enum.Material.Slate, style)
+	-- a ring of short bars on `parent` (radius r, n segments, bar width w, height y)
+	local function ring(parent, name, r, n, w, y, color)
+		local len = 2 * math.pi * r / n + 0.04
+		for k = 0, n - 1 do
+			local a = (k + 0.5) / n * math.pi * 2
+			part(name, Vector3.new(w, 0.04, len), centre * CFrame.Angles(0, a, 0) * CFrame.new(r, y, 0), color, Enum.Material.Neon, nil, parent)
+		end
 	end
+	-- a spinning group: a model round an invisible centre part, tagged SpinFx (client WorldFx turns it)
+	local function spinner(name, speed)
+		local m = Instance.new("Model")
+		m.Name = name
+		local hub = part(name .. "Hub", Vector3.new(0.2, 0.2, 0.2), centre * CFrame.new(0, 0.1, 0), STONE_DARK, Enum.Material.SmoothPlastic, nil, m)
+		hub.Transparency = 1
+		m.PrimaryPart = hub
+		m:SetAttribute("SpinSpeed", speed)
+		m.Parent = style
+		game:GetService("CollectionService"):AddTag(m, "SpinFx")
+		return m
+	end
+	ring(style, "SpawnRing", 5.6, 28, 0.22, 0.12, SOUL_VIOLET)
+	ring(style, "SpawnRing", 4.75, 24, 0.12, 0.12, SOUL_VIOLET)
+	-- the rune band: a glyph of two or three strokes every 22.5 degrees
+	local glyphs = spinner("SpawnGlyphs", 0.12)
+	local GLYPH = Color3.fromRGB(120, 90, 210)
+	local SHAPES = { { { 0, 0.5, 0 }, { 0, -0.1, 50 } }, { { -0.12, 0.45, 0 }, { 0.12, 0.45, 0 }, { 0, 0.3, 90 } },
+		{ { 0, 0.5, 30 }, { 0, 0.5, -30 } }, { { 0, 0.55, 0 }, { 0, 0.25, 90 }, { 0.1, 0.2, 45 } } }
+	for k = 0, 15 do
+		local a = k / 16 * math.pi * 2
+		local cf = centre * CFrame.Angles(0, a, 0) * CFrame.new(5.18, 0.13, 0)
+		for _, s in ipairs(SHAPES[k % #SHAPES + 1]) do
+			part("SpawnGlyph", Vector3.new(0.09, 0.04, s[2]), cf * CFrame.new(0, 0, s[1]) * CFrame.Angles(0, math.rad(s[3]), 0), GLYPH, Enum.Material.Neon, nil, glyphs)
+		end
+	end
+	-- the hexagram: two triangles, a dot at each point
+	local star = spinner("SpawnStar", -0.07)
+	local R = 4.55
+	for t = 0, 1 do
+		for k = 0, 2 do
+			local a0 = (k / 3 + t / 6) * math.pi * 2
+			local a1 = ((k + 1) / 3 + t / 6) * math.pi * 2
+			local p0 = (centre * CFrame.new(math.cos(a0) * R, 0.14, math.sin(a0) * R)).Position
+			local p1 = (centre * CFrame.new(math.cos(a1) * R, 0.14, math.sin(a1) * R)).Position
+			part("SpawnStarLine", Vector3.new(0.14, 0.04, (p1 - p0).Magnitude), CFrame.lookAt((p0 + p1) / 2, p1), SOUL_VIOLET, Enum.Material.Neon, nil, star)
+		end
+	end
+	for k = 0, 5 do
+		local a = k / 6 * math.pi * 2
+		local p = centre * CFrame.new(math.cos(a) * R, 0.15, math.sin(a) * R)
+		part("SpawnStarDot", Vector3.new(0.05, 0.75, 0.75), p * UP, Color3.fromRGB(200, 170, 255), Enum.Material.Neon, Enum.PartType.Cylinder, star)
+	end
+	ring(star, "SpawnInnerRing", 2.1, 16, 0.12, 0.14, SOUL_VIOLET)
+	-- the core: a small glowing disc, a soft light, souls rising slowly
+	local core = part("SpawnCore", Vector3.new(0.06, 1.3, 1.3), centre * CFrame.new(0, 0.15, 0) * UP, Color3.fromRGB(200, 170, 255), Enum.Material.Neon, Enum.PartType.Cylinder, style)
+	local light = Instance.new("PointLight")
+	light.Color = SOUL_VIOLET
+	light.Range = 14
+	light.Brightness = 0.8
+	light.Shadows = false
+	light.Parent = core
+	local souls = Instance.new("ParticleEmitter")
+	souls.Name = "SpawnSouls"
+	souls.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	souls.Color = ColorSequence.new(Color3.fromRGB(200, 170, 255), SOUL_VIOLET)
+	souls.LightEmission = 1
+	souls.LightInfluence = 0
+	souls.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0) })
+	souls.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	souls.Lifetime = NumberRange.new(2, 3.5)
+	souls.Rate = 4
+	souls.Speed = NumberRange.new(0.6, 1.4)
+	souls.SpreadAngle = Vector2.new(25, 25)
+	souls.Shape = Enum.ParticleEmitterShape.Disc
+	souls.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	souls.EmissionDirection = Enum.NormalId.Right -- (the cylinder's axis points up)
+	souls.Parent = core
 
 	-- ── the floor: a bone border, two bands down the middle ──
 	for _, s in ipairs({ -1, 1 }) do
