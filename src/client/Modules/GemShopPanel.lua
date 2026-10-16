@@ -1,9 +1,11 @@
--- The Gem Shop (the Soul Broker's shop, Design.md "The Soul Broker"): everything gems buy, in four tabs:
+-- The Gem Shop (the Soul Broker's shop, Design.md "The Soul Broker"): everything gems buy, in five tabs:
 --   Deals  the Broker's hourly portrait deals (shared BrokerDeals, BuyBrokerDeal(portrait, rotation); stock per player
 --          per rotation from DataSync State.broker)
 --   Wares  consumables bought again and again: the two Forge catalysts (BuyCatalyst)
 --   Unlocks permanent upgrades: the Remote Forge, the Soul Wisp speed levels and the second commander throne
 --          (BuyGemItem "RemoteForge" | "WispSpeed" | "CommanderSlot")
+--   Outfit the Outfit of the Day (shared OutfitSets: one set a day for everyone): every piece or the whole set
+--          (BuyOutfit(what, day), server OutfitOfTheDay); the mannequin at the stall wears it
 --   Skills unlockable skills and finishers: Malak's Fleet Strike (BuyGemItem "FleetStrike"; also sold on his Codex
 --          page); the necromancer's spells join it later
 -- Opened by the Shop tile in the right HUD column (works anywhere, a plain centred panel) and at the Soul Broker stall
@@ -28,6 +30,8 @@ local ForgePanel = require(script.Parent.ForgePanel)
 local WorldView = require(script.Parent.WorldView)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local BrokerDeals = require(ReplicatedStorage.Shared.BrokerDeals)
+local OutfitSets = require(ReplicatedStorage.Shared.OutfitSets)
+local Items = require(ReplicatedStorage.Shared.Items)
 
 local C = Theme.Color
 local Z = 36
@@ -37,6 +41,7 @@ local GemShopPanel = {}
 local buyCatalystRemote = ReplicatedStorage:WaitForChild("BuyCatalyst", 5)
 local buyItemRemote = ReplicatedStorage:WaitForChild("BuyGemItem", 5)
 local buyDealRemote = ReplicatedStorage:WaitForChild("BuyBrokerDeal", 5)
+local buyOutfitRemote = ReplicatedStorage:WaitForChild("BuyOutfit", 5)
 
 -- ============================================================
 -- Frame
@@ -76,7 +81,7 @@ gemsLbl.ZIndex = Z + 2
 -- one page per tab, below the tab row
 local TOP_Y = 48
 local pages = {}
-for _, key in ipairs({ "deals", "wares", "unlocks", "skills" }) do
+for _, key in ipairs({ "deals", "wares", "unlocks", "outfit", "skills" }) do
 	local f = Instance.new("Frame")
 	f.Name = key
 	f.BackgroundTransparency = 1
@@ -182,6 +187,31 @@ local wispCard = itemCard(pages.unlocks, 2, "Soul Wisp Speed", Theme.Image.Icon.
 local throneCard = itemCard(pages.unlocks, 3, "Second Commander Throne", Theme.Image.Icon.Ascend, "CommanderSlot")
 
 -- ============================================================
+-- Outfit: the Outfit of the Day (a piece per slot and the whole set)
+-- ============================================================
+local outfitTitle = Theme.label(pages.outfit, { text = "", size = "Heading", font = "Strong", color = C.Bone, frameSize = UDim2.new(1, -24, 0, 26) })
+outfitTitle.Position = UDim2.fromOffset(14, 0)
+outfitTitle.ZIndex = Z + 2
+local outfitCountdown = Theme.label(pages.outfit, { text = "", size = "Small", color = C.BoneDim, frameSize = UDim2.new(1, -24, 0, 18) })
+outfitCountdown.Position = UDim2.fromOffset(14, 26)
+outfitCountdown.ZIndex = Z + 2
+local outfitCards = {}
+local function outfitBuy(what)
+	return function()
+		if buyOutfitRemote then
+			buyOutfitRemote:FireServer(what, OutfitSets.day(workspace:GetServerTimeNow()))
+		end
+	end
+end
+for i, slot in ipairs(Items.SLOTS) do
+	local c = card(pages.outfit, i, "", nil, 50)
+	buyButton(c, outfitBuy(slot))
+	outfitCards[slot] = c
+end
+local setCard = card(pages.outfit, #Items.SLOTS + 1, "", Theme.Image.Icon.Gems, 50)
+buyButton(setCard, outfitBuy("Set"))
+
+-- ============================================================
 -- Skills: unlockable skills and finishers
 -- ============================================================
 local fleetCard = itemCard(pages.skills, 1, "Fleet Strike", Theme.Image.Icon.Gems, "FleetStrike")
@@ -257,6 +287,45 @@ local function paintSkills(gems)
 	end
 end
 
+local function paintOutfit(gems)
+	local now = workspace:GetServerTimeNow()
+	local _, set = OutfitSets.today(now)
+	local s = math.floor(OutfitSets.secondsLeft(now))
+	outfitCountdown.Text = string.format("A new outfit in %d:%02d:%02d", s // 3600, (s // 60) % 60, s % 60)
+	local owned = {}
+	for _, key in ipairs(State.items or {}) do owned[key] = true end
+	setCard.frame.Visible = set ~= nil
+	if not set then
+		outfitTitle.Text = "No outfit today"
+		for _, c in pairs(outfitCards) do c.frame.Visible = false end
+		return
+	end
+	outfitTitle.Text = set.name
+	for _, slot in ipairs(Items.SLOTS) do
+		local c = outfitCards[slot]
+		local key = set.pieces[slot]
+		local def = Items.Defs[key]
+		local price = OutfitSets.piecePrice(key)
+		c.frame.Visible = true
+		c.title.Text = Items.SLOT_INFO[slot].name .. ": " .. def.name
+		c.desc.Text = def.description or ""
+		if owned[key] then
+			setButton(c, "Owned", true)
+		else
+			setButton(c, price .. " Gems", gems < price)
+		end
+	end
+	local setPrice = OutfitSets.setPrice(set, owned)
+	setCard.title.Text = "The whole set"
+	if setPrice then
+		setCard.desc.Text = "Every piece you are missing, " .. math.floor((1 - OutfitSets.SET_DISCOUNT) * 100 + 0.5) .. "% off."
+		setButton(setCard, setPrice .. " Gems", gems < setPrice)
+	else
+		setCard.desc.Text = "You own every piece. Wear it in Outfits."
+		setButton(setCard, "Owned", true)
+	end
+end
+
 local tab = "deals"
 local function paint()
 	local gems = State.gems or 0
@@ -267,6 +336,8 @@ local function paint()
 		paintWares(gems)
 	elseif tab == "unlocks" then
 		paintUnlocks(gems)
+	elseif tab == "outfit" then
+		paintOutfit(gems)
 	else
 		paintSkills(gems)
 	end
@@ -287,12 +358,12 @@ local function setTab(name)
 	end
 	paint()
 end
-for i, def in ipairs({ { "deals", "Deals" }, { "wares", "Wares" }, { "unlocks", "Unlocks" }, { "skills", "Skills" } }) do
+for i, def in ipairs({ { "deals", "Deals" }, { "wares", "Wares" }, { "unlocks", "Unlocks" }, { "outfit", "Outfit" }, { "skills", "Skills" } }) do
 	local t = {}
 	for _, state in ipairs({ "on", "off" }) do
 		t[state] = Theme.stoneButton(body, {
-			text = def[2], color = state == "on" and "green" or "stone", size = UDim2.fromOffset(120, 32),
-			position = UDim2.fromOffset(12 + (i - 1) * 128, 6), zIndex = Z + 2,
+			text = def[2], color = state == "on" and "green" or "stone", size = UDim2.fromOffset(104, 32),
+			position = UDim2.fromOffset(12 + (i - 1) * 110, 6), zIndex = Z + 2,
 			onClick = function() setTab(def[1]) end,
 		})
 	end
@@ -300,9 +371,17 @@ for i, def in ipairs({ { "deals", "Deals" }, { "wares", "Wares" }, { "unlocks", 
 end
 setTab("deals")
 
--- the Deals countdown, and a repaint when the hour turns
+-- the Deals / Outfit countdowns, and a repaint when the hour (or the day) turns
 local lastSecond = -1
 RunService.Heartbeat:Connect(function()
+	if panel.Visible and tab == "outfit" then
+		local s = math.floor(OutfitSets.secondsLeft(workspace:GetServerTimeNow()))
+		if s ~= lastSecond then
+			lastSecond = s
+			paint()
+		end
+		return
+	end
 	if not (panel.Visible and tab == "deals") then return end
 	local s = math.floor(BrokerDeals.secondsLeft(workspace:GetServerTimeNow()))
 	if s ~= lastSecond then
@@ -334,7 +413,7 @@ forgeTile.root.Visible = false
 function GemShopPanel.toggle()
 	panel.Visible = not panel.Visible
 end
--- opens the shop on a tab ("deals" | "wares" | "unlocks" | "skills")
+-- opens the shop on a tab ("deals" | "wares" | "unlocks" | "outfit" | "skills")
 function GemShopPanel.open(tabName)
 	setTab(tabName or tab)
 	panel.Visible = true
@@ -361,7 +440,12 @@ end
 function GemShopPanel.select(index) -- a deal (portrait 1..4), nil clears
 	highlight(index and dealCards[index])
 end
-function GemShopPanel.selectWare(key) -- a ware on the counter: "Fortune" | "Warding"
+function GemShopPanel.selectWare(key) -- a ware at the stall: "Fortune" | "Warding" | "Outfit" (the mannequin)
+	if key == "Outfit" then
+		setTab("outfit")
+		highlight(nil)
+		return
+	end
 	local c = catalystCards[key]
 	if c then
 		setTab("wares")
@@ -406,6 +490,11 @@ end
 local CAM_POS = Vector3.new(-16.5, 8.6, 2.5) -- in the stall's frame (it faces -X)
 local CAM_LOOK = Vector3.new(3, 9.2, 2.5)
 local CAM_SHIFT = 4.0 -- studs to the right in camera space
+-- on the Outfit tab the camera glides over to the mannequin (front left of the stall) and back on the other tabs
+local OUTFIT_CAM_POS = Vector3.new(-15, 6.8, -4.2)
+local OUTFIT_CAM_LOOK = Vector3.new(-4.4, 3.9, -9.0)
+local OUTFIT_CAM_SHIFT = 3.6
+local camFocus = 0 -- 0 = the counter, 1 = the mannequin (eases toward the tab's target)
 
 function GemShopPanel.openAtStall(tabName)
 	setTab(tabName or "deals")
@@ -418,12 +507,17 @@ function GemShopPanel.openAtStall(tabName)
 		panel.Visible = true -- (no stall in this place: the plain panel)
 		return
 	end
+	camFocus = tab == "outfit" and 1 or 0
 	view = WorldView.open({
 		keep = { shopGui },
 		openTime = 0.9,
 		fov = 50,
-		goal = function()
-			return CFrame.lookAt((P * CFrame.new(CAM_POS)).Position, (P * CFrame.new(CAM_LOOK)).Position) * CFrame.new(CAM_SHIFT, 0, 0)
+		goal = function(_, dt)
+			local want = tab == "outfit" and 1 or 0
+			camFocus += (want - camFocus) * math.min(1, (dt or 0) * 2.5)
+			local counter = CFrame.lookAt((P * CFrame.new(CAM_POS)).Position, (P * CFrame.new(CAM_LOOK)).Position) * CFrame.new(CAM_SHIFT, 0, 0)
+			local outfit = CFrame.lookAt((P * CFrame.new(OUTFIT_CAM_POS)).Position, (P * CFrame.new(OUTFIT_CAM_LOOK)).Position) * CFrame.new(OUTFIT_CAM_SHIFT, 0, 0)
+			return counter:Lerp(outfit, WorldView.smooth(camFocus))
 		end,
 		onStep = function(v, _, k)
 			hideCharacter(v.char, k > 0.4) -- (the character stands between the camera and the counter)

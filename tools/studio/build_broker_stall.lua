@@ -1,6 +1,6 @@
 -- Builds the Soul Broker's gem stall on the plaza: Workspace.HubDecor.Stall_SoulBroker (a hooded merchant behind a
 -- carved counter, a tall gallery wall with three gilded portraits (the big Featured one in the centre, Bundle left,
--- Potion right) and the Curio portrait on an easel front right (where the stall view's camera sees it), a velvet canopy, lanterns, gem chests, potion shelves)
+-- Potion right) and the Curio portrait on an easel front right (where the stall view's camera sees it), a velvet canopy, lanterns, the Outfit of the Day's pedestal, potion shelves)
 -- and the invisible interaction anchor Workspace.Shops.SoulBroker (with its ProximityPrompt; the server wires it in
 -- ShopNpcs). Design.md "The Soul Broker". Theme: violet velvet, gold and gem cyan (the grave shop is red, the Forge green).
 -- Each portrait's canvas is a part named "Canvas" with the attribute Portrait = 1..4 (BrokerDeals.PORTRAITS order): the
@@ -652,7 +652,36 @@ local function chest(cf, scale)
 		gemstone(m, "SpilledGem", 0.2, cf * CFrame.new(-1.0 * s - rng:NextNumber(0, 0.6), 0.12, rng:NextNumber(-0.9, 0.9) * s), GEM)
 	end
 end
-chest(at(-4.6, TOP, -9.2) * CFrame.Angles(0, math.rad(-20), 0), 1.0) -- (front left)
+-- the Outfit of the Day's pedestal, front left: the server (OutfitOfTheDay) stands a mannequin on "MannequinSpot"
+do
+	local px, pz = -4.4, -9.0
+	disc(m, "MannequinPlinth", 1.5, 0.3, at(px, TOP + 0.15, pz), STONE_DARK, Enum.Material.Slate)
+	disc(m, "MannequinPedestal", 1.25, 0.35, at(px, TOP + 0.47, pz), STONE, Enum.Material.Slate)
+	disc(m, "MannequinRim", 1.28, 0.08, at(px, TOP + 0.62, pz), GOLD, Enum.Material.Metal)
+	disc(m, "MannequinGlow", 1.1, 0.04, at(px, TOP + 0.66, pz), GEM_VIOLET, Enum.Material.Neon)
+	disc(m, "MannequinTop", 1.0, 0.06, at(px, TOP + 0.68, pz), VELVET_DARK, Enum.Material.Fabric)
+	local spot = part(m, "MannequinSpot", Vector3.new(0.4, 0.1, 0.4), at(px, TOP + 0.71, pz) * CFrame.Angles(0, math.rad(115), 0), GOLD, Enum.Material.SmoothPlastic)
+	spot.Transparency = 1 -- (its LookVector: the front, turned a little toward the stall's middle)
+	-- a small standing sign on a post in front of the pedestal (clear of its round side)
+	local signAt = at(px - 2.0, TOP, pz + 0.5) * CFrame.Angles(0, math.rad(25), 0)
+	part(m, "MannequinSignPost", Vector3.new(0.12, 0.9, 0.12), signAt * CFrame.new(0.06, 0.45, 0), GOLD_DARK, Enum.Material.Metal)
+	part(m, "MannequinSignFrame", Vector3.new(0.08, 0.66, 1.86), signAt * CFrame.new(0.02, 1.1, 0) * CFrame.Angles(0, 0, math.rad(-12)), GOLD, Enum.Material.Metal)
+	local plaque = part(m, "MannequinPlaque", Vector3.new(0.1, 0.56, 1.76), signAt * CFrame.new(-0.02, 1.1, 0) * CFrame.Angles(0, 0, math.rad(-12)), BASALT, Enum.Material.Metal)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Left
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 80
+	gui.LightInfluence = 0.2
+	gui.Parent = plaque
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundTransparency = 1
+	t.Text = "OUTFIT OF THE DAY"
+	t.TextScaled = true
+	t.Font = Enum.Font.GothamBlack
+	t.TextColor3 = GOLD
+	t.Parent = gui
+end
 chest(at(-2.8, TOP, -10.8) * CFrame.Angles(0, math.rad(10), 0), 0.75)
 -- stacked crates of bottles behind the right chest
 part(m, "Crate", Vector3.new(1.6, 1.4, 1.6), at(-0.6, TOP + 0.7, -10.6), WOOD_DARK, Enum.Material.WoodPlanks)
@@ -662,17 +691,6 @@ for i = 0, 2 do
 	b.Transparency = 0.15
 end
 
--- tall candelabras by the counter ends
-for _, z in ipairs({ -7.6, 7.6 }) do
-	local cb = at(-3.4, TOP, z)
-	disc(m, "CandelabraFoot", 0.45, 0.2, cb * CFrame.new(0, 0.1, 0), GOLD_DARK, Enum.Material.Metal)
-	part(m, "CandelabraStem", Vector3.new(0.14, 4.2, 0.14), cb * CFrame.new(0, 2.2, 0), GOLD_DARK, Enum.Material.Metal)
-	part(m, "CandelabraArms", Vector3.new(0.1, 0.1, 1.6), cb * CFrame.new(0, 4.1, 0), GOLD_DARK, Enum.Material.Metal)
-	for _, dz in ipairs({ -0.8, 0, 0.8 }) do
-		part(m, "CandelabraCup", Vector3.new(0.3, 0.12, 0.3), cb * CFrame.new(0, 4.2 + (dz == 0 and 0.35 or 0), dz), GOLD, Enum.Material.Metal)
-		candle(m, cb * CFrame.new(0, 4.26 + (dz == 0 and 0.35 or 0), dz), 0.7)
-	end
-end
 
 -- floating gems circling above the chests and in front of the gallery (SpinFx models turned by the client's WorldFx)
 local function orbit(name, center, radius, count, speed, size)
@@ -691,7 +709,6 @@ local function orbit(name, center, radius, count, speed, size)
 	CollectionService:AddTag(om, "SpinFx")
 	om.Parent = m
 end
-orbit("GemOrbitChest", at(-4.6, TOP + 2.9, -9.2), 1.1, 5, 0.6, 0.26)
 orbit("GemOrbitGallery", at(FACE - 0.9, FEATURED_Y, 0) * CFrame.Angles(0, 0, math.rad(90)), 4.2, 10, -0.18, 0.3) -- upright ring round the Featured frame (its up axis faces the customer)
 
 -- ============================================================

@@ -92,6 +92,31 @@ local function scaleFor(character, slot)
 	return math.clamp(part.Size.X / info.baseSize, MIN_SCALE, MAX_SCALE)
 end
 
+-- Dresses any rig in the given items ({ [slot] = item key }), replacing the items it wore: the Soul Broker's mannequin
+-- (OutfitOfTheDay). No avatar accessories to hide there.
+function Outfits.dress(model, pieces)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+	for _, child in model:GetChildren() do
+		if child:IsA("Accessory") and child:GetAttribute("OutfitItem") then
+			child:Destroy()
+		end
+	end
+	local folder = ReplicatedStorage:FindFirstChild("ItemModels")
+	for _, slot in ipairs(Items.SLOTS) do
+		local key = pieces[slot]
+		local template = key and folder and folder:FindFirstChild(key)
+		if template then
+			local acc = template:Clone()
+			acc:SetAttribute("OutfitItem", key)
+			acc:SetAttribute("OutfitSlot", slot)
+			scaleItem(acc, scaleFor(model, slot))
+			placeAt(acc, model)
+			humanoid:AddAccessory(acc)
+		end
+	end
+end
+
 -- Puts the player's equipped items on their character (and takes off the old ones).
 function Outfits.apply(player)
 	local character = player.Character

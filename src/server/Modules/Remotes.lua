@@ -42,6 +42,7 @@ local EVENTS = {
 	"OpenBroker", -- the Soul Broker stall's prompt (ShopNpcs) -> client GemShopPanel (Deals tab)
 	"BuyBrokerDeal", -- (portrait, rotation): the Soul Broker's portrait deals, see Broker
 	"BuyGemItem", -- (item "RemoteForge" | "WispSpeed"): the Gem Shop, see GemShop
+	"BuyOutfit", -- (what "Set" | slot, day): the Outfit of the Day, see OutfitOfTheDay
 	"EquipItem", -- (slot, item key | nil): wear or take off an outfit item, see Outfits
 	"WheelSpin",
 	"UseLuckPotion", -- use one saved potion for five minutes of 2x luck (time stacks)

@@ -27,6 +27,7 @@ require(Modules.UnitUpgrades)
 require(Modules.GemShop)
 require(Modules.Broker)
 require(Modules.Outfits) -- outfit items on the characters
+require(Modules.OutfitOfTheDay) -- one outfit set a day: BuyOutfit, the mannequin at the Soul Broker
 require(Modules.ShopNpcs)
 require(Modules.Digging)
 require(Modules.DevTools)

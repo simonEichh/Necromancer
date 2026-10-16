@@ -437,7 +437,13 @@ drumming his fingers; head follows a nearby player; the prompt calls him to the 
 arrives) DONE 2026-10-16; 3b. the in-world view DONE 2026-10-16 (agreed with the user: like the Forge, the camera glides to the counter, the
 stall fills the left, the normal Gem Shop panel stands on the right at once while the broker walks over; hovering a
 portrait gives it a gold rim, a click opens the view if needed and highlights that deal's card; the Shop tile keeps the
-plain panel anywhere); 3c. the wares as real objects DONE 2026-10-16: only what you buy again and again (the user's call: one-time unlocks
+plain panel anywhere); **Outfit of the Day** (agreed 2026-10-16, built): one themed outfit SET (Head + Back + Hand) a day for everyone (new at
+00:00 UTC, shared `OutfitSets`, picked from the clock), worn by a mannequin on a pedestal at the stall's front left
+(server `OutfitOfTheDay`, `Outfits.dress`), sold in the Gem Shop's **Outfit** tab: each piece (150 Gems unless the item
+has a `price`) or the whole set at 80 % of the missing pieces (`BuyOutfit(what, day)`). Only sets whose pieces all have
+models are offered; the collection (`OutfitSets.SETS`) is added later, Studio offers a test set of the starter pieces
+meanwhile. The two candelabras and the big gem chest made room for the pedestal.
+3c. the wares as real objects DONE 2026-10-16: only what you buy again and again (the user's call: one-time unlocks
 stay in the panel): a gold-green Fortune jar and a blue Warding jar on the counter (`Ware_<key>` models, client
 `BrokerWares`: gold outline on hover, a click selects the card in Wares); the burn-and-paint rotation is parked for later; 4. cosmetics in the Curio.
 
