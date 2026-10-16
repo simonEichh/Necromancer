@@ -7,7 +7,7 @@ Economy.INVENTORY_MAX = 300
 -- Tuned with tools/sim/economy_sim.py (the "income" preset); change the numbers there first and check the pace table.
 -- ============================================================
 -- Per ascension, the wall gets tougher and pays more (index k = going from k to k+1 ascensions). Tuned for the gate design.
-local HP_STEP = { 5, 5.5, 5.5, 7.5, 7, 10, 9, 7, 6 }
+local HP_STEP = { 14, 10, 3, 14, 4, 5.5, 6.5, 6, 5 } -- (2026-10-16 balance pass: stages 2, 3, 5 were too fast; sim variant G)
 local GOLD_STEP = { 4, 4, 4, 5, 5, 5, 4.5, 4, 4 }
 local WALL_HP_BASE, WALL_HP_GROWTH = 300, 1.20 -- HP of layer L = base * growth^(L-1) * ascension steps
 local WALL_GOLD_BASE, WALL_GOLD_GROWTH = 45, 1.12

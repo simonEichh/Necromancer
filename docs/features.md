@@ -34,7 +34,7 @@ No game-script errors during the check.
 | Gold Chest | 30% | Ten minutes of the placed army's hit income (`WheelPrizes.armyIncome`: ascension steps, coin boost, Soul Harvest; no family bonus), at least 300 gold. Was 3x the top grave's price until the sim showed that outgrows late income by far. |
 | Luck Potion | 10% | One saved potion: activate when ready for five minutes of 2x luck. |
 | Gems | 16% | 75 Gems. |
-| Grave Hoard | 20% | Five graves of the highest unlocked tier (Mossy through Celestial). |
+| Grave Hoard | 20% | Three graves of the highest unlocked tier (Mossy through Celestial); was five until the 2026-10-16 balance pass. |
 | Dust Cache | 15% | 12 dust of the highest tier unlocked in the dust shop (Stone / Silver / Gold / Diamond / Star at ascensions 0 / 1 / 3 / 5 / 7). |
 | Fortune Catalysts | 8% | Three Fortune Catalysts for Forge attempts. |
 | Spectral Crown | 1% | Permanent Head-slot outfit unlock; repeat wins give 250 Gems. **Modelling postponed by the user.** |

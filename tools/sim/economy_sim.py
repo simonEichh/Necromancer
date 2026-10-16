@@ -90,8 +90,18 @@ RANK = GAME["rank"]
 # ============================================================
 # Rules (presets). "current" = what the game does today. "proposed" = the new design being tuned.
 # ============================================================
-SHOP_STOCK = {"Mossy": 999, "Stone": 50, "Ancient": 30, "Cursed": 20, "Shadow": 15, "Abyssal": 10, "Eldritch": 5, "Void": 3, "Eternal": 2, "Celestial": 1}
-SHOP_CHANCE = {"Mossy": 1.0, "Stone": 0.9, "Ancient": 0.8, "Cursed": 0.7, "Shadow": 0.6, "Abyssal": 0.5, "Eldritch": 0.4, "Void": 0.3, "Eternal": 0.2, "Celestial": 0.1}
+def read_grave_shop():
+    """GRAVE_STOCK_BASE / GRAVE_ROTATION_CHANCE from src/server/Modules/GraveShop.lua (the grave shop's restock)."""
+    with open(os.path.join(ROOT, "src", "server", "Modules", "GraveShop.lua"), encoding="utf-8") as f:
+        src = f.read()
+    def table(name):
+        block = src[src.index("local " + name + " = {"):]
+        block = block[: block.index("}")]
+        return {k: float(v) for k, v in re.findall(r"(\w+) = ([\d.]+)", block)}
+    return {k: int(v) for k, v in table("GRAVE_STOCK_BASE").items()}, table("GRAVE_ROTATION_CHANCE")
+
+
+SHOP_STOCK, SHOP_CHANCE = read_grave_shop()  # read from the game (the old hard-coded copy had drifted: Mossy 999 vs 40)
 RESTOCK_SECONDS = 300
 MATERIALS = ["Stone Dust", "Bone Shards", "Grave Iron", "Hex Ash", "Gilded Relic", "Abyssal Pearl", "Eldritch Ichor", "Eternal Ember", "Primordial Core"]  # one per rarity, lowest first
 
@@ -164,7 +174,7 @@ PRESETS["dust"] = dict(
 # break gold), geometric by rarity rank, x the level bonus, x the ascension gold steps, x the coin boost.
 # hit_uptime = share of the time the army is actually hitting (the rest is marching to the next wall).
 INCOME_STEP = [4, 4, 3, 2, 1.5, 1.5, 1.5, 1.5, 1.5]  # per-ascension growth of hit income (weaker late: stages last hours)
-INCOME_HP_STEP = [5, 5.5, 5.5, 7.5, 7, 10, 9, 7, 6]  # walls a bit tougher than "gate": hit income keeps the gold flowing
+INCOME_HP_STEP = [14, 10, 3, 14, 4, 5.5, 6.5, 6, 5]  # = Economy.HP_STEP (retuned in the 2026-10-16 balance pass)
 PRESETS["income"] = dict(
     PRESETS["dust"],
     hit_income=lambda rank, r, coin: 3.0 * 1.5 ** (rank - 1) * prod(INCOME_STEP[:r]) * (1 + 0.5 * coin),
@@ -197,7 +207,7 @@ PITY_AT = 60
 LUCK_STEP = 0.10  # +10 % per luck upgrade level (rework: multiplies the weights of Rare and better)
 
 # The Lucky Wheel (src/shared/WheelRewards.lua + WheelPrizes.lua): (id, weight, amount)
-WHEEL = [("gold_chest", 30, 0), ("luck_potion", 10, 1), ("gems", 16, 75), ("grave_hoard", 20, 5),
+WHEEL = [("gold_chest", 30, 0), ("luck_potion", 10, 1), ("gems", 16, 75), ("grave_hoard", 20, 3),
          ("dust_cache", 15, 12), ("fortune_bundle", 8, 3), ("spectral_crown", 1, 250)]
 WHEEL_SPIN_SECONDS = 900  # one free spin per 15 minutes in the game
 POTION_SECONDS = 300  # 2x luck
@@ -240,6 +250,8 @@ class Player:
         self.gold_from = {"wall": 0.0, "hit": 0.0, "sell": 0.0}
         self.realm_lv = {}  # realm upgrade levels (reset with the gold when a new realm starts)
         self.stage_from = []  # gold_from per stage (copied at every ascension)
+        self.top_got = {"shop": 0, "wheel": 0}  # graves of the highest unlocked tier this stage
+        self.stage_top = []  # top_got per stage
         self.next_spin = WHEEL_SPIN_SECONDS
         self.luck_buff_end = 0.0
         self.fortune = 0
@@ -286,6 +298,8 @@ class Player:
             self.gold = 0
             self.realm_lv = {}
         self.stage_from.append(dict(self.gold_from))
+        self.stage_top.append(dict(self.top_got))
+        self.top_got = {"shop": 0, "wheel": 0}
         self.gold_from = {k: 0.0 for k in self.gold_from}
         self.r += 1
         self.snap.append((self.pulls, round(self.total_dps()), [GAME["unit_rarity"][u["type"]][:4] for u in self.placed()][:5]))
@@ -421,6 +435,7 @@ class Player:
             self.graves[top["key"]] += amount
             self.wheel_graves += amount
             self.wheel_by[top["key"]] = self.wheel_by.get(top["key"], 0) + amount
+            self.top_got["wheel"] += amount
         elif wid == "dust_cache":
             if self.R["upgrades"] and self.R.get("mat_group") == 2:
                 d = max(d for d in range(1, 6) if DUST_SHOP_UNLOCK(d) <= self.r)
@@ -474,6 +489,8 @@ class Player:
                 self.shop[key] = stock - n
                 self.graves[key] += n
                 self.bought[key] = self.bought.get(key, 0) + n
+                if grave["unlock"] == min(self.r, max(g["unlock"] for g in GAME["graves"])):
+                    self.top_got["shop"] += n
         before = {u["id"] for u in self.placed()}
         # open everything (only up to the free inventory; ignored here)
         for key, n in list(self.graves.items()):
@@ -740,6 +757,9 @@ def report(runs, preset, hours_per_day):
         for i, gf in enumerate(p.stage_from):
             tot = sum(gf.values()) or 1
             print(f"  #{i + 1}: {gf['wall']:>12.3g} {gf['hit']:>12.3g} {gf['sell']:>12.3g}   hits {100 * gf['hit'] / tot:4.0f}%")
+    if p.stage_top:
+        print("\nfirst run, graves of the top unlocked tier got per stage (shop + wheel):")
+        print("  " + "  ".join(f"#{i + 1}: {t['shop']}+{t['wheel']}" for i, t in enumerate(p.stage_top)))
     print(f"longest gap without any progress event (new rarity / level up / ascension / boss wall): median {statistics.median(gaps):.1f} min")
 
     if p.R.get("wheel"):

@@ -128,7 +128,7 @@ for ascension = 0, 12 do
 			elseif prize.gems then
 				check(profile.gems == 75, "gem award mismatch")
 			elseif prize.graveType then
-				check(prize.graveType == expectedGrave and profile.ownedGraves[expectedGrave] == 5, "grave hoard must use unlocked tier")
+				check(prize.graveType == expectedGrave and profile.ownedGraves[expectedGrave] == 3, "grave hoard must use unlocked tier")
 			elseif prize.dust then
 				check(prize.dust == expectedDust and profile.materials[expectedDust] == 12, "dust must use unlocked tier")
 			elseif prize.catalyst then
