@@ -1096,4 +1096,14 @@ end)
 
 return {
 	IMPACT_AT = IMPACT_AT,
+	-- the big hologram's frame (-Z towards him, +X its right as he sees it) and size factor, or nil while it is closed
+	-- (RequisitionFx draws the special's dial next to it)
+	board = function(model)
+		local b = boards[model]
+		if b and b.cf and b.open > 0.3 then
+			return b.cf, b.k
+		end
+		return nil
+	end,
+	BOARD_W = BOARD_W,
 }

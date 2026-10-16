@@ -1,6 +1,9 @@
--- Malak's special, the REQUISITION (Units.Malak.special, kind "Requisition", 40 s; he keeps attacking meanwhile).
+-- Malak's special, the REQUISITION (Units.Malak.special, kind "Requisition", 42 s; he keeps attacking meanwhile).
+--   0. (0-2.9 s) The call: a round dial appears on the left of his big hologram (OrbitalStrike.board), he reaches over
+--      and turns it with his index finger (UnitAnimator's Envoy block; it clicks round three quarters), it locks with a
+--      flash and fades: the request is sent. (Every time below is 2 s later than the first draft for this.)
 -- Drawn from the synced server clock (SpecialAt) and the shared seed (SpecialSeed), so every player sees the same.
---   1. (0-2.2 s) He taps his hologram; a supply pod (Modules/DropPod, small) drops out of the sky from the Absolution
+--   1. (2.6-4.2 s) A supply pod (Modules/DropPod, small) drops out of the sky from the Absolution
 --      on a vapour trail and slams down beside the army, near the front (dust, sparks, a ring of cold-blue runes).
 --   2. (2.5-5 s) Steam out of its vents, then the petals fold open.
 --   3. (5.2-9.8 s) A drone dispenser rises out of it (a chrome launch column with a glowing muzzle) and kicks out six
@@ -19,6 +22,7 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local DropPod = require(script.Parent.DropPod)
+local OrbitalStrike = require(script.Parent.OrbitalStrike)
 local Sfx = require(script.Parent.Sfx)
 
 local FX_DISTANCE = 360 -- (players farther than this from both Malak and the pod do not draw it)
@@ -34,24 +38,28 @@ local SILVER = Color3.fromRGB(176, 180, 196)
 local UP = Vector3.yAxis
 
 -- ── Timeline (s after SpecialAt) ─────────────────────────────
-local DROP_FROM = 0.6 -- the pod appears high in the sky ...
-local IMPACT_AT = 2.2 -- ... and lands
-local OPEN_FROM, T_OPEN = 3.6, 1.4 -- the petals fold open
-local RISE_FROM, T_RISE = 5.2, 1.2 -- the dispenser rises out of the open pod
-local LAUNCH_FROM, LAUNCH_GAP = 6.8, 0.6 -- the drones are kicked out one after another
+local DIAL_IN = 0.1 -- the dial appears on the hologram ...
+local TURN_FROM, TURN_TO = 1.0, 2.2 -- ... he turns it (= UnitAnimator's Envoy block) ...
+local DIAL_OUT = 2.4 -- ... it locks, flashes and fades
+local DROP_FROM = 2.6 -- the pod appears high in the sky ...
+local IMPACT_AT = 4.2 -- ... and lands
+local OPEN_FROM, T_OPEN = 5.6, 1.4 -- the petals fold open
+local RISE_FROM, T_RISE = 7.2, 1.2 -- the dispenser rises out of the open pod
+local LAUNCH_FROM, LAUNCH_GAP = 8.8, 0.6 -- the drones are kicked out one after another
 local DRONES = 6
 local T_LAUNCH = 1.6 -- a drone's flight from the muzzle to its post
 local SWARM_END = LAUNCH_FROM + 25 -- the drones fight for 25 s (from the first launch)
-local RECALL_GAP, T_RECALL = 0.35, 2.2 -- the drones fly home one after another (the last lands at ~35.8)
-local SINK_FROM, T_SINK = 36.0, 0.8 -- the dispenser sinks back
+local RECALL_GAP, T_RECALL = 0.35, 2.2 -- the drones fly home one after another (the last lands at ~37.8)
+local SINK_FROM, T_SINK = 38.0, 0.8 -- the dispenser sinks back
 local PULSE_EVERY = 3 -- while it is up the dispenser pings and sends a shockwave over the ground (the buff)
 local PULSE_TIME = 0.9
 local PULSE_RADIUS = 20
-local CLOSE_FROM, T_CLOSE = 36.8, 0.8 -- the petals close ...
-local BEAM_FROM = 37.6 -- ... the tractor beam comes down ...
-local LIFT_FROM, T_LIFT = 38.0, 1.4 -- ... and lifts the pod into the sky
+local CLOSE_FROM, T_CLOSE = 38.8, 0.8 -- the petals close ...
+local BEAM_FROM = 39.6 -- ... the tractor beam comes down ...
+local LIFT_FROM, T_LIFT = 40.0, 1.4 -- ... and lifts the pod into the sky
 local LIFT_HEIGHT = 220
-local END_AT = 40
+local END_AT = 42
+local DIAL_X, DIAL_Y, DIAL_R = -1.62, -0.05, 0.42 -- (on the board, in board units: left of it as he sees it)
 
 local BOLT_SPEED = 160 -- studs/s
 local BOLT_VOLUME = 0.28 -- (every bolt has its sound, quiet: six drones fire about six a second)
@@ -118,6 +126,54 @@ local function requisition(model)
 	local folder = Instance.new("Folder")
 	folder.Name = "Requisition"
 	folder.Parent = Workspace
+
+	-- ── the call: the dial next to his hologram ──
+	local dial = { rings = {}, ticks = {} }
+	for k = 0, 23 do
+		table.insert(dial.rings, { part = newPart(folder, Vector3.new(0.1, 0.03, 0.02), CFrame.new(0, -5000, 0), GLOW), a = (k + 0.5) / 24 * math.pi * 2, r = 1 })
+	end
+	for k = 0, 11 do
+		table.insert(dial.rings, { part = newPart(folder, Vector3.new(0.1, 0.022, 0.02), CFrame.new(0, -5000, 0), GLOW), a = (k + 0.5) / 12 * math.pi * 2, r = 0.58, inner = true })
+	end
+	for k = 0, 7 do
+		table.insert(dial.ticks, { part = newPart(folder, Vector3.new(0.025, 0.11, 0.02), CFrame.new(0, -5000, 0), GLOW_CORE), a = k / 8 * math.pi * 2 })
+	end
+	dial.pointer = newPart(folder, Vector3.new(0.03, 0.3, 0.02), CFrame.new(0, -5000, 0), GLOW_CORE)
+	dial.core = newPart(folder, Vector3.new(0.09, 0.09, 0.02), CFrame.new(0, -5000, 0), GLOW_CORE)
+	local function placeDial(t)
+		local cf, k = OrbitalStrike.board(model)
+		local show = e(t, DIAL_IN, DIAL_IN + 0.35) * (1 - e(t, DIAL_OUT + 0.15, DIAL_OUT + 0.5))
+		local all = { dial.pointer, dial.core }
+		for _, r in ipairs(dial.rings) do table.insert(all, r.part) end
+		for _, tk in ipairs(dial.ticks) do table.insert(all, tk.part) end
+		if not cf or show <= 0 or t > DIAL_OUT + 0.5 then
+			for _, p in ipairs(all) do p.Transparency = 1 end
+			return
+		end
+		local flash = math.max(0, 1 - math.abs(t - DIAL_OUT) / 0.2) -- (it locks with a flash)
+		local turned = smooth((t - TURN_FROM) / (TURN_TO - TURN_FROM)) * math.pi * 1.5
+		local radius = DIAL_R * k * (0.6 + 0.4 * show) * (1 + 0.25 * flash)
+		local centre = cf * CFrame.new(DIAL_X * k, DIAL_Y * k, -0.02)
+		local tr = 1 - show * (0.85 + 0.15 * flash)
+		for _, r in ipairs(dial.rings) do
+			local rr = radius * r.r
+			local a = r.a + (r.inner and -turned * 0.5 or 0) + t * 0.3
+			r.part.Size = Vector3.new(2 * rr * math.sin(math.pi / (r.inner and 12 or 24)) * 0.8, (r.inner and 0.022 or 0.03) * k, 0.02)
+			r.part.CFrame = centre * CFrame.Angles(0, 0, a) * CFrame.new(rr, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
+			r.part.Transparency = tr
+		end
+		for _, tk in ipairs(dial.ticks) do
+			tk.part.Size = Vector3.new(0.025 * k, 0.11 * k, 0.02)
+			tk.part.CFrame = centre * CFrame.Angles(0, 0, tk.a - turned) * CFrame.new(0, radius * 0.8, 0)
+			tk.part.Transparency = tr
+		end
+		dial.pointer.Size = Vector3.new(0.03 * k, radius * 0.7, 0.02)
+		dial.pointer.CFrame = centre * CFrame.Angles(0, 0, -turned) * CFrame.new(0, radius * 0.35, -0.005)
+		dial.pointer.Transparency = tr
+		dial.core.Size = Vector3.new(0.09, 0.09, 0.02) * k * (1 + flash)
+		dial.core.CFrame = centre * CFrame.new(0, 0, -0.005) * CFrame.Angles(0, 0, math.rad(45))
+		dial.core.Transparency = tr
+	end
 
 	local pod = DropPod.build(folder, POD_SCALE)
 	pod.setHidden(true)
@@ -353,7 +409,9 @@ local function requisition(model)
 
 	-- the sounds, from where they happen
 	local cues = {
-		{ name = "holo_tap", at = 0, parent = root, volume = 0.8 },
+		{ name = "holo_open", at = DIAL_IN, parent = root, volume = 0.5, pitch = 1.3, cut = 0.6 },
+		{ name = "holo_tap", at = DIAL_OUT, parent = root, volume = 0.8 },
+		{ name = "rune_confirm", at = DIAL_OUT + 0.05, parent = root, volume = 0.4, pitch = 1.2, cut = 0.6 },
 		{ name = "drone_transform", at = DROP_FROM - 0.2, parent = root, volume = 2, pitch = 0.8 }, -- (the clamps letting go, far above)
 		{ name = "shell_impact", at = IMPACT_AT, parent = ground, volume = 0.7, pitch = 0.8 },
 		{ name = "reactor_lock", at = OPEN_FROM - 0.25, parent = ground, volume = 0.6, pitch = 1.1 },
@@ -364,6 +422,10 @@ local function requisition(model)
 	table.insert(cues, { name = "warp_out", at = LIFT_FROM + T_LIFT - 0.3, parent = ground, volume = 0.7, pitch = 1.3 })
 	for i = 1, DRONES do
 		table.insert(cues, { name = "rune_click", at = SWARM_END + (DRONES - i) * RECALL_GAP + T_RECALL, parent = muzzle, volume = 0.5, pitch = 1.4 + i * 0.05 })
+	end
+	for k = 0, 5 do
+		-- (the dial clicking round as he turns it)
+		table.insert(cues, { name = "rune_click", at = TURN_FROM + k * (TURN_TO - TURN_FROM) / 6, parent = root, volume = 0.35, pitch = 1.5 + k * 0.05 })
 	end
 	for _, pt in ipairs(pulseTimes) do
 		table.insert(cues, { name = "rune_confirm", at = pt, parent = muzzle, volume = 0.45, pitch = 1.7, cut = 0.5 }) -- (the ping)
@@ -415,6 +477,8 @@ local function requisition(model)
 				end
 			end
 		end
+
+		placeDial(t)
 
 		-- ── 1. the drop ──
 		if t < DROP_FROM then

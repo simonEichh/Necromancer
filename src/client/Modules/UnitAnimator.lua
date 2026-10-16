@@ -1732,6 +1732,26 @@ local function animate(model, rig, dt, now)
 			tapTarget = ease(1.75, 3.0) * (1 - ease(3.4, 4.6))
 			press = ease(2.95, 3.05) * (1 - ease(3.1, 3.35)) -- (the poke itself, TAP_AT = 3.05)
 		end
+		-- the Requisition's call (model SpecialAt / SpecialKind; RequisitionFx draws the dial): he reaches over to the left
+		-- of the big hologram (0.25-1.0 s), turns the dial with his index finger, the fingertip going round in a small
+		-- circle (TURN 1.0-2.2 s, = RequisitionFx), holds as it locks and lets the arm float back (2.4-3.2 s)
+		local dialTarget, twirl = 0, 0
+		local specialAt = model:GetAttribute("SpecialAt")
+		if style == "OrbitalTag" and specialAt and model:GetAttribute("SpecialKind") == "Requisition" then
+			local sp = workspace:GetServerTimeNow() - specialAt
+			if sp >= 0 and sp < 3.4 then
+				local function sease(a, b)
+					local x = clamp01((sp - a) / (b - a))
+					return x * x * (3 - 2 * x)
+				end
+				dialTarget = sease(0.25, 1.0) * (1 - sease(2.45, 3.2))
+				twirl = sease(1.0, 2.2)
+				fighting = fighting or sp < 3.2 -- (the big hologram stays open for it)
+			end
+		end
+		rig.dialv = (rig.dialv or 0) + ((dialTarget - (rig.dial or 0)) * 34 - (rig.dialv or 0) * 8.5) * ddt
+		rig.dial = math.clamp((rig.dial or 0) + rig.dialv * ddt, -0.05, 1.06)
+		local dial = math.clamp(rig.dial, 0, 1.06)
 		rig.boardOpen = (rig.boardOpen or 0) + ((fighting and 1 or 0) - (rig.boardOpen or 0)) * clamp01(dt * 4)
 		local open = rig.boardOpen
 		rig.tapv = (rig.tapv or 0) + ((tapTarget - (rig.tap or 0)) * 40 - (rig.tapv or 0) * 9) * ddt
@@ -1744,8 +1764,8 @@ local function animate(model, rig, dt, now)
 		-- attack he looks ahead and a little down at the big hologram instead
 		local glance = window((t / 11) % 1, 0.55, 0.8, 0.06) * (1 - glide) * (1 - open)
 		local read = focus * open
-		set(rig, "Neck", ANGLES(-0.04 - glance * 0.32 - read * 0.14 + check * 0.12 + math.sin(t * 0.7) * 0.02,
-			-glance * 0.35 - read * 0.08 + math.sin(t * 0.3) * 0.05, glance * 0.08))
+		set(rig, "Neck", ANGLES(-0.04 - glance * 0.32 - read * 0.14 + check * 0.12 - dial * 0.1 + math.sin(t * 0.7) * 0.02,
+			-glance * 0.35 - read * 0.08 + dial * 0.32 + math.sin(t * 0.3) * 0.05, glance * 0.08))
 
 		-- right arm: palm up under the small pad; with the big hologram open the empty hand sinks and turns inward,
 		-- relaxed; the tap reaches out with the hand turned over so the straight index finger leads
@@ -1758,9 +1778,15 @@ local function animate(model, rig, dt, now)
 		local tapS = ANGLES(1.42 + press * 0.07, 0.06, 0)
 		local tapE = ANGLES(-1.12 - press * 0.12, 0, 0)
 		local tapW = ANGLES(0.15, 0, -2.5)
-		set(rig, "RShoulder", idleS:Lerp(restS, open):Lerp(tapS, tap))
-		set(rig, "RElbow", idleE:Lerp(restE, open):Lerp(tapE, tap))
-		set(rig, "RWrist", idleW:Lerp(restW, open):Lerp(tapW, tap))
+		-- the dial: the arm across to his left, the fingertip drawing a small circle while he turns it
+		local ring = twirl * math.pi * 1.5
+		local circle = math.sin(math.pi * twirl) -- (the circle grows in and out with the turn)
+		local dialS = ANGLES(1.3 + math.sin(ring) * 0.07 * circle, 0.62 + math.cos(ring) * 0.07 * circle, 0)
+		local dialE = ANGLES(-0.85, 0, 0)
+		local dialW = ANGLES(0.1, 0, -2.4 + twirl * 0.5)
+		set(rig, "RShoulder", idleS:Lerp(restS, open):Lerp(tapS, tap):Lerp(dialS, dial))
+		set(rig, "RElbow", idleE:Lerp(restE, open):Lerp(tapE, tap):Lerp(dialE, dial))
+		set(rig, "RWrist", idleW:Lerp(restW, open):Lerp(tapW, tap):Lerp(dialW, dial))
 		set(rig, "LShoulder", ANGLES(breathe * 0.3, 0, 0))
 		set(rig, "LElbow", CFrame.new())
 
