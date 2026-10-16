@@ -219,7 +219,8 @@ function Sfx.loopAt(name, position, range)
 	return h
 end
 
-function Sfx.play(name, parent, volume, pitch)
+-- (timePosition: start that many seconds in; returns the Sound, which destroys itself when it ends)
+function Sfx.play(name, parent, volume, pitch, timePosition)
 	local s, slot = make(name, parent)
 	if not s then
 		return
@@ -230,7 +231,11 @@ function Sfx.play(name, parent, volume, pitch)
 	s.Ended:Connect(function()
 		s:Destroy()
 	end)
+	if timePosition and timePosition > 0 then
+		s.TimePosition = timePosition
+	end
 	s:Play()
+	return s
 end
 
 return Sfx

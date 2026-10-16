@@ -159,6 +159,14 @@ cut to silence, the beam impact, the slow warp-out boom.
 
 ## Pull cinematic: "The Envoy Arrives" (agreed with the user 2026-10-15; first draft built, see the end)
 
+**Other players (2026-10-16):** everyone gets the `RarePull` banner ("NAME SUMMONED / MALAK, THE ENVOY / SOVEREIGN - 1 IN N",
+client `RarePullBanner`, also for Signatures). The puller's client reports where its grave stands (`ArrivalStarted`); server
+`Digging` checks it against the Sovereign just pulled (once, within 120 s, within 60 studs of the character) and sends
+`ArrivalShow` with a shared start time to everyone else: `SovereignArrival.play(..., { spectate = ... })` plays the world part
+on that clock (grave, laser, tear, ship, pod, Malak) with their own camera and quiet sound (`SPECTATOR_VOLUME`), plus a Watch
+button for the whole cinematic (full camera, sound, subtitles; his line joins mid-line), Leave gives the camera back. No
+ritual and no absorb for spectators; their own Sovereign pull stops watching. Not yet tested with two real clients.
+
 Sovereign pulls only (Malak), always this one (no 50/50 with the star summon), ~26 s (the user: longer is better),
 Skip / Continue. Reuses the Fleet Strike's `skyTear`, `warpIn` and the Absolution; keep everything within ~300 studs of
 the camera (low graphics draw distance). Beats: 1. bait (the grave rises, shakes, freezes; silence) 2. a thin red

@@ -13,6 +13,8 @@ local EVENTS = {
 	"DevGiveGold",
 	"DevFastSpecials",
 	"DevFleetStrike", -- (on) Studio: start / stop a Fleet Strike finisher on your plot (FleetStrike.lua previews it)
+	"ArrivalStarted", -- client -> server ({ G, dir, feet }): the puller's Sovereign arrival cinematic started (Digging checks it)
+	"ArrivalShow", -- server -> other clients ({ owner, unitType, rarity, graveType, G, dir, feet, startAt }): play it in their world
 	"RarePull", -- server -> all clients ({ userId, name, unitType, oneIn }): someone pulled a Signature / Sovereign (client RarePullBanner)
 	"DevBreakAll", -- Studio: break every wall including the gate (loot and all), so you can ascend
 	"DevGateLow", -- Studio: break walls up to the gate and set it just above 20% HP (to test the Fleet Strike trigger)

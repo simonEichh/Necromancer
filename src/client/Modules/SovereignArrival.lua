@@ -22,6 +22,13 @@
 --      "High Command sends its regards. The Envoy has arrived."
 --   8. The camera cranes back: the ship pulls back into the portal, which snaps shut. Continue: the usual absorb.
 -- Everything stays within ~300 studs of the camera (what low graphics quality still draws, see FleetStrike).
+--
+-- Other players (opts.spectate, started by the server's ArrivalShow): the puller's client reports where its grave
+-- stands (ArrivalStarted); the server checks it against the Sovereign they just pulled and sends it to everyone else
+-- with a shared start time. They see it all happen in the world on that clock (grave, laser, tear, ship, the pod, the
+-- unit) with their own camera and quiet sound, and get a Watch button for the whole cinematic: it takes over their
+-- camera with the full shots, sound and subtitles; Leave gives it back, and Watch stays there to go back in. No
+-- ritual, no Continue / absorb for them; it ends on its own after the ship has gone.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,6 +50,8 @@ local SKY = FleetStrike.sky
 
 local SovereignArrival = {}
 SovereignArrival.active = false
+SovereignArrival.spectating = nil -- { stop = fn } while another player's arrival plays in this client's world
+local SPECTATOR_VOLUME = 0.3 -- (the sound for spectators who are not watching)
 
 -- ============================================================
 -- Settings
@@ -90,10 +99,11 @@ local T_FALL = 2.6
 local IMPACT_AT = RELEASE_AT + T_FALL
 local PETALS_FROM = IMPACT_AT + 1.5 -- steam first, then the petals fold open
 local T_PETALS = 2.2
-local VOICE_AT = PETALS_FROM + T_PETALS + 0.4
+local VOICE_AT = PETALS_FROM + 0.3 -- his line starts as the pod opens
 local VOICE_LENGTH = 5.97
-local CRANE_FROM = VOICE_AT + 2.3 -- the camera cranes back while he speaks on
-local RETREAT_FROM = VOICE_AT + 2.6 -- the ship pulls back into the portal ...
+local SHOT_AT = PETALS_FROM + T_PETALS + 0.4 -- (the hero shot: the pod is open)
+local CRANE_FROM = SHOT_AT + 2.3 -- the camera cranes back while he speaks on
+local RETREAT_FROM = SHOT_AT + 2.6 -- the ship pulls back into the portal ...
 local RETREAT_TO = RETREAT_FROM + 4.6
 local SNAP_AT = RETREAT_TO + 0.2 -- ... and it snaps shut
 local HOLD_AT = SNAP_AT + 1.2 -- Continue
@@ -252,16 +262,27 @@ end
 -- ============================================================
 function SovereignArrival.play(results, opts)
 	opts = opts or {}
+	local spectate = opts.spectate -- { G, dir, feet, startAt } (another player's arrival)
 	local template = GraveOpening.template(opts.graveType)
 	local shipModels = ReplicatedStorage:FindFirstChild("ShipModels")
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	local camera = Workspace.CurrentCamera
-	if SovereignArrival.active or SignatureDescent.active or FleetStrike.active or not template or not (shipModels and shipModels:FindFirstChild("Absolution"))
-		or not hrp or not camera or not results or #results == 0 then
-		return false
+	if spectate then
+		if SovereignArrival.active or SovereignArrival.spectating or not template or not (shipModels and shipModels:FindFirstChild("Absolution"))
+			or not camera or not results or #results == 0 then
+			return false
+		end
+	else
+		if SovereignArrival.spectating then
+			SovereignArrival.spectating.stop() -- (their own pull wins over watching someone else's)
+		end
+		if SovereignArrival.active or SignatureDescent.active or FleetStrike.active or not template or not (shipModels and shipModels:FindFirstChild("Absolution"))
+			or not hrp or not camera or not results or #results == 0 then
+			return false
+		end
+		SovereignArrival.active = true
 	end
-	SovereignArrival.active = true
 
 	-- the Sovereign among the results (the best one)
 	local best = results[1]
@@ -285,10 +306,16 @@ function SovereignArrival.play(results, opts)
 	local function viewIsClear(from, to)
 		return Workspace:Raycast(from, to - from, rayParams) == nil
 	end
-	local flatLook = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
-	local lookDir = flatLook.Magnitude > 0.1 and flatLook.Unit or Vector3.new(0, 0, -1)
 	local dir, right, G
-	for _, degrees in ipairs({ 0, 45, -45, 90, -90, 135, -135, 180 }) do
+	local lookDir = Vector3.new(0, 0, -1)
+	if spectate then
+		G, dir = spectate.G, spectate.dir
+		right = Vector3.new(-dir.Z, 0, dir.X)
+	else
+		local flatLook = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
+		lookDir = flatLook.Magnitude > 0.1 and flatLook.Unit or lookDir
+	end
+	for _, degrees in ipairs(spectate and {} or { 0, 45, -45, 90, -90, 135, -135, 180 }) do
 		local a = math.rad(degrees)
 		local d = Vector3.new(lookDir.X * math.cos(a) - lookDir.Z * math.sin(a), 0, lookDir.X * math.sin(a) + lookDir.Z * math.cos(a))
 		local r = Vector3.new(-d.Z, 0, d.X)
@@ -478,24 +505,46 @@ function SovereignArrival.play(results, opts)
 	end
 
 	-- ── Take over camera, controls and the UI (like The Descent) ──
-	local saved = { cameraType = camera.CameraType, fov = camera.FieldOfView, guiEnabled = mainGui.Enabled }
-	local controls
-	pcall(function()
-		controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
-		controls:Disable()
-	end)
-	mainGui.Enabled = false
-	local hiddenGuis = {}
-	for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
-		if g:IsA("ScreenGui") and g.Enabled and g.Name ~= "Freecam" then
-			g.Enabled = false
-			table.insert(hiddenGuis, g)
+	local saved, controls, hiddenGuis
+	local function takeOver()
+		saved = { cameraType = camera.CameraType, fov = camera.FieldOfView, guiEnabled = mainGui.Enabled }
+		pcall(function()
+			controls = require(player.PlayerScripts:WaitForChild("PlayerModule", 2)):GetControls()
+			controls:Disable()
+		end)
+		mainGui.Enabled = false
+		hiddenGuis = {}
+		for _, g in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+			if g:IsA("ScreenGui") and g.Enabled and g.Name ~= "Freecam" and g.Name ~= "SovereignArrivalUI" and g.Name ~= "ArrivalWatchUI" then
+				g.Enabled = false
+				table.insert(hiddenGuis, g)
+			end
 		end
+		camera.CameraType = Enum.CameraType.Scriptable
 	end
-	camera.CameraType = Enum.CameraType.Scriptable
+	local function giveBack()
+		if not saved then
+			return
+		end
+		camera.CameraType = saved.cameraType == Enum.CameraType.Scriptable and Enum.CameraType.Custom or saved.cameraType
+		camera.FieldOfView = saved.fov
+		mainGui.Enabled = saved.guiEnabled
+		for _, g in ipairs(hiddenGuis) do
+			if g.Parent then
+				g.Enabled = true
+			end
+		end
+		if controls then
+			pcall(function() controls:Enable() end)
+		end
+		saved = nil
+	end
+	if not spectate then
+		takeOver()
+	end
 	local characterHidden = false
 	local function hideCharacter(hidden)
-		if hidden == characterHidden then
+		if spectate or hidden == characterHidden then
 			return
 		end
 		characterHidden = hidden
@@ -508,20 +557,31 @@ function SovereignArrival.play(results, opts)
 		end
 	end
 	local startCam = camera.CFrame
-	local charHum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
-	local charFeet = hrp.Position - Vector3.new(0, (charHum and charHum.HipHeight or 2) + hrp.Size.Y / 2, 0)
-	local savedAnchored = hrp.Anchored
-	hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(G.X, hrp.Position.Y, G.Z))
-	hrp.Anchored = true
-	local graveTarget = newPart(fxFolder, Vector3.one * 0.3, CFrame.new(G + up * 2), GLOW, Enum.Material.SmoothPlastic)
-	graveTarget.Transparency = 1
-	local ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = graveTarget, smokeAt = graveTarget, feet = charFeet, color = GLOW })
+	local charFeet, savedAnchored, ritual
+	if spectate then
+		charFeet = spectate.feet
+	else
+		local charHum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+		charFeet = hrp.Position - Vector3.new(0, (charHum and charHum.HipHeight or 2) + hrp.Size.Y / 2, 0)
+		savedAnchored = hrp.Anchored
+		hrp.CFrame = CFrame.lookAt(hrp.Position, Vector3.new(G.X, hrp.Position.Y, G.Z))
+		hrp.Anchored = true
+		local graveTarget = newPart(fxFolder, Vector3.one * 0.3, CFrame.new(G + up * 2), GLOW, Enum.Material.SmoothPlastic)
+		graveTarget.Transparency = 1
+		ritual = NecroRitual.new({ hrp = hrp, folder = fxFolder, target = graveTarget, smokeAt = graveTarget, feet = charFeet, color = GLOW })
+		-- the other players see it too (the server checks it against the Sovereign just pulled)
+		local started = ReplicatedStorage:FindFirstChild("ArrivalStarted")
+		if started then
+			started:FireServer({ G = G, dir = dir, feet = charFeet })
+		end
+	end
 
 	local ui = Instance.new("ScreenGui")
 	ui.Name = "SovereignArrivalUI"
 	ui.ResetOnSpawn = false
 	ui.IgnoreGuiInset = true
 	ui.DisplayOrder = 100
+	ui.Enabled = not spectate -- (spectators: only while watching)
 	ui.Parent = player:WaitForChild("PlayerGui")
 	local function bar(anchorY)
 		local f = Instance.new("Frame")
@@ -613,7 +673,7 @@ function SovereignArrival.play(results, opts)
 	line.Text = fullText
 
 	local skipBtn = Theme.stoneButton(ui, {
-		text = "Skip", color = "stone", size = UDim2.fromOffset(120, 40),
+		text = spectate and "Leave" or "Skip", color = "stone", size = UDim2.fromOffset(120, 40),
 		position = UDim2.new(1, -24, 1, -20), anchor = Vector2.new(1, 1), zIndex = 8,
 	})
 	local continueBtn = Theme.stoneButton(ui, {
@@ -624,7 +684,12 @@ function SovereignArrival.play(results, opts)
 
 	-- ── State ────────────────────────────────────────────────
 	local T = 0
-	local endTime = math.huge
+	local endTime = spectate and (HOLD_AT + 1.5) or math.huge
+	local watching = not spectate
+	local voiceSfx -- his line (only while watching: a late Watch joins it mid-line, Leave stops it)
+	local function volume()
+		return watching and 1 or SPECTATOR_VOLUME
+	end
 	local absorbStart
 	local done = false
 	local connection, keyConn
@@ -636,10 +701,11 @@ function SovereignArrival.play(results, opts)
 	local function cue(name, at, volume, pitch)
 		table.insert(cues, { name = name, at = at, volume = volume, pitch = pitch })
 	end
-	cue("target_lock", LASER_FROM + 0.1, 0.6, 0.9)
-	cue("target_lock", LOCK_AT - 0.9, 0.7, 1)
-	cue("target_lock", LOCK_AT - 0.45, 0.8, 1.05)
-	cue("target_lock", LOCK_AT, 1, 1.12)
+	-- (the aiming beeps at 40% of their first volumes: they were too loud)
+	cue("target_lock", LASER_FROM + 0.1, 0.24, 0.9)
+	cue("target_lock", LOCK_AT - 0.9, 0.28, 1)
+	cue("target_lock", LOCK_AT - 0.45, 0.32, 1.05)
+	cue("target_lock", LOCK_AT, 0.4, 1.12)
 	cue("tear_rumble", TEAR_FROM)
 	cue("tear_crack", TEAR_FROM + (SKY.CRACKS_AT - SKY.TEAR_AT) * (EMERGE_FROM - TEAR_FROM) / (SKY.EMERGE_FROM - SKY.TEAR_AT))
 	cue("warp_in_suspense", EMERGE_FROM - 1)
@@ -651,7 +717,6 @@ function SovereignArrival.play(results, opts)
 	cue("shell_impact", IMPACT_AT, 1, 0.6)
 	cue("reactor_lock", PETALS_FROM - 0.25, 0.8, 0.9) -- (the locks release)
 	cue("bow_open", PETALS_FROM, 0.9, 1.25)
-	cue("voice_arrival", VOICE_AT)
 	cue("portal_snap", SNAP_AT)
 
 	local function startFlash(seconds, transparency)
@@ -659,6 +724,7 @@ function SovereignArrival.play(results, opts)
 		flash.BackgroundTransparency = transparency or 0
 	end
 
+	local watchUi
 	local function finish()
 		if done then
 			return
@@ -679,29 +745,66 @@ function SovereignArrival.play(results, opts)
 		end
 		fxFolder:Destroy()
 		ui:Destroy()
-		camera.CameraType = saved.cameraType == Enum.CameraType.Scriptable and Enum.CameraType.Custom or saved.cameraType
-		camera.FieldOfView = saved.fov
-		mainGui.Enabled = saved.guiEnabled
-		for _, g in ipairs(hiddenGuis) do
-			if g.Parent then
-				g.Enabled = true
+		if watchUi then
+			watchUi:Destroy()
+		end
+		giveBack()
+		if voiceSfx and voiceSfx.Parent then
+			voiceSfx:Destroy()
+		end
+		if spectate then
+			SovereignArrival.spectating = nil
+		else
+			hideCharacter(false)
+			ritual.restore()
+			if hrp.Parent then
+				hrp.Anchored = savedAnchored
 			end
+			SovereignArrival.active = false
 		end
-		hideCharacter(false)
-		ritual.restore()
-		if hrp.Parent then
-			hrp.Anchored = savedAnchored
-		end
-		if controls then
-			pcall(function() controls:Enable() end)
-		end
-		SovereignArrival.active = false
 		if opts.onDone then
 			opts.onDone()
 		end
 	end
-	skipBtn.button.Activated:Connect(finish)
+	-- spectators: Watch takes over the camera, Leave gives it back (Watch stays there until the end)
+	local watchBtn
+	if spectate then
+		watchUi = Instance.new("ScreenGui")
+		watchUi.Name = "ArrivalWatchUI"
+		watchUi.ResetOnSpawn = false
+		watchUi.DisplayOrder = 99
+		watchUi.Parent = player:WaitForChild("PlayerGui")
+		watchBtn = Theme.stoneButton(watchUi, {
+			text = "Watch", size = UDim2.fromOffset(150, 44),
+			position = UDim2.new(0.5, 0, 0, 122), anchor = Vector2.new(0.5, 0), zIndex = 8,
+		})
+		watchBtn.button.Activated:Connect(function()
+			if watching or done or SovereignArrival.active or SignatureDescent.active or FleetStrike.active then
+				return
+			end
+			watching = true
+			startCam = camera.CFrame
+			takeOver()
+			ui.Enabled = true
+			watchBtn.root.Visible = false
+		end)
+		skipBtn.button.Activated:Connect(function()
+			if not watching then
+				return
+			end
+			watching = false
+			ui.Enabled = false
+			giveBack()
+			watchBtn.root.Visible = true
+		end)
+		SovereignArrival.spectating = { stop = finish }
+	else
+		skipBtn.button.Activated:Connect(finish)
+	end
 	local function continue()
+		if spectate then
+			return
+		end
 		if endTime == math.huge and continueBtn.root.Visible then
 			absorbStart = T
 			endTime = T + ABSORB_TIME + 0.5
@@ -749,8 +852,14 @@ function SovereignArrival.play(results, opts)
 			return
 		end
 		local dt = realDt * speed
-		T += dt
-		if absorbStart then
+		if spectate then
+			T = math.max(0, Workspace:GetServerTimeNow() - spectate.startAt)
+		else
+			T += dt
+		end
+		if spectate then
+			-- (no ritual for the other players)
+		elseif absorbStart then
 			hideCharacter(false)
 			if ritual.absorb((T - absorbStart) / ABSORB_TIME, unit) then
 				unit = nil
@@ -770,7 +879,7 @@ function SovereignArrival.play(results, opts)
 			finish()
 			return
 		end
-		if T >= HOLD_AT and endTime == math.huge and not continueBtn.root.Visible then
+		if not spectate and T >= HOLD_AT and endTime == math.huge and not continueBtn.root.Visible then
 			continueBtn.root.Visible = true
 			skipBtn.root.Visible = false
 		end
@@ -788,9 +897,17 @@ function SovereignArrival.play(results, opts)
 			if not c.fired and T >= c.at then
 				c.fired = true
 				if T - c.at < 0.5 then
-					Sfx.play(c.name, nil, c.volume or 1, c.pitch)
+					Sfx.play(c.name, nil, (c.volume or 1) * volume(), c.pitch)
 				end
 			end
+		end
+		if watching and not voiceSfx and T >= VOICE_AT and T < VOICE_AT + VOICE_LENGTH - 0.3 then
+			voiceSfx = Sfx.play("voice_arrival", nil, 1, nil, T - VOICE_AT)
+		elseif voiceSfx and not watching then
+			if voiceSfx.Parent then
+				voiceSfx:Destroy()
+			end
+			voiceSfx = nil
 		end
 
 		-- ── 1. The grave rises, shakes ... and freezes ──
@@ -862,14 +979,14 @@ function SovereignArrival.play(results, opts)
 			humSfx = Sfx.loop("portal_hum")
 		end
 		if humSfx then
-			humSfx.set(hum)
+			humSfx.set(hum * volume())
 		end
 		local engines = e(T, EMERGE_FROM, EMERGE_FROM + 3) * (1 - e(T, RETREAT_FROM + 2, RETREAT_TO))
 		if engines > 0 and not shipSfx then
 			shipSfx = Sfx.loop("ship_hum")
 		end
 		if shipSfx then
-			shipSfx.set(engines)
+			shipSfx.set(engines * volume())
 		end
 		-- the bow's helmet halves swing aside (and close again before it leaves)
 		local bowOpen = e(T, BOW_OPEN_FROM, BOW_OPEN_TO) * (1 - e(T, RETREAT_FROM - 1.5, RETREAT_FROM))
@@ -957,6 +1074,9 @@ function SovereignArrival.play(results, opts)
 		end
 
 		-- ── Camera ──────────────────────────────────────────
+		if not watching then
+			return -- (a spectator's own camera)
+		end
 		local camPos, camLook, fov
 		if absorbStart then
 			local mid = charFeet:Lerp(G, 0.45)
@@ -1032,5 +1152,23 @@ function SovereignArrival.play(results, opts)
 	end)
 	return true
 end
+
+-- another player's arrival (server ArrivalShow): it plays in this world, with a Watch button
+task.spawn(function()
+	local show = ReplicatedStorage:WaitForChild("ArrivalShow", 10)
+	if not show then
+		return
+	end
+	show.OnClientEvent:Connect(function(data)
+		if type(data) ~= "table" or data.owner == player.UserId or typeof(data.G) ~= "Vector3" or typeof(data.dir) ~= "Vector3"
+			or typeof(data.feet) ~= "Vector3" or type(data.startAt) ~= "number" then
+			return
+		end
+		pcall(SovereignArrival.play, { { unitType = data.unitType, rarity = data.rarity } }, {
+			graveType = data.graveType,
+			spectate = { G = data.G, dir = data.dir, feet = data.feet, startAt = data.startAt },
+		})
+	end)
+end)
 
 return SovereignArrival
