@@ -326,7 +326,7 @@ From the user's "general ideas.txt" (switching to a star / banner system with fe
   If Forge success chances are lowered, failures should build progress (fragments towards a guaranteed success)
   rather than simply removing the pity.
 
-### Unit families, the commander slot and placement (2026-10-16; families OK'd by the user, numbers open. BUILT: the family data + bonuses (server), the commander thrones (2nd for 500 gems), family-aware Place Best (`Army.bestLineup`: best DPS with Flesh and the Beasts' burst at 25% uptime, swap search). TO DO: the placement screen, the Codex line, the unique traits of Knell / Hush / Sigilwright)
+### Unit families, the commander slot and placement (2026-10-16; families OK'd by the user, numbers open. BUILT: the family data + bonuses (server), the commander thrones (2nd for 500 gems), family-aware Place Best (`Army.bestLineup`: best DPS with Flesh and the Beasts' burst at 25% uptime, swap search). BUILT too: the Army screen (`ArmyPanel`, tile + R). TO DO: the Codex line, the unique traits of Knell / Hush / Sigilwright)
 
 Problem: DPS is the only reason to pick a unit, and Place Best makes even that choice for the player. Goal: a reason to
 keep, level and place weaker units, and a real decision when building the army, without forcing anyone to micromanage.

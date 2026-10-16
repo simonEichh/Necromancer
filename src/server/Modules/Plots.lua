@@ -132,6 +132,11 @@ local function addGraveSlot(i, basePos, plotState, ownerId)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = slab
 
+	-- (the Army screen finds the grave under the mouse by this)
+	for _, inst in ipairs({ slab, graveModel }) do
+		inst:SetAttribute("GraveSlot", i)
+		inst:SetAttribute("OwnerId", tonumber(ownerId))
+	end
 	plotState.graveSlots[i] = {
 		slab = slab, stone = graveModel, label = lbl,
 		rarityLabel = rarityLbl, dpsLabel = dpsLbl,
@@ -215,6 +220,9 @@ local function buildThrone(k, plotState, ownerId, sealed)
 		-- at the back of the dais (towards the lane), facing the plaza
 		stone:PivotTo(CFrame.new(floor + Vector3.new(0, 1.25, 0) + plotState.frame.LookVector * 1.6) * facePlaza)
 	end
+	model:SetAttribute("GraveSlot", Army.COMMANDER_BASE + k) -- (the Army screen finds the throne under the mouse by this)
+	model:SetAttribute("Sealed", sealed == true)
+	model:SetAttribute("OwnerId", tonumber(ownerId))
 	model.Parent = workspace
 
 	local gui = Instance.new("BillboardGui", top)

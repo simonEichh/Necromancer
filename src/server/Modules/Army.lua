@@ -435,6 +435,14 @@ PlayerData.placedProvider = function(player)
 	return plotState and placedList(plotState) or {}
 end
 
+-- The Army screen: a unit off a grave / throne back into the inventory.
+Remotes.RecallUnit.OnServerEvent:Connect(function(player, slotIndex)
+	local plotState = getPlot(player)
+	if plotState and type(slotIndex) == "number" then
+		recallUnitFromSlot(slotIndex, player, plotState)
+	end
+end)
+
 -- Client asks to place the unit from inventory slot `invIndex` on grave slot `slotIndex`.
 Remotes.PlaceAtGrave.OnServerEvent:Connect(function(player, invIndex, slotIndex)
 	local plotState = getPlot(player)
