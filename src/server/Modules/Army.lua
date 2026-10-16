@@ -479,6 +479,53 @@ local function clearSlot(i, plotState)
 	return { unitType = unitType, oneIn = getBaseOneIn(unitType), level = level, fails = fails, locked = locked }
 end
 
+-- Place Best's choice of grave units (family-aware): the lineup of `slotCount` normal units with the best total DPS,
+-- counting the family bonuses that are damage (Flesh; the Beasts' burst at BEAST_UPTIME, the share of a run their burst
+-- is up). Gold (Spirits), the gate (Bones) and specials (Arcane) are left out on purpose: room for the player's own
+-- choices (Design.md). Starts from the strongest units, then swaps one in / one out while the total grows.
+local BEAST_UPTIME = 0.25
+local function unitDps(item)
+	local def = UNITS[item.unitType]
+	return def and (def.damage / def.attackCD * Economy.levelMultiplier(item.level)) or 0
+end
+local function lineupScore(items)
+	local bonus = SharedUnits.familyBonuses(items, Economy.AWAKEN_LEVEL)
+	local total = 0
+	for _, item in ipairs(items) do
+		local fam = SharedUnits.FamilyOf[item.unitType]
+		local m = 1
+		if fam == "Flesh" then m = 1 + bonus.Flesh end
+		if fam == "Beasts" then m = 1 + bonus.Beasts * BEAST_UPTIME end
+		total += unitDps(item) * m
+	end
+	return total
+end
+local function bestLineup(pool, slotCount)
+	table.sort(pool, function(a, b) return unitDps(a) > unitDps(b) end)
+	local chosen, rest = {}, {}
+	for i, item in ipairs(pool) do
+		if i <= slotCount then table.insert(chosen, item) else table.insert(rest, item) end
+	end
+	local best = lineupScore(chosen)
+	for _ = 1, 40 do -- (each pass makes the single best swap; it stops when no swap helps)
+		local gain, swapI, swapJ = 0, nil, nil
+		for i = 1, #chosen do
+			for j = 1, #rest do
+				chosen[i], rest[j] = rest[j], chosen[i]
+				local score = lineupScore(chosen)
+				chosen[i], rest[j] = rest[j], chosen[i]
+				if score - best > gain + 1e-6 then
+					gain, swapI, swapJ = score - best, i, j
+				end
+			end
+		end
+		if not swapI then break end
+		chosen[swapI], rest[swapJ] = rest[swapJ], chosen[swapI]
+		best += gain
+	end
+	return chosen, rest
+end
+
 -- Re-deploys the strongest units (from the graves and the server-side inventory) onto the graves.
 Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 	local plotState = getPlot(player)
@@ -500,7 +547,16 @@ Remotes.PlaceBest.OnServerEvent:Connect(function(player)
 		local dB = UNITS[b.unitType] and (UNITS[b.unitType].damage / UNITS[b.unitType].attackCD * Economy.levelMultiplier(b.level)) or 0
 		return dA > dB
 	end)
-	-- the strongest commanders onto the open thrones, the strongest of the rest onto the graves
+	-- the strongest commanders onto the open thrones; the graves get the best lineup of the rest (families counted)
+	local commanders, normals = {}, {}
+	for _, item in ipairs(pool) do
+		table.insert(isCommanderUnit(item.unitType) and commanders or normals, item)
+	end
+	local lineup, unused = bestLineup(normals, #plotState.graveSlots)
+	pool = {}
+	for _, list in ipairs({ commanders, lineup, unused }) do
+		for _, item in ipairs(list) do table.insert(pool, item) end
+	end
 	local thrones = {}
 	for k, slot in pairs(plotState.commanderSlots or {}) do
 		if not slot.sealed then table.insert(thrones, COMMANDER_BASE + k) end
