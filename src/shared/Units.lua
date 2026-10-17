@@ -635,6 +635,12 @@ local ABILITIES = {
 				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
 		end, unlock = { state = "finalHorizon", price = "FINAL_HORIZON_PRICE", buy = "FinalHorizon" } },
 	},
+	Orvoss = {
+		{ name = "The Last Broadside", kind = "Finisher", text = function(_, Economy)
+			return ("When the gate falls below {%d%%} HP, Orvoss calls his drowned fleet out of a black ocean in the sky. Ship after ship turns its broadside on the gate and the volley rolls down the line until the flagship fires last. Then the anchors drag the ruins into the deep. Everyone on the server sees it.")
+				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
+		end, unlock = { state = "lastBroadside", price = "LAST_BROADSIDE_PRICE", buy = "LastBroadside" } },
+	},
 }
 
 -- ============================================================

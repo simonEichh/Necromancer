@@ -4,6 +4,7 @@
 --   BuyGemItem("WispSpeed")     the next Soul Wisp speed level (needs the wisp; Economy.wispLevelPrice / wispSpeed)
 --   BuyGemItem("FleetStrike")   one-time, Economy.FLEET_STRIKE_PRICE: Malak's gate finisher (Army.checkFinisher)
 --   BuyGemItem("FinalHorizon")  one-time, Economy.FINAL_HORIZON_PRICE: Veyr's gate finisher (separate from the above)
+--   BuyGemItem("LastBroadside") one-time, Economy.LAST_BROADSIDE_PRICE: Orvoss's gate finisher
 --   BuyGemItem("CommanderSlot") one-time, Economy.COMMANDER_SLOT_PRICE: the second commander throne (Plots unseals it)
 -- Server authoritative: it checks the gems and the limits and changes the profile through PlayerData.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -63,6 +64,17 @@ function GemShop.buy(player, item)
 		profile.finalHorizon = true
 		PlayerData.changed(player)
 		Remotes.Notice:FireClient(player, "The Final Horizon unlocked: with Veyr on a commander throne, he takes the gate at 20%.")
+	elseif item == "LastBroadside" then
+		if profile.lastBroadside then
+			return
+		end
+		if not PlayerData.spendGems(player, Economy.LAST_BROADSIDE_PRICE) then
+			Remotes.Notice:FireClient(player, "Not enough Gems (" .. Economy.LAST_BROADSIDE_PRICE .. " needed).")
+			return
+		end
+		profile.lastBroadside = true
+		PlayerData.changed(player)
+		Remotes.Notice:FireClient(player, "The Last Broadside unlocked: with Orvoss on a commander throne, his fleet takes the gate at 20%.")
 	elseif item == "CommanderSlot" then
 		if (profile.commanderSlots or 1) >= Economy.MAX_COMMANDER_SLOTS then
 			return

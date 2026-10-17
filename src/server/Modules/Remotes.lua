@@ -23,6 +23,8 @@ local EVENTS = {
 	"DevGateLow", -- Studio: break walls up to the gate and set it just above 20% HP (to test the Fleet Strike trigger)
 	"DevFinalHorizon", -- Studio: Veyr's finisher preview (the army holds, then flees; no real gate break)
 	"FinalHorizon", -- server -> all clients: Veyr's gate finisher starts ({ owner, startAt, unit, gate, unitCF })
+	"DevLastBroadside", -- Studio: Orvoss's finisher preview (the army holds; no real gate break)
+	"LastBroadside", -- server -> all clients: Orvoss's gate finisher starts ({ owner, startAt, unit, gate, unitCF })
 	"DevToughWall", -- Studio: the wall being fought gets a huge HP pool (to watch attacks, marks and specials on one wall)
 	"SaveSettings", -- ({ master, effects, music } volumes 0..1): the Settings panel (PlayerData)
 	"FleetStrike", -- server -> all clients ({ owner, startAt, malak, gate }): Malak's finisher starts (client FleetStrike)

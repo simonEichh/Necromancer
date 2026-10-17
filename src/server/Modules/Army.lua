@@ -15,6 +15,7 @@ local SharedUnits = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local VeyrTimeline = require(ReplicatedStorage.Shared.VeyrTimeline)
+local AdmiralTimeline = require(ReplicatedStorage.Shared.AdmiralTimeline)
 local GraveRune = require(script.Parent.GraveRune)
 
 local UNITS = SharedUnits.Stats
@@ -1288,6 +1289,9 @@ local FINISHERS = {
 	Malak = { kind = "FleetStrike", unlock = "fleetStrike", fleeAt = 11, length = 54, gateHit = 49.4, remote = "FleetStrike" },
 	Veyr = { kind = "FinalHorizon", unlock = "finalHorizon", fleeAt = VeyrTimeline.FINISHER.FLEE,
 		length = VeyrTimeline.FINISHER.END, gateHit = VeyrTimeline.FINISHER.GATE_HIT, remote = "FinalHorizon" },
+	-- (the army never flees in his: it stands idle and the clients hide it on their screens, the user's call)
+	Orvoss = { kind = "LastBroadside", unlock = "lastBroadside", fleeAt = AdmiralTimeline.FINISHER.END + 10,
+		length = AdmiralTimeline.FINISHER.END, gateHit = AdmiralTimeline.FINISHER.GATE_HIT, remote = "LastBroadside" },
 }
 
 -- the unit whose finisher fires on this plot now (or nil), and its registry entry

@@ -18,4 +18,25 @@ return {
 	SINK_TO = 4.4,
 	LOWER_FROM = 3.0, -- he lowers the pistol slowly
 	LOWER_TO = 5.0,
+	-- his gate finisher, THE LAST BROADSIDE (docs/orvoss.md "Beat sheet"): seconds after the server starts it. The
+	-- server holds the gate until GATE_HIT and ends the finisher at END (Army FINISHERS); the client (LastBroadside)
+	-- plays the rest on the same clock.
+	FINISHER = {
+		CALL = 0, -- he snaps his compass shut and looks up; a distant bell
+		OMEN = 4, -- water drips upwards off his coat, black fog rolls down the lane, ship shadows glide under it
+		ANCHOR = 9, -- an anchor falls out of the clouds...
+		ANCHOR_HIT = 10.6, -- ...and slams into the ground beside the gate
+		SEA = 13, -- the black ocean opens in the sky beyond the gate, the fleet breaks out of it
+		FLAGSHIP = 20, -- the flagship tears out last and crosses in front of him
+		LINE = 28, -- the fleet swings into line, broadsides on the gate, the ports glow up (loading)
+		ORDER = 34, -- spectral rigging, he rises, raises his cutlass; silence
+		ORDER_LINE = 37.5, -- "Give them the deep."
+		BROADSIDE = 40, -- the travelling broadside: from the farthest ship towards the camera
+		FLAG_FIRE = 48, -- the flagship fires last and loudest
+		GATE_HIT = 52, -- the server breaks the gate
+		DRAG = 52.5, -- the chains pull taut, the fleet drags the ruins into a whirlpool
+		CLOSE = 58, -- the ocean closes, the fog lifts
+		LAND = 63, -- he drops back down, catches his hat
+		END = 67,
+	},
 }

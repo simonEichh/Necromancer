@@ -40,6 +40,7 @@ local function apply(snap)
 	State.remoteForge = snap.remoteForge == true
 	State.fleetStrike = snap.fleetStrike == true
 	State.finalHorizon = snap.finalHorizon == true
+	State.lastBroadside = snap.lastBroadside == true
 	State.commanderSlots = snap.commanderSlots or 1 -- (commander thrones owned: Design.md "the commander slot")
 	State.settings = snap.settings
 	State.goldMultiplier = snap.goldMultiplier

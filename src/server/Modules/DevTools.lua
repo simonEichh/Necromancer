@@ -178,6 +178,21 @@ Remotes.DevFinalHorizon.OnServerEvent:Connect(function(player, on)
 	Army.startFinisher(plotState, veyr, F.FLEE, F.END, on ~= false)
 end)
 
+-- a Last Broadside preview (client LastBroadside.lua): the plot's army holds (never flees; hidden on the screen), Orvoss
+-- stays put. No gate hold and no break.
+Remotes.DevLastBroadside.OnServerEvent:Connect(function(player, on)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local orvoss
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.unitType == "Orvoss" then
+			orvoss = u
+		end
+	end
+	local F = require(ReplicatedStorage.Shared.AdmiralTimeline).FINISHER
+	Army.startFinisher(plotState, orvoss, F.END + 10, F.END, on ~= false)
+end)
+
 Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)
 	workspace:SetAttribute("DevFastSpecials", fast == true)
 end)
