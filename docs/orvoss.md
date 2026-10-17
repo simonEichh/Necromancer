@@ -133,8 +133,15 @@ Contract: bow -Z, up +Y, origin at the
 waterline amidships; `Root` anchored and invisible, everything welded to it; `PortGlow` parts (attributes Deck, Index
 bow to stern, Side) and `Gun` barrels with a `Muzzle` attachment for the rolling broadside; `Hawse` attachment on Root
 for an anchor chain; model attributes Length, Variant, GunDecks, PortsPerSide. `tools/studio/show_fleet.lua` stages
-them high over the plaza in `Workspace.FleetPreview` (**delete before publishing**). Not yet: the flagship, the anchor
-+ chain, the ghost cannon; no close-up check of the stern, bow or breaches.
+them high over the plaza in `Workspace.FleetPreview` (**delete before publishing**).
+
+**The flagship** (same builder, variant `Flagship`, 1047 parts, first pass 2026-10-17, Claude's own design: the user
+did not like the generated concept art): 290 studs, three gun decks of bigger ports (`portScale` 1.4), a drowned
+copper bottom gone verdigris, a soul-light seam along the waterline, Orvoss himself as the figurehead (tricorn,
+cutlass thrust forward), a great black main course with a bone skull-and-anchor, a three-row stern gallery, two
+anchors on catheads with short chains, lanterns along the rails. Extra attachments on Root: `Bridge` (quarterdeck,
+where Orvoss stands), `HawseL` / `HawseR` (the anchor rings). Not checked up close: the figurehead, the stern, the
+emblem. Not yet: the separate anchor + chain model for the finisher, the ghost cannon.
 
 ## Finisher models (estimate, 2026-10-17)
 

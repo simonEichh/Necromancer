@@ -3,7 +3,7 @@
 -- Workspace.FleetPreview before publishing.
 local fleet = game:GetService("ReplicatedStorage").ShipModels.BlackwakeFleet
 local HEIGHT = 90
-local GAP = 230
+local GAP = 340
 
 local old = workspace:FindFirstChild("FleetPreview")
 if old then
