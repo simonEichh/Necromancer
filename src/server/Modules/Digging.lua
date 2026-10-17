@@ -43,6 +43,7 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 	}
 
 	local results = {}
+	local sovereignThisDig = false
 	for _ = 1, count do
 		-- Must own the grave and have room for the unit
 		if (profile.ownedGraves[graveType] or 0) <= 0 then
@@ -63,8 +64,10 @@ Remotes.DigGrave.OnServerEvent:Connect(function(player, graveType, count)
 		PlayerData.addUnit(player, unitType, oneIn)
 		PlayerData.recordPull(player, unitType) -- (the Codex)
 		ShowcasePulls.record(player, unitType) -- (the Reliquary's "Pulled by")
-		if Units.isSovereign(unitType) then
-			-- (the puller's client reports where its arrival cinematic plays: ArrivalStarted below)
+		if Units.isSovereign(unitType) and not sovereignThisDig then
+			-- (the puller's client reports where its arrival cinematic plays: ArrivalStarted below; the first Sovereign
+			-- of the pull is the one whose arrival plays, client SovereignArrival)
+			sovereignThisDig = true
 			pendingArrivals[player] = { unitType = unitType, rarity = rarity, graveType = graveType, at = os.clock() }
 		end
 		if Units.isSignature(unitType) or Units.isSovereign(unitType) then

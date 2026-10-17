@@ -240,7 +240,7 @@ graveBtn.MouseButton1Click:Connect(function()
 	previewGrave = GRAVE_ORDER[index % #GRAVE_ORDER + 1]
 	graveBtn.Text = graveLabel()
 end)
-local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet", "Horizon", "Arrival", "Ascend" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed), Malak's pull (SovereignArrival)
+local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet", "Horizon", "Arrival", "Veyr Pull", "Ascend" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed), Malak's pull (SovereignArrival), Veyr's pull (VeyrArrival)
 local previewAnim = 1
 local animBtn = makeButton(panel, "Anim: " .. ANIMS[previewAnim], Color3.fromRGB(230, 200, 255))
 animBtn.Size = UDim2.new(0.4, -8, 0, 28)
@@ -272,9 +272,10 @@ playBtn.MouseButton1Click:Connect(function()
 		panel.Visible = false
 		require(script.Parent.AscensionCinematic).play({ preview = true })
 		task.delay(17, function() panel.Visible = true end)
-	elseif anim == "Arrival" then
+	elseif anim == "Arrival" or anim == "Veyr Pull" then
 		panel.Visible = false
-		local results = { { unitType = "Malak", rarity = Units.Rarity.Malak or "Primordial", pity = 0, oneIn = Units.getBaseOneIn("Malak") } }
+		local who = anim == "Arrival" and "Malak" or "Veyr"
+		local results = { { unitType = who, rarity = Units.Rarity[who] or "Primordial", pity = 0, oneIn = Units.getBaseOneIn(who) } }
 		if not require(script.Parent.SovereignArrival).play(results, { graveType = previewGrave, onDone = function() panel.Visible = true end }) then
 			panel.Visible = true
 		end

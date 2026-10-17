@@ -44,6 +44,7 @@ local DropPod = require(script.Parent.DropPod)
 local Sfx = require(script.Parent.Sfx)
 local FleetStrike = require(script.Parent.FleetStrike)
 local SignatureDescent = require(script.Parent.SignatureDescent)
+local VeyrArrival = require(script.Parent.VeyrArrival)
 local Units = require(ReplicatedStorage.Shared.Units)
 
 local player = Players.LocalPlayer
@@ -53,6 +54,11 @@ local SovereignArrival = {}
 SovereignArrival.active = false
 SovereignArrival.spectating = nil -- { stop = fn } while another player's arrival plays in this client's world
 local SPECTATOR_VOLUME = 0.3 -- (the sound for spectators who are not watching)
+SovereignArrival.SPECTATOR_VOLUME = SPECTATOR_VOLUME
+-- Sovereigns with their own arrival (the rest get Malak's ship): play(results, opts, SovereignArrival)
+SovereignArrival.ARRIVALS = {
+	Veyr = VeyrArrival, -- "A Sight Beyond the Grave"
+}
 
 -- ============================================================
 -- Settings
@@ -172,6 +178,16 @@ end
 -- ============================================================
 function SovereignArrival.play(results, opts)
 	opts = opts or {}
+	-- the first Sovereign in the pull decides whose arrival plays (the server's ArrivalShow names the same one)
+	for _, r in ipairs(results or {}) do
+		if Units.isSovereign(r.unitType) then
+			local own = SovereignArrival.ARRIVALS[r.unitType]
+			if own then
+				return own.play(results, opts, SovereignArrival)
+			end
+			break
+		end
+	end
 	local spectate = opts.spectate -- { G, dir, feet, startAt } (another player's arrival)
 	local template = GraveOpening.template(opts.graveType)
 	local shipModels = ReplicatedStorage:FindFirstChild("ShipModels")
@@ -194,11 +210,12 @@ function SovereignArrival.play(results, opts)
 		SovereignArrival.active = true
 	end
 
-	-- the Sovereign among the results (the best one)
+	-- the Sovereign among the results (the first one)
 	local best = results[1]
 	for _, r in ipairs(results) do
-		if Units.isSovereign(r.unitType) and not Units.isSovereign(best.unitType) then
+		if Units.isSovereign(r.unitType) then
 			best = r
+			break
 		end
 	end
 
