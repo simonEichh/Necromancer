@@ -11,7 +11,8 @@ weapons, gestures brim push / listening / compass glance; dev attributes `DevGes
 the grip, the pistol's index finger curled). The user approved it. `Workspace.OrvossPreview` is still in the place
 (delete before publishing; tag it `ProceduralUnit` on the client in play mode to see him animate).
 
-**Next for Orvoss (agreed order):** 1) his unit def (Sovereign, throne only, pool weight like Malak/Veyr, Codex, check
+**Next for Orvoss (agreed order):** 1) DONE (unit def, see docs/orvoss.md "Status"; the user still has to look at the
+portrait / walk / Codex page) his unit def (Sovereign, throne only, pool weight like Malak/Veyr, Codex, check
 the portraits and the army walk); 2) his basic attack, idea from the user (docs/orvoss.md "Basic attack"): he aims and
 fires the flintlock while a ghost cannon forms beside him and fires at the same moment; open: the cannon's side
 (suggested: his left, a little behind) and the name (not "Dead Reckoning"). Later: the special, the pull cinematic, the

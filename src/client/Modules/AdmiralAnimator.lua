@@ -13,8 +13,13 @@
 --     the arm sinks slowly and the hat settles back over a few seconds;
 --   listening to the fleet: the head turns up to one side, holds, the jaw opens a hair as if to give an order;
 --   compass glance: the head tips down to the open compass on his belt and the needle twitches towards the gate.
--- Every gesture channel runs through a spring, so nothing snaps back to rest (Knell's momentum rule). The walk is the
--- generic stride for now.
+-- Every gesture channel runs through a spring, so nothing snaps back to rest (Knell's momentum rule).
+--
+-- The walk is his own and heavy: long, slow strides whose cadence follows his real ground speed, so the planted foot
+-- never slides (two-bone IK, the foot level while it carries him, the heel peeling off before the swing). The pelvis
+-- sinks into every footfall and climbs out of it slowly, the weight rolls over the standing leg, the hips turn with the
+-- stride and the chest counters them, leaning forward; the skull nods a little late after each step, and the arms swing
+-- on their soft springs with a jolt at every footfall.
 --
 -- All of it is worked out in the root's build space (RS: the HumanoidRootPart at the origin, model axes), where every
 -- body joint frame is axis-aligned, so a Motor6D.Transform there is just the rotation itself.
@@ -29,6 +34,12 @@ local GESTURE_LEN = { 7.2, 7.5, 6.6 } -- brim, listen, compass (how long each bl
 local BRIM_MUZZLE = Vector3.new(-0.1, 2.9, -1.12)
 local BRIM_DIR = Vector3.new(0.3, 0.95, -0.04).Unit
 local BRIM_POLE = Vector3.new(-0.8, -0.6, 0.15)
+-- the heavy walk: stride length (share of the leg's length), the share of the cycle a foot stays planted, the cycle's
+-- limits in seconds (inside them the cadence follows his ground speed), the swing foot's lift (share of the leg)
+local STRIDE = 0.75
+local DUTY = 0.6
+local CYCLE_MIN, CYCLE_MAX = 0.8, 1.8
+local SWING_LIFT = 0.13
 
 local function clamp01(x)
 	return math.clamp(x, 0, 1)
@@ -221,7 +232,23 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	end
 	local t = now + rig.t0
 	local w = rig.walk -- (0..1, the generic walk blend)
-	local still = 1 - w
+	-- (his own, slower blend: the stride eases in and out instead of snapping from the stance)
+	local wk = clamp01(spring(st, "walkW", w, 10, 6.5, dt))
+	local still = 1 - wk
+
+	-- ── the walk's clock: one cycle = two steps; it runs as fast as the planted foot needs to keep up with the ground
+	local pos = model:GetPivot().Position
+	local lastPivot = ad.lastPivot or pos
+	ad.lastPivot = pos
+	local moved = Vector3.new(pos.X - lastPivot.X, 0, pos.Z - lastPivot.Z).Magnitude
+	local gSpeed = spring(st, "gSpeed", math.min(moved / dt, 40), 12, 7, dt)
+	local strideL = STRIDE * (ad.lLeg.a + ad.lLeg.b)
+	local cycle = math.clamp(strideL / math.max(gSpeed * DUTY, 1e-3), CYCLE_MIN, CYCLE_MAX)
+	ad.phase = (ad.phase or 0) + dt * (2 * math.pi / cycle) * math.max(w, wk)
+	local wph = ad.phase -- (0: the left foot lands, pi: the right one)
+	local stepF = (wph / math.pi) % 1 -- (0..1 through the current step)
+	-- the footfall: the pelvis drops fast into it and climbs back out slowly
+	local thud = ease(stepF, 0, 0.14) * (1 - ease(stepF, 0.14, 0.62)) * wk
 
 	-- ── gestures: pick one every GESTURE_GAP s, never the same twice in a row; walking cancels it
 	local forced = model:GetAttribute("DevGesture") -- (dev: 1 brim, 2 listen, 3 compass plays that gesture now)
@@ -278,21 +305,29 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	local rootRoll = -0.032 * sr * still -- (leans the way the weight goes)
 	local rootPitch = (0.014 * math.sin(ph * 0.63 + 1.1)) * still
 	local rootYaw = 0.02 * math.sin(ph * 0.5 + 0.4) * still
-	local walkBob = math.abs(math.sin(rig.phase)) * 0.12 * w
-	local rootCF = CFrame.new(rootX * scale, (rootY + walkBob) * scale, 0) * ANGLES(rootPitch, rootYaw, rootRoll)
+	-- walking: a lower stance, the drop into each footfall, the weight over the standing leg (left is -X), the hips
+	-- turning so the swinging leg's side comes forward
+	local walkY = (-0.22 - 0.2 * ease(stepF, 0, 0.14) * (1 - ease(stepF, 0.14, 0.62)) + 0.04 * math.sin(math.pi * stepF)) * wk
+	local walkX = -0.12 * math.sin(wph) * wk
+	local walkRoll = 0.05 * math.sin(wph) * wk
+	local walkYaw = -0.1 * math.cos(wph) * wk
+	local rootCF = CFrame.new((rootX + walkX) * scale, (rootY + walkY) * scale, 0)
+		* ANGLES(rootPitch, rootYaw + walkYaw, rootRoll + walkRoll)
 	set(rig, "Root", rootCF)
 	local breathe = math.sin(t * 1.1) * 0.012
-	local waistRoll = 0.022 * math.sin(ph - 1.0) * still
+	local waistRoll = 0.022 * math.sin(ph - 1.0) * still - 0.4 * walkRoll
 	local waistPitch = 0.012 * math.sin(ph * 0.63 + 0.2) + breathe - 0.07 * lookDown + 0.02 * brimArm
-	local waistYaw = 0.1 * listen * side + 0.06 * brimArm
+		- 0.09 * wk - 0.05 * thud -- (leaning into the march, the chest nodding into each footfall)
+	local waistYaw = 0.1 * listen * side + 0.06 * brimArm - 0.7 * walkYaw
 	local waistRot = ANGLES(waistPitch, waistYaw, waistRoll)
 	set(rig, "Waist", waistRot)
 	local chestRot = rootCF.Rotation * waistRot
 	local chestRoll, chestPitch = rootRoll + waistRoll, rootPitch + waistPitch
 
-	-- ── the skull keeps the horizon (counters the whole roll), plus the gestures
+	-- ── the skull keeps the horizon (counters the whole roll), plus the gestures and a late nod after each footfall
+	local nod = spring(st, "nod", thud, 30, 6, dt)
 	local headGesture = ANGLES(
-		0.22 * listen - 0.5 * lookDown + 0.06 * hatLift - 0.05 * brimArm + math.sin(t * 0.37) * 0.015,
+		0.22 * listen - 0.5 * lookDown + 0.06 * hatLift - 0.05 * brimArm + math.sin(t * 0.37) * 0.015 - 0.06 * nod,
 		0.62 * listen * side + 0.1 * lookDown + 0.08 * brimArm + math.sin(t * 0.23 + 1) * 0.03,
 		-0.08 * listen * side)
 	local neckRot = chestRot:Inverse() * headGesture
@@ -303,8 +338,10 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	set(rig, "Hat", CFrame.new(0, 0.05 * hatLift * scale, 0.02 * hatLift * scale) * ANGLES(0.17 * hatLift, 0, hatWobble))
 
 	-- ── the right arm hangs heavy: its swing lags the chest on a soft spring; the cutlass follows the hand
-	local rz = spring(st, "rz", -chestRoll * 0.8, 9, 2.2, dt)
-	local rx = spring(st, "rx", -chestPitch * 0.7 + 0.015 * math.sin(t * 1.1 - 0.5), 9, 2.2, dt)
+	-- (walking: it swings against the left leg, and every footfall jolts it forward and out)
+	local rz = spring(st, "rz", -chestRoll * 0.8 + 0.05 * thud, 9, 2.2, dt)
+	local rx = spring(st, "rx", -chestPitch * 0.7 + 0.015 * math.sin(t * 1.1 - 0.5)
+		+ 0.26 * math.cos(wph) * wk + 0.06 * thud, 9, 2.2, dt)
 	set(rig, "RShoulder", ANGLES(rx, 0, rz))
 	set(rig, "RElbow", ANGLES(0.03 * math.sin(ph - 1.6) * still, 0, 0))
 	set(rig, "RWrist", CFrame.new())
@@ -318,8 +355,9 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	end
 
 	-- ── the left arm (by IK, so the brim push can lead the muzzle to the hat): hanging, it swings like the right one
-	local lz = spring(st, "lz", -chestRoll * 0.8, 8.5, 2.1, dt)
-	local lx = spring(st, "lx", -chestPitch * 0.7 + 0.015 * math.sin(t * 1.1 - 0.9), 8.5, 2.1, dt)
+	local lz = spring(st, "lz", -chestRoll * 0.8 - 0.05 * thud, 8.5, 2.1, dt)
+	local lx = spring(st, "lx", -chestPitch * 0.7 + 0.015 * math.sin(t * 1.1 - 0.9)
+		- 0.26 * math.cos(wph) * wk + 0.06 * thud, 8.5, 2.1, dt)
 	local pend = ANGLES(lx, 0, lz)
 	local arm = ad.lArm
 	local Wrest = arm.S + pend * (arm.W - arm.S)
@@ -344,21 +382,33 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	local pisLag = ANGLES(math.clamp(px, -0.1, 0.1), 0, math.clamp(pz, -0.1, 0.1)):Lerp(CFrame.new(), clamp01(brimArm))
 	set(rig, "Pistol", ad.pisRot:Inverse() * pisLag * ad.pisRot)
 
-	-- ── the legs: the feet stay planted (IK in the pelvis's rest space), blended with the generic stride when walking
+	-- ── the legs, by IK in the pelvis's rest space: standing, the feet stay planted; walking, each foot is planted in
+	-- front (-Z), carries him while it moves back at his ground speed (heel peeling off at the end), then swings forward
+	-- low and heavy, toes up just before it lands
 	local rootInv = rootCF:Inverse()
 	local footRot = rootCF.Rotation:Inverse()
-	local stride = math.sin(rig.phase)
-	local strideC = math.cos(rig.phase)
-	for _, sd in ipairs({ { ad.lLeg, 1 }, { ad.rLeg, -1 } }) do
-		local lb, sgn = sd[1], sd[2]
-		solveLimb(lb, rootInv * lb.W, footRot)
-		if w > 0.001 then
-			local hip = ANGLES(sgn * stride * 0.75 * w, 0, 0)
-			local knee = ANGLES(-math.max(0, -sgn * strideC) * 0.9 * w, 0, 0)
-			lb.sJ.Transform = lb.sJ.Transform:Lerp(hip, w)
-			lb.eJ.Transform = lb.eJ.Transform:Lerp(knee, w)
-			lb.wJ.Transform = lb.wJ.Transform:Lerp(CFrame.new(), w)
+	for _, sd in ipairs({ { ad.lLeg, 0 }, { ad.rLeg, math.pi } }) do
+		local lb, off = sd[1], sd[2]
+		local Wt, pitch = lb.W, 0
+		if wk > 0.001 then
+			local legLen = lb.a + lb.b
+			local f = ((wph + off) / (2 * math.pi)) % 1
+			local z, lift
+			if f < DUTY then
+				local u = f / DUTY
+				z = strideL * (u - 0.5)
+				lift = 0.05 * legLen * ease(u, 0.75, 1)
+				pitch = 0.16 * (1 - ease(u, 0, 0.12)) - 0.35 * ease(u, 0.7, 1)
+			else
+				local u = (f - DUTY) / (1 - DUTY)
+				z = strideL * (0.5 - ease(u, 0, 1))
+				lift = 0.05 * legLen * (1 - ease(u, 0, 0.3)) + SWING_LIFT * legLen * math.sin(math.pi * u ^ 0.75)
+				pitch = -0.35 + 0.51 * ease(u, 0.1, 0.85)
+			end
+			Wt = lb.W + Vector3.new(0, lift * wk, z * wk)
+			pitch *= wk
 		end
+		solveLimb(lb, rootInv * Wt, footRot * ANGLES(pitch, 0, 0))
 	end
 
 	-- ── the compass needle: a slow restless drift; in the glance it snaps round towards the gate and quivers there
@@ -388,11 +438,11 @@ function Admiral.animate(model, rig, dt, now, ctx)
 			local spread = 0.5 + 0.5 * math.sin(t * 0.42 - a * 1.1)
 			tx = -(gl.Z - tl.g0.Z) * 0.6 + vl.Z * 0.35 -- (hang, then lag)
 				- 0.04 - 0.07 * spread - 0.02 * math.sin(t * 0.9 + tl.i * 1.7)
-				- w * 0.4 * math.max(0, -math.cos(a) * 0.9 + 0.3) -- (trailing behind him while he walks)
+				- wk * 0.4 * math.max(0, -math.cos(a) * 0.9 + 0.3) -- (trailing behind him while he walks)
 			tz = (gl.X - tl.g0.X) * 0.6 - vl.X * 0.35 + 0.05 * math.sin(t * 0.33 + tl.i * 2.1)
 		else
 			local up = upper[tl.i] or { x = 0, vx = 0, z = 0, vz = 0 }
-			tx = -0.05 * math.sin(t * 0.42 - a * 1.1 - 0.9) - up.vx * 0.22 - 0.25 * w * math.max(0, -math.cos(a))
+			tx = -0.05 * math.sin(t * 0.42 - a * 1.1 - 0.9) - up.vx * 0.22 - 0.25 * wk * math.max(0, -math.cos(a))
 			tz = 0.04 * math.sin(t * 0.33 + tl.i * 2.1 - 0.9) - up.vz * 0.22
 		end
 		local soft = tl.seg == 1 and 7 or 5

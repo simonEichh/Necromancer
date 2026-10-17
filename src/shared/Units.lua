@@ -391,6 +391,20 @@ local UNITS = {
 			-- (24 army-seconds + the mark's ~+8 % against Malak's Requisition 25 s + aura +10 %: about level, 2026-10-17)
 			army = { seconds = 24, hits = { { at = VEYR_SP.IMPACT, share = 0.8 }, { at = VEYR_SP.COLLAPSE, share = 0.2 } } } },
 	},
+	-- Orvoss, the Blackwake: the third Sovereign (docs/orvoss.md), a drowned skeletal admiral with a cutlass, a
+	-- flintlock and a ghost fleet. Unit def only so far (2026-10-17): the generic hit until his basic attack (the
+	-- flintlock + ghost cannon volley) is built; no special, trait, finisher or own pull cinematic yet (he gets Malak's).
+	Orvoss = {
+		sovereign = true,
+		title = "The Blackwake",
+		color = BrickColor.new("Really black"),
+		size = Vector3.new(2.4, 4, 2.4),
+		damage = 510000, -- 85K DPS like Malak and Veyr (placeholder until his kit is built)
+		speed = 4.5, -- (a heavy march: his stride is long and slow, the cadence follows this speed; AdmiralAnimator)
+		attackRange = 25, -- stands 40 studs from the wall (Army.standDistance): a gunline, closer than Malak
+		attackCD = 6,
+		hitHeight = 4,
+	},
 }
 
 -- Which units belong to which rarity, each with a relative weight
@@ -444,6 +458,7 @@ local RARITY_UNITS = {
 		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
 		{ unit = "Malak", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: rarer than a Signature, and only from the Celestial grave (`graves`: Rolling skips the entry elsewhere, the wheel never gives him)
 		{ unit = "Veyr", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: like Malak (his own pull cinematic, VeyrArrival, approved 2026-10-17)
+		{ unit = "Orvoss", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: like Malak (no own pull cinematic yet: he gets Malak's ship)
 	},
 }
 
@@ -496,6 +511,7 @@ local UNIT_EMOJIS = {
 	Sigilwright = "",
 	Malak = "",
 	Veyr = "",
+	Orvoss = "",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)
@@ -652,6 +668,7 @@ local DESCRIPTIONS = {
 	Hush = "A child found in a sealed ward, still wearing the gas mask the nurses gave it. It never breathed again, and it never came down. It does not speak. It only points.",
 	Sigilwright = "A scribe of the old courts who wrote the sentences that kings would speak. Death took the kings; the scribe kept writing. Every verdict it writes is final, and every word of it burns.",
 	Veyr = "He was the marksman of a city that fell. He waited at his post for the one shot that would have saved it, and he was still waiting when the last bell stopped. Death did not end the wait. Now he sees the one point where any resistance can still break, and he is patient enough to wait beyond death for it.",
+	Orvoss = "An admiral who sank with his flagship rather than strike his colours. The sea kept him, and the drowned crews of every ship he ever sent to the bottom. He came back up to finish the war, and his fleet still answers when he calls.",
 	Malak = "An envoy of a High Command no one in this realm has ever seen. He arrived from a tear in the sky, aboard a warship that does not answer to the dead, and he did not come to serve. He came to negotiate, and his terms are written in orbital fire.",
 }
 
