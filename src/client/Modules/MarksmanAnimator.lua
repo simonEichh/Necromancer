@@ -34,6 +34,7 @@ local function finisherState(model)
 end
 
 local ANGLES = CFrame.Angles
+local GATHER_STEP, GATHER_FLY, GATHER_R = 0.28, 0.45, 5 -- (his pull) the shards click in: s apart, s in flight, studs out
 local FLY_HEIGHT = 1.8 -- studs he floats above his build height (in the world; portraits too)
 local Marksman = {}
 
@@ -246,12 +247,11 @@ function Marksman.animate(model, rig, dt, now, ctx)
 	end
 	-- his gate finisher, THE FINAL HORIZON (VeyrTimeline.FINISHER; VeyrFinisher sets the client-only attribute FinisherAt
 	-- = the server's start): he seats one round, holds absolutely still, fires once (the world freezes: so does he),
-	-- then lowers the rifle, works the bolt and turns his back on the gate before it erupts
+	-- then stays on the gate while it erupts and ends on working the bolt (FN.RELOAD)
 	local finAt = model:GetAttribute("FinisherAt")
 	local ft = finAt and (serverNow - finAt) or math.huge
 	local inFin = ft >= 0 and ft < FN.END
 	local finState = inFin and finisherState(model) or nil
-	local finTurn = inFin and ease(ft, FN.TURN + 0.6, FN.TURN + 2.8) or 0
 	-- his flight: up and back along the lane (fast off the perch, easing into the peak), and down again after the shot;
 	-- the momentum tilts him forward while he rises
 	local flightUp, flightBack, flightTilt = 0, 0, 0
@@ -269,7 +269,7 @@ function Marksman.animate(model, rig, dt, now, ctx)
 		mk.flightSpeed = 0
 	end
 	if inFin then
-		fighting = finTurn < 0.5
+		fighting = true -- (the user: he never turns his back; he stays on the gate and ends on the reload)
 		inCycle = false
 		local finStill = ease(ft, FN.STILL - 0.6, FN.STILL) * (1 - ease(ft, FN.FIRE, FN.FIRE + 0.3))
 		focus = math.max(ease(ft, FN.LOCK, FN.CHARGE) * (1 - ease(ft, FN.FIRE, FN.FIRE + 0.3)), finStill)
@@ -342,7 +342,7 @@ function Marksman.animate(model, rig, dt, now, ctx)
 	elseif inSpecial then
 		bt = sp - (SP.BREAK + 0.6)
 	elseif inFin then
-		bt = ft < FN.TURN and (ft - (FN.SEAT - 1.0)) or (ft - (FN.TURN + 0.3))
+		bt = ft < FN.TURN and (ft - (FN.SEAT - 1.0)) or (ft - FN.RELOAD) * FN.RELOAD_SLOW
 	end
 	if bt then
 		local len = T.BOLT_TO - T.BOLT_FROM
@@ -396,7 +396,7 @@ function Marksman.animate(model, rig, dt, now, ctx)
 		local l = pivot:VectorToObjectSpace(target - rootPos)
 		yawNeed = math.atan2(-l.X, -l.Z) * clamp01(aim)
 		if inFin then
-			yawNeed = math.atan2(-l.X, -l.Z) + finTurn * 2.5 -- (he turns his back on the gate)
+			yawNeed = math.atan2(-l.X, -l.Z)
 		end
 	end
 	local bodyYaw = spring(st, "bodyYaw", yawNeed, 14, 6.5, dt)
@@ -508,16 +508,25 @@ function Marksman.animate(model, rig, dt, now, ctx)
 
 	-- ── the mantle strips and ribbons: a chain of springs per strip (negative X = the bottom swings back, away from
 	-- him); the later segments are softer, the ribbons flutter more, a slow wind runs across them, never in unison
+	-- (his pull, VeyrArrival: model attribute MantleFlare 0..1 throws the mantle out behind him like wings)
+	local flare = model:GetAttribute("MantleFlare") or 0
+	mk.msign = mk.msign or {}
 	for _, m in ipairs(mk.mantle) do
 		local soft = m.k
+		if m.k == 1 and mk.msign[m.i] == nil then
+			local j = rig.joints[m.name]
+			mk.msign[m.i] = j and (j.C0.Position.X >= 0 and 1 or -1) or 0
+		end
 		local amp = m.thin and 0.11 or 0.05
 		local wind = (math.sin(t * (0.7 + m.i * 0.07) - m.k * 0.9 + m.i * 1.3) + 0.4 * math.sin(t * 1.9 + m.i * 2.1)) * amp * (1 - 0.5 * lock)
 		local trail = -stream * (0.22 + 0.1 * soft) * (m.thin and 1.4 or 1)
 		local target = trail + wind - 0.02 * soft + pull * (0.22 + 0.08 * soft) * (m.thin and 1.5 or 1)
 			+ pull * math.sin(t * 7 + m.i * 1.7 + m.k) * 0.05 -- (straining, trembling)
+			- flare * (0.75 + 0.2 * soft) * (m.thin and 1.2 or 1)
 		local x = spring(st, m.name, target, 30 - soft * 6, 4.5 - soft * 0.4, dt)
 		x = math.clamp(x, -1.1, 0.12 + 0.45 * pull)
-		local side = spring(st, m.name .. "s", -turn * 0.06 * soft + (m.thin and 0.05 * math.sin(t * 2.3 + m.i) or 0), 20, 4, dt)
+		local side = spring(st, m.name .. "s", -turn * 0.06 * soft + (m.thin and 0.05 * math.sin(t * 2.3 + m.i) or 0)
+			+ flare * 0.35 * (mk.msign[m.i] or 0), 20, 4, dt)
 		set(rig, m.name, ANGLES(x, 0, side))
 	end
 	-- the robe panels (negative X = the bottom swings outward)
@@ -549,6 +558,9 @@ function Marksman.animate(model, rig, dt, now, ctx)
 		local spState = inSpecial and VeyrSpecial.state(model)
 		local station = spState and spState.stations[sh.i]
 		local w = 0
+		local joint = rig.joints[sh.name]
+		local torso = joint and joint.Part0
+		local gatherAt = model:GetAttribute("ShardsGatherAt")
 		if station then
 			local out = ease(sp, SP.SHARDS_OUT + (sh.i - 1) * SP.SHARD_STEP, SP.SHARDS_OUT + (sh.i - 1) * SP.SHARD_STEP + SP.SHARD_FLY)
 			local home = ease(sp, SP.BREAK + 0.3 + (#mk.shards - sh.i) * 0.12, SP.SHARDS_HOME)
@@ -559,13 +571,19 @@ function Marksman.animate(model, rig, dt, now, ctx)
 			local out = ease(ft, FN.ARSENAL, FN.ARSENAL + 0.6)
 			local home = ease(ft, FN.FADE, FN.FADE + 2)
 			w = out * (1 - home)
+		elseif gatherAt and torso then
+			-- (his pull, VeyrArrival: model attribute ShardsGatherAt, server time) the shards circle wide round him, then
+			-- click into place one by one
+			local arrive = gatherAt + (sh.i - 1) * GATHER_STEP
+			w = 1 - ease(serverNow, arrive - GATHER_FLY, arrive)
+			local a = sh.i / math.max(1, #mk.shards) * math.pi * 2 + serverNow * 0.7
+			station = torso.Position + Vector3.new(math.cos(a), 0.35 * math.sin(a * 2 + sh.i), math.sin(a)) * GATHER_R * scale
 		end
-		local joint = rig.joints[sh.name]
-		local torso = joint and joint.Part0
 		if w > 0.001 and torso then
 			local restCF = torso.CFrame * joint.C0 * idleT * joint.C1:Inverse()
 			local pos = restCF.Position:Lerp(station, w) + Vector3.new(0, 2.5 * math.sin(math.pi * w), 0)
-			local rot = restCF.Rotation:Lerp(CFrame.Angles(0, (inSpecial and sp or ft) * 1.2 + sh.i, 0), w)
+			local spinT = inSpecial and sp or (inFin and ft) or serverNow
+			local rot = restCF.Rotation:Lerp(CFrame.Angles(0, spinT * 1.2 + sh.i, 0), w)
 			local desired = CFrame.new(pos) * rot
 			joint.Transform = joint.C0:Inverse() * torso.CFrame:Inverse() * desired * joint.C1
 		else

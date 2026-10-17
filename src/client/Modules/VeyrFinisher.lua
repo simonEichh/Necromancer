@@ -22,11 +22,12 @@
 --   STILL, LIGHT_RUN     everything goes quiet: the debris stops in the air; a faint light runs along every weapon
 --                        from stock to barrel; a short pause
 --   FIRE, IMPACT         nine rounds at once (impact frames); they hit (impact frames, the scope picture shatters,
---                        the keeper's hands are blown back, the gate vanishes in smoke); a black hole opens there
---   CRUMBLE, TURN        the giant rifles dissolve into falling sparks; the gate still stands, cracks spreading; he
---   DESCEND              lowers the rifle, works the bolt, turns his back and drifts back down to his perch
---   GATE_HIT             the gate erupts behind him (the server breaks it): the black hole swells and swallows the
---                        chunks, implodes to a point and bursts: a shockwave down the lane past him
+--                        the keeper's hands are blown back); the gate stands untouched but for one glowing pinhole
+--   CRUMBLE, TURN        the giant rifles dissolve into falling sparks; a web of violet cracks spreads from the pinhole; he
+--   DESCEND              drifts back down to his perch, still on the gate (he never turns his back, the user's call)
+--   GATE_HIT             the server breaks the gate: stone by stone, outward from the pinhole, it turns to soul ash
+--                        and is blown away down the lane past him (ALREADY DEAD, the user's pick over a black hole)
+--   RELOAD               the last beat: close on him, he works the bolt
 -- Everything is measured from his real model, the lane and the gate the server sends, so it works on every rotated
 -- plot. The scope views lock the camera at his eyepiece (it must not wander while he is still).
 local Players = game:GetService("Players")
@@ -63,6 +64,26 @@ local VIOLET_DEEP = Color3.fromRGB(64, 40, 190)
 local MOON = Color3.fromRGB(222, 222, 240)
 local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
 local SPARK = "rbxasset://textures/particles/sparkles_main.dds"
+local ASH = Color3.fromRGB(58, 54, 64)
+local CRACKS = 220 -- (the crack web's segments, at most)
+local MAX_STONES = 700 -- (the gate's parts turned to ash, at most)
+local ASH_WAVE_SPEED = 26 -- studs/s: how fast the ash spreads out from the pinhole over the gate
+
+-- his lines (sounds/veyr/finisher_*.ogg, demonic undead voice): only for watchers; a late Watch joins a line mid-way,
+-- Leave stops it. phrases: when each part of the subtitle starts (s into the clip) and how long it takes to appear
+local LINES = {
+	{ sound = "voice_veyr_seat", at = F.MARKSMAN + 0.3, length = 3.82, -- (the round seats on "That is all ...")
+		phrases = { { at = 0, text = "ONE ROUND. ", reveal = 1.0 }, { at = 1.97, text = "THAT IS ALL YOU DESERVE.", reveal = 1.5 } } },
+	{ sound = "voice_veyr_bang", at = F.FIRE - 0.75, length = 0.88, -- (the word ends just before the shot)
+		phrases = { { at = 0, text = "BANG.", reveal = 0.4 } } },
+}
+for _, l in ipairs(LINES) do
+	l.text = ""
+	for _, ph in ipairs(l.phrases) do
+		ph.count = utf8.len(ph.text)
+		l.text ..= ph.text
+	end
+end
 
 local BEATS = {
 	{ at = F.QUIET, name = "The line goes quiet" }, { at = F.MARKSMAN, name = "The marksman" },
@@ -165,6 +186,17 @@ local function findVeyr()
 		end
 	end
 	return best
+end
+
+local function wallModelOf(part)
+	local p = part
+	while p and p ~= workspace do
+		if p.Name == "WallModel" then
+			return p
+		end
+		p = p.Parent
+	end
+	return nil
 end
 
 local function keeperOf(gate)
@@ -292,15 +324,17 @@ local KEYS = {
 	{ t = 21.8, pos = function(c) return orbit(c, 40, 46, 6) end, look = function(c) return c.peak end, fov = 64 },
 	{ t = 23.6, pos = function(c) return orbit(c, 100, 44, 9) end, look = function(c) return c.peak end, fov = 64 },
 	{ t = 25.4, pos = function(c) return orbit(c, 160, 44, 12) end, look = function(c) return c.peak:Lerp(c.gate, 0.15) end, fov = 62 },
-	-- quiet: close on his eyes ...
-	{ t = 27.3, pos = function(c) return (CFrame.lookAt(chestAt(c), c.gate) * CFrame.new(1.1, 1.5, -2.2)).Position end, look = function(c) return (CFrame.lookAt(chestAt(c), c.gate) * CFrame.new(0.1, 1.4, -0.2)).Position end, fov = 34 },
-	-- ... then into his scope until the hit
-	{ t = F.SCOPE_2, pos = function(c) return scopeEye(c, 2) end, look = scopeLook, fov = 30 },
+	-- quiet: a slow push in over his shoulder, down the barrel at the gate (the user: the close-up on his face between
+	-- the orbit and the scope swung the camera to him and back to the wall) ...
+	{ t = 27.3, pos = function(c) return (CFrame.lookAt(chestAt(c), c.gate) * CFrame.new(2.2, 2, 6)).Position end, look = scopeLook, fov = 44 },
+	{ t = F.SCOPE_2 - 0.05, pos = function(c) return (CFrame.lookAt(chestAt(c), c.gate) * CFrame.new(1.5, 1.7, 3.6)).Position end, look = scopeLook, fov = 38 },
+	-- ... then a cut into his scope until the hit
+	{ t = F.SCOPE_2, cut = true, pos = function(c) return scopeEye(c, 2) end, look = scopeLook, fov = 30 },
 	{ t = F.IMPACT, pos = function(c) return scopeEye(c, 2) end, look = scopeLook, fov = 30 },
-	-- the smoke on the gate (a cut right after the hit's impact frames): still standing
+	-- the gate (a cut right after the hit's impact frames): still standing, the pinhole glowing
 	{ t = F.IMPACT + 0.25, cut = true, pos = function(c) return c.gate - c.L.LookVector * 46 + Vector3.new(0, 12, 0) end, look = function(c) return c.gate + Vector3.new(0, 5, 0) end, fov = 58 },
 	{ t = 32.7, pos = function(c) return c.gate - c.L.LookVector * 52 + Vector3.new(0, 13, 0) end, look = function(c) return c.gate + Vector3.new(0, 5, 0) end, fov = 56 },
-	-- already dead (a cut back up to him): in front of him as he lowers the rifle and turns his back, then following
+	-- already dead (a cut back up to him): in front of him, still on the gate, then following
 	-- him down at the same distance
 	{ t = 32.8, cut = true, pos = function(c) return chestAt(c) + c.L.LookVector * 11 - c.side * 7 + Vector3.new(0, 1.5, 0) end, look = function(c) return chestAt(c) + Vector3.new(0, 0.5, 0) end, fov = 56 },
 	{ t = 35.0, pos = function(c) return chestAt(c) + c.L.LookVector * 11 - c.side * 9 + Vector3.new(0, 1.5, 0) end, look = function(c) return chestAt(c) + Vector3.new(0, 0.5, 0) end, fov = 58 },
@@ -309,8 +343,9 @@ local KEYS = {
 	{ t = 38.4, pos = function(c) return chestAt(c) + c.L.LookVector * 9 - c.side * 15 + Vector3.new(0, 1.2, 0) end, look = function(c) return chestAt(c):Lerp(c.gate, 0.26) end, fov = 62 },
 	{ t = 39.6, pos = function(c) return chestAt(c) + c.L.LookVector * 8 - c.side * 14 + Vector3.new(0, 1.4, 0) end, look = function(c) return chestAt(c):Lerp(c.gate, 0.55) end, fov = 44 },
 	{ t = 41.4, pos = function(c) return chestAt(c) + c.L.LookVector * 7 - c.side * 12 + Vector3.new(0, 1.5, 0) end, look = function(c) return chestAt(c):Lerp(c.gate, 0.25) end, fov = 56 },
-	{ t = 44.0, pos = function(c) return chestAt(c) + c.L.LookVector * 4.5 - c.side * 6 + Vector3.new(0, 0.6, 0) end, look = function(c) return chestAt(c) + Vector3.new(0, 0.6, 0) end, fov = 50 },
-	{ t = 45.0, pos = function(c) return chestAt(c) + c.L.LookVector * 4.2 - c.side * 5.6 + Vector3.new(0, 0.6, 0) end, look = function(c) return chestAt(c) + Vector3.new(0, 0.6, 0) end, fov = 49 },
+	-- the reload (a cut): close on the receiver like the seat at the start, he works the bolt (FINISHER.RELOAD)
+	{ t = F.RELOAD - 0.4, cut = true, pos = function(c) return (c.H * CFrame.new(2.4, 1.2, -3)).Position end, look = function(c) return (c.H * CFrame.new(0.3, 0.8, -0.9)).Position end, fov = 54 },
+	{ t = 45.0, pos = function(c) return (c.H * CFrame.new(2.0, 0.8, -2.4)).Position end, look = function(c) return (c.H * CFrame.new(0.4, 0.6, -1.1)).Position end, fov = 48 },
 }
 
 local function cameraAt(T, c)
@@ -444,62 +479,186 @@ local function world(folder, ctx)
 	for i = 1, (GIANTS + 1) * 2 do
 		dashes[i] = newPart(folder, Vector3.new(0.4, 0.4, 3), WHITE, 1)
 	end
-	-- the gate's cracks after the hit
-	local gateCracks = {}
-	for i = 1, 14 do
-		local a = (i / 14) * math.pi * 2 + math.random() * 0.3
-		gateCracks[i] = { part = newPart(folder, Vector3.new(0.4, 1, 0.2), VIOLET_CORE, 1), a = a, len = 4 + math.random() * 8 }
-	end
-	-- the black hole where the rounds strike: a black core, a glowing rim facing the camera, two tilted accretion rings,
-	-- smoke and sparks drawn in; it grows, swallows the gate's debris, implodes and bursts
-	local hole = {
-		core = newPart(folder, Vector3.one, Color3.new(0, 0, 0), 1, Enum.PartType.Ball, Enum.Material.SmoothPlastic),
-		rim = VeyrSights.build(folder, 1, VIOLET_CORE, WHITE, { segments = 36, inner = false, spikes = false, ticks = false, nodes = false }),
-		disc1 = VeyrSights.build(folder, 1, VIOLET, VIOLET_CORE, { segments = 44, innerCount = 18, spikes = false, ticks = false }),
-		disc2 = VeyrSights.build(folder, 1, VIOLET_DEEP, VIOLET, { segments = 36, inner = false, spikes = false, ticks = false, nodes = false }),
-		shell = newPart(folder, Vector3.one * 8, WHITE, 1, Enum.PartType.Ball),
-		spin = 0,
+	-- ── after the hit, ALREADY DEAD (the user's pick, replacing the black hole): the gate stands untouched but for one
+	-- glowing pinhole where the rounds struck; a web of violet cracks spreads from it over the whole gate; when the
+	-- server breaks it the gate does not explode: stone by stone, outward from the pinhole, it turns to soul ash and is
+	-- blown away down the lane past him
+	local pin = {
+		core = newPart(folder, Vector3.one * 0.7, WHITE, 1, Enum.PartType.Ball),
+		glow = newPart(folder, Vector3.one * 2.4, VIOLET, 1, Enum.PartType.Ball),
 	}
-	do
-		local e = Instance.new("ParticleEmitter")
-		e.Texture = SPARK
-		e.Color = ColorSequence.new(VIOLET_CORE, VIOLET)
-		e.LightEmission = 1
-		e.LightInfluence = 0
-		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 0.1) })
-		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.2), NumberSequenceKeypoint.new(1, 0.7) })
-		e.Lifetime = NumberRange.new(0.6, 0.9)
-		e.Speed = NumberRange.new(-14, -9) -- (in: they spawn on the shell)
-		e.Shape = Enum.ParticleEmitterShape.Sphere
-		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
-		e.Rate = 0
-		e.Parent = hole.shell
-		hole.sparks = e
-		local m = Instance.new("ParticleEmitter")
-		m.Texture = SMOKE
-		m.Color = ColorSequence.new(Color3.fromRGB(40, 30, 64), Color3.fromRGB(10, 8, 16))
-		m.LightInfluence = 0
-		m.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0.6) })
-		m.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.45), NumberSequenceKeypoint.new(1, 0.9) })
-		m.Lifetime = NumberRange.new(0.8, 1.2)
-		m.Speed = NumberRange.new(-10, -6)
-		m.Shape = Enum.ParticleEmitterShape.Sphere
-		m.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
-		m.RotSpeed = NumberRange.new(-90, 90)
-		m.Rate = 0
-		m.Parent = hole.shell
-		hole.smoke = m
-	end
-	-- the gate's chunks (thrown out when it erupts, then swallowed)
-	local chunks = {}
-	for i = 1, 46 do
-		local sz = 1 + math.random() * 2.8
-		chunks[i] = { part = newPart(folder, Vector3.new(sz, sz * (0.5 + math.random() * 0.6), sz * (0.6 + math.random() * 0.5)),
-			Color3.fromRGB(116 + math.random(0, 30), 108 + math.random(0, 26), 98 + math.random(0, 22)), 1, nil, Enum.Material.Slate),
-			spin = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 6 }
-	end
-	local fired, impacted, erupted, crumbled = false, false, false, false
+	local pinLight = Instance.new("PointLight")
+	pinLight.Color = VIOLET
+	pinLight.Range = 16
+	pinLight.Brightness = 0
+	pinLight.Shadows = false
+	pinLight.Parent = pin.core
+	local cracks = {} -- built at the hit, on the gate's real surface
+	local crackLen = 1
+	local stones = {} -- copies of the gate's parts, made just before the break (the real ones are hidden on this screen)
+	local wind = -ctx.L.LookVector -- (down the lane, towards him)
+	local ashHolder = newPart(folder, Vector3.one * 0.2, WHITE, 1)
+	local ash = Instance.new("ParticleEmitter")
+	ash.Texture = SMOKE
+	ash.Color = ColorSequence.new(Color3.fromRGB(120, 96, 190), ASH)
+	ash.LightInfluence = 0.5
+	ash.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 3.4) })
+	ash.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	ash.Lifetime = NumberRange.new(2.5, 4)
+	ash.Speed = NumberRange.new(2, 6)
+	ash.SpreadAngle = Vector2.new(180, 180)
+	ash.Drag = 0.6
+	ash.Acceleration = wind * 12 + Vector3.new(0, 1.5, 0)
+	ash.Rotation = NumberRange.new(0, 360)
+	ash.RotSpeed = NumberRange.new(-40, 40)
+	ash.Enabled = false
+	ash.Parent = ashHolder
+	local embers = Instance.new("ParticleEmitter")
+	embers.Texture = SPARK
+	embers.Color = ColorSequence.new(VIOLET_CORE, VIOLET)
+	embers.LightEmission = 1
+	embers.LightInfluence = 0
+	embers.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
+	embers.Lifetime = NumberRange.new(1.5, 3)
+	embers.Speed = NumberRange.new(3, 8)
+	embers.SpreadAngle = Vector2.new(180, 180)
+	embers.Drag = 0.8
+	embers.Acceleration = wind * 16 + Vector3.new(0, 3, 0)
+	embers.Enabled = false
+	embers.Parent = ashHolder
+	-- the ash wave rolling down the lane past his perch
+	local waveHolder = newPart(folder, Vector3.new(36, 3, 3), WHITE, 1)
+	local waveFx = Instance.new("ParticleEmitter")
+	waveFx.Texture = SMOKE
+	waveFx.Color = ColorSequence.new(Color3.fromRGB(96, 84, 130), Color3.fromRGB(46, 42, 54))
+	waveFx.LightInfluence = 0.6
+	waveFx.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 14) })
+	waveFx.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	waveFx.Lifetime = NumberRange.new(1.6, 2.6)
+	waveFx.Speed = NumberRange.new(4, 10)
+	waveFx.SpreadAngle = Vector2.new(60, 20)
+	waveFx.Drag = 1
+	waveFx.Acceleration = wind * 6 + Vector3.new(0, 2, 0)
+	waveFx.Rotation = NumberRange.new(0, 360)
+	waveFx.RotSpeed = NumberRange.new(-30, 30)
+	waveFx.Shape = Enum.ParticleEmitterShape.Box
+	waveFx.Rate = 0
+	waveFx.Parent = waveHolder
+	local fired, impacted, erupted = false, false, false
 	local hiddenGate = {}
+
+	-- the gate's real surface where the rounds struck (past the keeper's hands, which may be in the way)
+	local function findGate()
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local ignore = { folder }
+		local from = ctx.gate + Vector3.new(0, 3, 0) - ctx.L.LookVector * 30
+		for _ = 1, 5 do
+			params.FilterDescendantsInstances = ignore
+			local hit = workspace:Raycast(from, ctx.L.LookVector * 60, params)
+			if not hit then
+				break
+			end
+			local model = wallModelOf(hit.Instance)
+			if model or hit.Instance:IsA("Terrain") then
+				return hit.Position, hit.Normal, model
+			end
+			table.insert(ignore, hit.Instance)
+		end
+		return ctx.gate + Vector3.new(0, 3, 0) - ctx.L.LookVector * 0.9, -ctx.L.LookVector, nil
+	end
+
+	-- the crack web: branching lines from the pinhole over the gate's face, laid on its real stones
+	local function buildCracks(P, n, model)
+		local right = n:Cross(Vector3.yAxis)
+		right = right.Magnitude > 0.1 and right.Unit or ctx.L.RightVector
+		local halfW, bottom, top = 18, ctx.gate.Y - 2, ctx.gate.Y + 22
+		if model then
+			local cf, size = model:GetBoundingBox()
+			halfW = (math.abs(size.X * cf.RightVector:Dot(right)) + math.abs(size.Z * cf.LookVector:Dot(right))) / 2
+			bottom, top = cf.Y - size.Y / 2 + 0.5, cf.Y + size.Y / 2 - 0.5
+		end
+		local params = RaycastParams.new()
+		params.FilterType = model and Enum.RaycastFilterType.Include or Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = model and { model } or { folder }
+		local function surface(x, y)
+			local p = P + right * x + Vector3.new(0, y, 0)
+			local hit = workspace:Raycast(p + n * 8, -n * 16, params)
+			return (hit and hit.Position or p) + n * 0.12
+		end
+		local function grow(x, y, a, at, cum, depth, width)
+			for _ = 1, 40 do
+				if #cracks >= CRACKS then
+					return
+				end
+				local len = 1.2 + math.random() * 2.2
+				a += (math.random() - 0.5) * 0.9
+				local nx, ny = x + math.cos(a) * len, y + math.sin(a) * len
+				if math.abs(nx) > halfW or P.Y + ny < bottom or P.Y + ny > top then
+					return
+				end
+				local b = surface(nx, ny)
+				table.insert(cracks, { a = at, b = b, from = cum, to = cum + len, width = width,
+					part = newPart(folder, Vector3.new(width, 0.08, len), VIOLET_CORE, 1) })
+				crackLen = math.max(crackLen, cum + len)
+				x, y, at, cum = nx, ny, b, cum + len
+				if depth < 3 and math.random() < 0.22 then
+					grow(x, y, a + (math.random() < 0.5 and -1 or 1) * (0.5 + math.random() * 0.7), at, cum, depth + 1, width * 0.65)
+				end
+			end
+		end
+		local start = surface(0, 0)
+		for k = 1, 7 do
+			grow(0, 0, k / 7 * math.pi * 2 + math.random() * 0.5, start, 0, 0, 0.24)
+		end
+	end
+
+	-- just before the break: copy the gate's parts and hide the real ones on this screen (the server removes them at
+	-- GATE_HIT; the cleanup shows them again if they are still there)
+	local function captureGate(P, model)
+		local parts = {}
+		if model and model.Parent then
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and d.Transparency < 0.98 and d.LocalTransparencyModifier < 1 then
+					table.insert(parts, d)
+				end
+			end
+		else
+			local params = OverlapParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { folder }
+			local box = CFrame.lookAt(ctx.gate + Vector3.new(0, 9, 0), ctx.gate + Vector3.new(0, 9, 0) + ctx.L.LookVector)
+			for _, part in ipairs(workspace:GetPartBoundsInBox(box, Vector3.new(44, 30, 14), params)) do
+				if part.Size.Magnitude < 90 and part.Transparency < 0.98 and part.LocalTransparencyModifier < 1 then
+					table.insert(parts, part)
+				end
+			end
+		end
+		for i, part in ipairs(parts) do
+			if i > MAX_STONES then
+				break
+			end
+			local copy = part:Clone()
+			for _, c in ipairs(copy:GetChildren()) do
+				if not (c:IsA("SpecialMesh") or c:IsA("Decal") or c:IsA("Texture") or c:IsA("SurfaceAppearance")) then
+					c:Destroy()
+				end
+			end
+			copy.Anchored = true
+			copy.CanCollide = false
+			copy.CanQuery = false
+			copy.CanTouch = false
+			copy.Parent = folder
+			part.LocalTransparencyModifier = 1
+			table.insert(hiddenGate, part)
+			local d = (part.Position - P).Magnitude
+			table.insert(stones, { part = copy, base = copy.CFrame, size = copy.Size, color = copy.Color, material = copy.Material,
+				at = F.GATE_HIT + d / ASH_WAVE_SPEED + math.random() * 0.15,
+				vel = wind * (4 + math.random() * 6) + Vector3.new((math.random() - 0.5) * 3, 1 + math.random() * 3, (math.random() - 0.5) * 3),
+				spin = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 3,
+				puff = math.clamp(math.floor((copy.Size.X * copy.Size.Y * copy.Size.Z) ^ (1 / 3) * 2.5), 2, 14) })
+		end
+	end
 
 	-- where each giant sits: round his line of fire (the wheel's axis = his aim), a little behind him
 	local function giantCF(g, T)
@@ -708,152 +867,121 @@ local function world(folder, ctx)
 				fly(g.round, g.roundGlow, st.froms[gi + 1])
 			end
 		end
-		-- ── the hit: the keeper's hands are blown back, the gate vanishes in smoke; it still stands
+		-- ── the hit: the keeper's hands are blown back; a flash, sparks, a little dust. The gate stands untouched
 		if not impacted and T >= F.IMPACT then
 			impacted = true
+			st.P, st.n, st.gateModel = findGate()
+			buildCracks(st.P, st.n, st.gateModel)
 			if T < F.IMPACT + 0.6 then
-				local g = ctx.gate
-				local n = -ctx.L.LookVector
-				flash(folder, g + n * 2, VIOLET, 6, 40, 0.5, 60, 14)
-				shockDisc(folder, g + n, n, 3, 42, 0.8, VIOLET_CORE, 0.35)
-				burst(folder, g + n * 2 + Vector3.new(0, 4, 0), n, 90, { color = Color3.fromRGB(60, 54, 70), color2 = Color3.fromRGB(26, 22, 34),
-					size0 = 6, size1 = 18, speed0 = 10, speed1 = 30, spread = 70, life0 = 2.2, life1 = 3.6, drag = 1.6, accel = Vector3.new(0, 1, 0), t0 = 0.15 })
-				burst(folder, g + n * 2, n, 80, { texture = SPARK, color = WHITE, color2 = VIOLET, emission = 1, size0 = 1.2,
+				local g = st.P
+				local n = st.n
+				flash(folder, g + n * 1, VIOLET, 4, 26, 0.4, 50, 12)
+				shockDisc(folder, g + n * 0.5, n, 2, 30, 0.7, VIOLET_CORE, 0.35)
+				burst(folder, g + n * 1, n, 70, { texture = SPARK, color = WHITE, color2 = VIOLET, emission = 1, size0 = 1.2,
 					size1 = 0.1, speed0 = 30, speed1 = 90, spread = 75, life0 = 0.5, life1 = 1.2, drag = 1.5, accel = Vector3.new(0, -40, 0), t0 = 0 })
+				burst(folder, g + n * 1, n, 18, { color = Color3.fromRGB(70, 64, 80), size0 = 2, size1 = 6, speed0 = 6, speed1 = 14,
+					spread = 50, life0 = 0.8, life1 = 1.6, drag = 2, t0 = 0.4 })
 				Sfx.playAt("veyr_impact", g, 1.6, 0.7, 900)
-				Sfx.playAt("gate_collapse", g, 0.5, 1.3, 900)
+				Sfx.playAt("gate_collapse", g, 0.4, 1.3, 900)
+				task.delay(1.4, function() Sfx.playAt("veyr_ring", g, 1.5, 1.9, 900) end) -- (the silence after: one glassy tink)
 				ctx.shake = 1
 			end
 		end
-		-- the cracks spreading over the gate, brighter and brighter until it erupts
-		local spread = ease(T, F.IMPACT + 1, F.GATE_HIT - 0.3)
-		local hot = ease(T, F.GATE_HIT - 1.2, F.GATE_HIT) * (1 - ease(T, F.GATE_HIT, F.GATE_HIT + 0.2))
-		for _, c in ipairs(gateCracks) do
-			if spread > 0.01 and T < F.GATE_HIT + 0.1 then
-				local len = c.len * spread
-				local face = CFrame.lookAt(ctx.gate + Vector3.new(0, 5, 0) - ctx.L.LookVector * 0.9, ctx.gate + Vector3.new(0, 5, 0) - ctx.L.LookVector * 5)
-				c.part.Size = Vector3.new(0.35 + 0.3 * hot, len, 0.2)
-				c.part.CFrame = face * CFrame.Angles(0, 0, c.a) * CFrame.new(0, 0.5 + len / 2, 0)
-				c.part.Transparency = 0.35 - 0.3 * hot
-				c.part.Color = hot > 0.5 and WHITE or VIOLET_CORE
-			else
-				c.part.Transparency = 1
-			end
-		end
-		if not crumbled and T >= F.CRUMBLE then
-			crumbled = true
-		end
-		-- ── the black hole: opens where the rounds struck, grows while he turns away; when the gate erupts (the server
-		-- breaks it now) it swells, swallows the chunks, implodes to a point and bursts (a shockwave down the lane)
-		-- (the user: more massive, and massive early: it tears open right after the hit, is already huge while he
-		-- descends, and swells to swallow the whole gate when it erupts)
-		local IMPLODE, BURST = F.GATE_HIT + 2.2, F.GATE_HIT + 2.6
-		local r = 0
-		if T >= F.IMPACT then
-			r = 3 + 13 * ease(T, F.IMPACT, F.IMPACT + 2.2) + 6 * ease(T, F.IMPACT + 2.2, F.GATE_HIT) + 20 * ease(T, F.GATE_HIT, F.GATE_HIT + 1.6)
-			r *= 1 - ease(T, IMPLODE, BURST) ^ 0.6
-			r += math.sin(T * 9) * 0.05 * r * (1 - ease(T, IMPLODE, BURST))
-		end
-		-- (it rises as it grows, so it never sinks into the ground)
-		local holeAt = ctx.gate + Vector3.new(0, 4 + r * 0.55, 0) - ctx.L.LookVector * 2
-		local camPos = workspace.CurrentCamera and workspace.CurrentCamera.CFrame.Position or ctx.peak
-		if r > 0.05 and T < BURST then
-			hole.spin += dt * (0.8 + 3 * ease(T, F.GATE_HIT, IMPLODE))
-			hole.core.Size = Vector3.one * (r * 2)
-			hole.core.CFrame = CFrame.new(holeAt)
-			hole.core.Transparency = 0
-			local facing = CFrame.lookAt(holeAt, camPos)
-			VeyrSights.place(hole.rim, facing, r * 1.08, 0.9, hole.spin * 0.3)
-			local tilt = CFrame.new(holeAt) * CFrame.Angles(math.rad(72), hole.spin * 0.2, math.rad(12))
-			VeyrSights.place(hole.disc1, tilt * CFrame.Angles(math.pi / 2, 0, 0), r * 2.3, 0.85, hole.spin)
-			VeyrSights.place(hole.disc2, tilt * CFrame.Angles(math.pi / 2, 0, 0), r * 1.7, 0.7, -hole.spin * 1.6)
-			hole.shell.Size = Vector3.one * math.max(4, r * 5)
-			hole.shell.CFrame = CFrame.new(holeAt)
-			local pull = ease(T, F.IMPACT, F.IMPACT + 1) * (1 + 2.5 * ease(T, F.GATE_HIT, F.GATE_HIT + 1))
-			hole.sparks.Rate = 40 * pull
-			hole.smoke.Rate = 18 * pull
-			hole.sparks.Speed = NumberRange.new(-r * 3.2, -r * 2.2)
-			hole.smoke.Speed = NumberRange.new(-r * 2.2, -r * 1.5)
+		-- the pinhole: a small, steady, glowing wound, pulsing slowly, hotter before the break; it goes out first
+		if impacted and T < F.GATE_HIT then
+			local beat = 0.85 + 0.15 * math.sin(T * 3.2)
+			local hot = ease(T, F.GATE_HIT - 1.2, F.GATE_HIT)
+			local on = ease(T, F.IMPACT + 0.15, F.IMPACT + 0.5)
+			local at = st.P + st.n * 0.2
+			pin.core.CFrame = CFrame.new(at)
+			pin.glow.CFrame = CFrame.new(at)
+			pin.core.Size = Vector3.one * (0.7 + 0.4 * hot) * beat
+			pin.glow.Size = Vector3.one * (2.4 + 2 * hot) * beat
+			pin.core.Transparency = 1 - on
+			pin.glow.Transparency = 1 - on * 0.55
+			pinLight.Brightness = on * (2 + 4 * hot) * beat
 		else
-			hole.core.Transparency = 1
-			VeyrSights.hide(hole.rim)
-			VeyrSights.hide(hole.disc1)
-			VeyrSights.hide(hole.disc2)
-			hole.sparks.Rate = 0
-			hole.smoke.Rate = 0
+			pin.core.Transparency = 1
+			pin.glow.Transparency = 1
+			pinLight.Brightness = 0
 		end
-		-- the eruption: the gate's chunks burst out, then curve back and are swallowed
-		if not erupted and T >= F.GATE_HIT then
-			erupted = true
-			if T < F.GATE_HIT + 1 then
-				local g = ctx.gate
-				local n = -ctx.L.LookVector
-				flash(folder, holeAt, VIOLET, 4, 26, 0.4, 60, 10)
-				for _, c in ipairs(chunks) do
-					local start = g + ctx.L.RightVector * (math.random() - 0.5) * 36 + Vector3.new(0, 1 + math.random() * 16, 0)
-					c.pos = start
-					c.vel = (start - holeAt).Unit * (18 + math.random() * 22) + n * (6 + math.random() * 14) + Vector3.new(0, 8, 0)
-					c.alive = true
-				end
-				burst(folder, g + n * 2, n, 60, { color = Color3.fromRGB(96, 90, 86), size0 = 3, size1 = 12, speed0 = 16,
-					speed1 = 40, spread = 75, life0 = 1, life1 = 2.2, t0 = 0.3 })
-				Sfx.playAt("gate_collapse", g, 1, 1, 900)
-				Sfx.playAt("veyr_collapse", holeAt, 1, 0.7, 900)
-				task.delay(0.6, function() Sfx.playAt("keeper_roar", g + Vector3.new(0, 30, 0), 0.9, 1, 900) end)
-				ctx.shake = 0.8
-				-- (preview: the gate is only hidden on this screen; for real the server breaks it at this very moment)
-				if ctx.preview then
-					local params = OverlapParams.new()
-					params.FilterType = Enum.RaycastFilterType.Exclude
-					params.FilterDescendantsInstances = { folder }
-					for _, part in ipairs(workspace:GetPartBoundsInBox(CFrame.new(g + Vector3.new(0, 9, 0)), Vector3.new(44, 30, 14), params)) do
-						if part.Size.Magnitude < 90 and part.LocalTransparencyModifier < 1 then
-							part.LocalTransparencyModifier = 1
-							table.insert(hiddenGate, part)
-						end
-					end
-				end
-			end
-		end
-		for _, c in ipairs(chunks) do
-			if c.alive then
-				local toHole = holeAt - c.pos
-				local d = toHole.Magnitude
-				local age = T - F.GATE_HIT
-				-- (thrown out first, then the pull wins: harder and harder, the chunks spiral in)
-				local pullK = ease(age, 0.25, 1.1)
-				c.vel += toHole.Unit * (140 * pullK) * dt + toHole.Unit:Cross(Vector3.yAxis) * (30 * pullK) * dt
-				c.vel *= 1 - math.min(0.9, dt * 1.2 * pullK)
-				c.pos += c.vel * dt
-				local shrink = math.clamp(d / math.max(1, r * 1.6), 0, 1)
-				c.part.CFrame = CFrame.new(c.pos) * CFrame.Angles(age * c.spin.X, age * c.spin.Y, age * c.spin.Z)
-				c.part.Transparency = 1 - shrink
-				if d < r * 0.9 or T >= IMPLODE then
-					c.alive = false
+		-- the crack web spreading from it (slow at first, then faster), brighter before the break; each crack goes out as
+		-- the ash wave reaches it
+		if impacted then
+			local s = ease(T, F.IMPACT + 1.2, F.GATE_HIT - 0.5)
+			local spread = crackLen * s * s
+			local hot = ease(T, F.GATE_HIT - 1.2, F.GATE_HIT)
+			for _, c in ipairs(cracks) do
+				local f = math.clamp((spread - c.from) / (c.to - c.from), 0, 1)
+				local goneAt = F.GATE_HIT + (c.a - st.P).Magnitude / ASH_WAVE_SPEED
+				if f > 0 and T < goneAt then
+					local b = c.a:Lerp(c.b, f)
+					local len = (b - c.a).Magnitude
+					c.part.Size = Vector3.new(c.width * (1 + 0.6 * hot), 0.08, math.max(0.05, len))
+					c.part.CFrame = CFrame.lookAt((c.a + b) / 2, b, st.n)
+					c.part.Transparency = 0.2 - 0.15 * hot + 0.1 * math.sin(T * 6 + c.from)
+					c.part.Color = VIOLET_CORE:Lerp(WHITE, hot)
+				else
 					c.part.Transparency = 1
 				end
 			end
 		end
-		-- the implosion's burst: a flash, a shockwave down the lane past his perch, sparks, the dust wall reaching him
-		if not st.burst and T >= BURST then
-			st.burst = true
-			if T < BURST + 1 then
-				local g = ctx.gate
-				flash(folder, holeAt, VIOLET, 2, 46, 0.5, 60, 14)
-				shockDisc(folder, g + Vector3.new(0, 1, 0), Vector3.yAxis, 2, ctx.laneDist + 30, 1.6, VIOLET, 0.3)
-				shockDisc(folder, holeAt, (camPos - holeAt).Unit, 2, 50, 0.8, VIOLET_CORE, 0.3)
-				burst(folder, holeAt, Vector3.yAxis, 120, { texture = SPARK, color = WHITE, color2 = VIOLET, emission = 1,
-					size0 = 1.4, size1 = 0.1, speed0 = 40, speed1 = 110, spread = 180, life0 = 0.6, life1 = 1.6, drag = 1.5,
-					accel = Vector3.new(0, -20, 0), t0 = 0 })
-				Sfx.playAt("veyr_collapse", holeAt, 1.6, 1.1, 900)
-				ctx.shake = 1
-				task.delay(math.clamp(ctx.laneDist / 180, 0.4, 1.6), function()
-					if folder.Parent then
-						burst(folder, ctx.floor + Vector3.new(0, 1, 0), ctx.L.LookVector * -1, 40, { color = Color3.fromRGB(90, 84, 80),
-							size0 = 4, size1 = 12, speed0 = 30, speed1 = 60, spread = 40, life0 = 1, life1 = 2, t0 = 0.4 })
-					end
-				end)
+		-- ── the break: the server breaks the gate now; on screen it turns to ash, stone by stone
+		if impacted and not st.captured and T >= F.GATE_HIT - 0.4 then
+			st.captured = true
+			captureGate(st.P, st.gateModel)
+		end
+		if not erupted and T >= F.GATE_HIT then
+			erupted = true
+			if T < F.GATE_HIT + 1 then
+				local g = st.P or ctx.gate
+				flash(folder, g, VIOLET_CORE, 1, 8, 0.3, 30, 8) -- (the pinhole goes out)
+				Sfx.playAt("gate_collapse", g, 0.7, 0.75, 900)
+				Sfx.playAt("veyr_collapse", g, 0.8, 0.6, 900)
+				task.delay(0.8, function() Sfx.playAt("keeper_roar", ctx.gate + Vector3.new(0, 30, 0), 0.9, 1, 900) end)
+				ctx.shake = 0.4
 			end
+		end
+		for _, s in ipairs(stones) do
+			local age = T - s.at
+			if age < 0 then
+				-- the wave is coming: the stone glows faintly from inside
+				local near = 1 - math.clamp(-age / 0.5, 0, 1)
+				s.part.Color = s.color:Lerp(VIOLET_CORE, 0.7 * near)
+			elseif not s.gone then
+				if not s.burst then
+					s.burst = true
+					s.part.Material = Enum.Material.Neon
+					ashHolder.CFrame = CFrame.new(s.base.Position)
+					ash:Emit(s.puff)
+					embers:Emit(math.ceil(s.puff / 3))
+				end
+				if age > 0.25 and s.part.Material == Enum.Material.Neon then
+					s.part.Material = s.material
+				end
+				local k = math.clamp(age / 1.4, 0, 1)
+				s.part.Color = VIOLET_CORE:Lerp(ASH, math.clamp(age / 0.3, 0, 1))
+				s.part.Size = s.size * math.max(0.02, 1 - k * k)
+				s.part.CFrame = CFrame.new(s.base.Position + s.vel * age + wind * 3 * age * age) * s.base.Rotation
+					* CFrame.Angles(s.spin.X * age, s.spin.Y * age, s.spin.Z * age)
+				s.part.Transparency = k * k
+				if k >= 1 then
+					s.gone = true
+					s.part.Transparency = 1
+				end
+			end
+		end
+		-- the ash wave down the lane, past his perch
+		local travel = math.clamp(ctx.laneDist / 110, 1.6, 3)
+		local waveK = (T - (F.GATE_HIT + 0.5)) / travel
+		if waveK >= 0 and waveK <= 1 then
+			local from = Vector3.new(ctx.gate.X, ctx.ground.Y + 1, ctx.gate.Z)
+			local to = ctx.ground + Vector3.new(0, 1, 0) + wind * 20
+			local pos = from:Lerp(to, waveK)
+			waveHolder.CFrame = CFrame.lookAt(pos, pos + wind)
+			waveFx.Rate = 70
+		else
+			waveFx.Rate = 0
 		end
 		if ctx.shake then
 			ctx.shake = math.max(0, ctx.shake - dt * 0.9)
@@ -1153,6 +1281,47 @@ function VeyrFinisher.play(opts)
 		caption.Parent = ui
 	end
 
+	-- his lines' subtitles (the same layout as the pull cinematics)
+	local subs = Instance.new("CanvasGroup")
+	subs.AnchorPoint = Vector2.new(0.5, 1)
+	subs.Position = UDim2.fromScale(0.5, 0.885)
+	subs.Size = UDim2.fromScale(0.84, 0.13)
+	subs.BackgroundTransparency = 1
+	subs.Visible = false
+	subs.ZIndex = 10
+	subs.Parent = ui
+	local speaker = Instance.new("TextLabel")
+	speaker.Size = UDim2.fromScale(1, 0.24)
+	speaker.BackgroundTransparency = 1
+	speaker.Font = Enum.Font.RobotoMono
+	speaker.Text = "VEYR"
+	speaker.TextColor3 = Color3.fromRGB(170, 155, 230)
+	speaker.TextScaled = true
+	speaker.ZIndex = 10
+	speaker.Parent = subs
+	local speakerSize = Instance.new("UITextSizeConstraint")
+	speakerSize.MaxTextSize = 14
+	speakerSize.Parent = speaker
+	local subLine = Instance.new("TextLabel")
+	subLine.Position = UDim2.fromScale(0, 0.3)
+	subLine.Size = UDim2.fromScale(1, 0.68)
+	subLine.BackgroundTransparency = 1
+	subLine.Font = Enum.Font.Sarpanch
+	subLine.TextColor3 = Color3.fromRGB(232, 228, 245)
+	subLine.TextScaled = true
+	subLine.TextWrapped = true
+	subLine.ZIndex = 10
+	subLine.Parent = subs
+	local subSize = Instance.new("UITextSizeConstraint")
+	subSize.MaxTextSize = 30
+	subSize.Parent = subLine
+	local subStroke = Instance.new("UIStroke")
+	subStroke.Color = Color3.fromRGB(8, 5, 14)
+	subStroke.Thickness = 1.5
+	subStroke.Transparency = 0.15
+	subStroke.Parent = subLine
+	local voices = {} -- [line] = its playing Sound
+
 	local watching = false
 	local watchStart = 0
 	local saved, controls
@@ -1256,6 +1425,11 @@ function VeyrFinisher.play(opts)
 		end
 		done = true
 		RunService:UnbindFromRenderStep(BIND)
+		for _, s in pairs(voices) do
+			if s and s.Parent then
+				s:Destroy()
+			end
+		end
 		giveBack()
 		ui:Destroy()
 		cc:Destroy()
@@ -1302,6 +1476,36 @@ function VeyrFinisher.play(opts)
 			warn("VeyrFinisher: " .. tostring(err))
 		end
 		local impactLines = updateScreen(T, watching)
+		-- his lines and their subtitles (watchers only)
+		local current
+		for _, l in ipairs(LINES) do
+			local elapsed = T - l.at
+			local inLine = elapsed >= 0 and elapsed < l.length
+			if watching and inLine and not voices[l] and elapsed < l.length - 0.3 then
+				voices[l] = Sfx.play(l.sound, nil, 1, nil, elapsed)
+			elseif voices[l] and not watching then
+				if voices[l].Parent then
+					voices[l]:Destroy()
+				end
+				voices[l] = nil -- (Leave; Watching again joins the line mid-way)
+			end
+			if elapsed >= 0 and elapsed < l.length + 0.65 then
+				current = l
+			end
+		end
+		if watching and current then
+			local elapsed = T - current.at
+			local visible = 0
+			for _, ph in ipairs(current.phrases) do
+				visible += math.floor(ph.count * math.clamp((elapsed - ph.at) / ph.reveal, 0, 1))
+			end
+			subLine.Text = current.text
+			subLine.MaxVisibleGraphemes = visible
+			subs.GroupTransparency = smooth((elapsed - current.length - 0.45) / 0.2)
+			subs.Visible = true
+		else
+			subs.Visible = false
+		end
 		if watchBtn.root.Visible and T >= F.GATE_HIT - 2 then
 			watchBtn.root.Visible = false
 		end
@@ -1321,7 +1525,7 @@ function VeyrFinisher.play(opts)
 			camera.CameraType = Enum.CameraType.Scriptable
 		end
 		-- (looking through his scope = through his eye: his whole model is hidden on this screen meanwhile)
-		local inScope = T >= F.SCOPE_2 - 0.1 and T < F.IMPACT
+		local inScope = T >= F.SCOPE_2 - 0.02 and T < F.IMPACT -- (the shot before is over his shoulder: he must not vanish early)
 		if inScope ~= ctx.scopeHidden then
 			ctx.scopeHidden = inScope
 			for _, p in ipairs(ctx.scopeParts) do

@@ -46,3 +46,7 @@ sounds/malak/transmit_laser.ogg -> rbxassetid://92306050351845
 sounds/malak/sublift_scanner.ogg -> rbxassetid://121738784959373
 sounds/malak/sublift_scanner.ogg -> rbxassetid://123365422126618
 sounds/malak/voice_arrival.ogg -> rbxassetid://139893314350646
+sounds/veyr/voice_arrival.ogg -> rbxassetid://110588920076095
+sounds/veyr/finisher_seat.ogg -> rbxassetid://70545838114962
+sounds/veyr/finisher_bang.ogg -> rbxassetid://82860162572332
+sounds/veyr/finisher_turn.ogg -> rbxassetid://134071586633328

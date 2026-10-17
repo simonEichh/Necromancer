@@ -46,12 +46,14 @@ T.FINISHER = {
 	LIGHT_END = 29, -- ... then a short pause
 	SCOPE_2 = 28.2, -- (watchers) back into his scope until the hit
 	FIRE = 30, -- three massive rounds at once: impact frames
-	IMPACT = 30.45, -- they hit: impact frames, the scope shatters, the keeper's hands are blown back, smoke
+	IMPACT = 30.45, -- they hit: impact frames, the scope shatters, the keeper's hands are blown back; only a pinhole
 	CRUMBLE = 32, -- the giant rifles dissolve into falling sparks
-	TURN = 32.5, -- he lowers the rifle, works the bolt, turns his back on the gate ...
+	TURN = 32.5, -- (after the hit; he no longer turns his back, the user's call: the camera cuts back to him) ...
 	DESCEND_FROM = 33, -- ... and drifts back down to his perch
 	DESCEND_TO = 37.5,
-	GATE_HIT = 38, -- the gate (still standing, cracks glowing) erupts behind him: the server breaks it here
+	GATE_HIT = 38,
+	RELOAD = 42.3, -- the last beat (the user: no turning his back): still on the gate, he works the bolt, slowly
+	RELOAD_SLOW = 0.65, -- (the bolt plays at this speed: ~2 s, heavier than after a basic shot) -- the gate (still standing, cracks glowing) erupts behind him: the server breaks it here
 	FADE = 40, -- the moon fades, the light comes back
 	END = 45,
 }

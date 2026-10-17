@@ -80,6 +80,9 @@ Sfx.Sounds = {
 	veyr_impact = { id = "rbxassetid://81958184521977", volume = 0.45 }, -- (= shell_impact; wanted: a sharp puncture + a low tail)
 	veyr_charge = { id = "", volume = 0.6 }, -- (special / finisher) a rising inward charge tone
 	veyr_collapse = { id = "", volume = 0.9 }, -- (special / finisher) the deep implosion of the fracture
+	voice_veyr_seat = { id = "rbxassetid://70545838114962", volume = 1 }, -- his finisher (VeyrFinisher): "One round. That is all you deserve."
+	voice_veyr_bang = { id = "rbxassetid://82860162572332", volume = 1 }, -- his finisher, just before the shot: "Bang."
+	voice_veyr_arrival = { id = "rbxassetid://110588920076095", volume = 1 }, -- his pull (VeyrArrival), a demonic undead voice: "Death is just the distance between us."
 	keeper_roar = { id = "rbxassetid://130529185820696", volume = 0.8 },
 	gate_collapse = { id = "rbxassetid://79285090609348", volume = 1 },
 	warp_out = { id = "rbxassetid://77036647861580", volume = 0.8 },
