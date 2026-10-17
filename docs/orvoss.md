@@ -67,7 +67,20 @@ slit mouths. Neon only in the eyes, chest, cutlass edge and compass needle.
 - At rest the hands are fairly close to the coat. The pistol is rather long and its grip is hard to see from the front.
 - The tails' clearance was only checked by eye (rest pose and a spread pose), not tested in motion.
 
-## Agreed next step: the idle animation (2026-10-17, not built)
+## Idle animation (2026-10-17, first pass built, not approved yet)
+
+`src/client/Modules/AdmiralAnimator.lua` (Pose "Admiral", called from UnitAnimator like Veyr's module): the deck roll
+(6.6 s, feet planted by leg IK, skull level), underwater coat tails on soft springs, heavy arms with the cutlass and
+flintlock lagging on their own springs, and the three gestures (brim push by left-arm IK onto the hat, listening,
+compass glance with the needle on its new `CompassNeedle` joint). Walk = the generic stride blended in. Dev
+attributes on the model: `DevGesture` (1 brim, 2 listen, 3 compass plays it now), `AnimTimeScale` (slow motion).
+Tested on `Workspace.OrvossPreview` (tag it `ProceduralUnit` on the client in play mode): no errors; each gesture
+checked by a frozen screenshot. Not checked: the motion's feel in real time, the army walk, portraits.
+The user asked for a normal weapon hold: both weapons now hang down and forward at his sides (grips at x = +-1.12),
+and both fists have the palm on the outside of the grip (back of the hand outwards); the pistol hand's index finger
+is curled round the grip like the others (the straight trigger finger looked wrong). 717 parts, 41 motors now.
+
+### The agreed spec
 
 Agreed with the user: the base layer plus gestures 1, 3 and 4 (the hammer check is dropped: too small to read).
 

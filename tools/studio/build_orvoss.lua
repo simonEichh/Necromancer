@@ -7,7 +7,7 @@
 -- A broad battered tricorn with a skull-and-anchor badge, a skull with deep sockets and sea-green eyes, a tall flared
 -- collar, a ruined charcoal greatcoat with sea-green lining, brass trim and fringed epaulettes, an open chest showing
 -- the ribcage round a green soul, a baldric, a belt with a compass, long torn coat tails, iron bracers, skeletal hands,
--- buckled boots. A cutlass in his RIGHT hand and a heavy flintlock in his LEFT, both lowered and pointing outwards.
+-- buckled boots. A cutlass in his RIGHT hand and a heavy flintlock in his LEFT, both held normally, lowered, pointing down and forward.
 -- Sparse barnacles (hat, left shoulder, right boot, a hem) and seaweed.
 --
 -- Rig conventions (see src/client/Modules/UnitAnimator.lua):
@@ -20,12 +20,13 @@
 --   * Pistol (LHand -> PistolRoot): -Z = the muzzle direction, +Y the top of the gun. PistolHammer (PistolRoot ->
 --     PistolHammerRoot, the cock). Attachments Muzzle (-Z out of the bore), PistolGrip, Hammer
 --   * Compass (Pelvis -> CompassRoot, face -Z), CompassLid (CompassRoot -> CompassLidRoot, hinged at the top, built OPEN;
---     rotate it 180 deg about its X to close). Attachments CompassFace, CompassGrip (the future left-hand hold)
+--     rotate it 180 deg about its X to close), CompassNeedle (CompassRoot -> the needle, turns about its Z). Attachments
+--     CompassFace, CompassGrip (the future left-hand hold)
 --   * Pelvis attachment PistolHolster (-Z down into the sheath) for stowing the pistol later
 --   * coat tails: Tail<i> (Pelvis -> the upper panel) and Tail<i>_2 (the lower panel of the long ones), attributes
 --     TailIndex, Segment, CoatAngle (degrees from the front towards his right)
 --   * every part carries the attribute Cat (its build region) so the report can count them
---   * attributes Rig = "Procedural", RootHeight, Height, BuiltBy; no Pose / AttackStyle yet (no animation handler)
+--   * attributes Rig = "Procedural", Pose = "Admiral", RootHeight, Height, BuiltBy; no AttackStyle yet
 local ServerStorage = game:GetService("ServerStorage")
 local models = ServerStorage.Models
 
@@ -587,14 +588,14 @@ end
 -- ====================================================================
 -- Weapon frames (the arms are built gripping them)
 -- ====================================================================
--- the cutlass: the right fist's centre GRIP_R, the blade running down and out along CUT_DIR
-local GRIP_R = Vector3.new(1.2, 3.6, -0.3)
-local CUT_DIR = Vector3.new(0.62, -0.58, -0.52).Unit
-local FORE_R = Vector3.new(0.2, -0.96, -0.12).Unit
+-- the cutlass: the right fist's centre GRIP_R, held normally at his side, the blade running down and forward along CUT_DIR
+local GRIP_R = Vector3.new(1.12, 3.6, -0.3)
+local CUT_DIR = Vector3.new(0.16, -0.6, -0.78).Unit
+local FORE_R = Vector3.new(0.08, -0.97, -0.2).Unit
 local cutWrist = (-FORE_R - CUT_DIR * (-FORE_R):Dot(CUT_DIR)).Unit -- from the handle towards the wrist (the spine side)
 local cutPalm = CUT_DIR:Cross(cutWrist).Unit
-if cutPalm.X > 0 then
-	cutPalm = -cutPalm -- the palm faces his body
+if cutPalm.X < 0 then
+	cutPalm = -cutPalm -- the palm sits on the outside of the grip, facing his body (the back of the hand outwards)
 end
 local CUT = CFrame.lookAt(GRIP_R, GRIP_R + CUT_DIR, cutWrist) -- origin = the grip centre, -Z = the blade, +Y = the spine
 local function CV(x, y, z)
@@ -602,17 +603,18 @@ local function CV(x, y, z)
 end
 local WRIST_R = GRIP_R + cutPalm * 0.13 + cutWrist * 0.3
 
--- the flintlock: the left fist's centre GRIP_L, the muzzle pointing down, forward and out; the top of the gun outwards
-local GRIP_L = Vector3.new(-1.2, 3.62, -0.26)
-local PIS_DIR = Vector3.new(-0.46, -0.76, -0.46).Unit
-local PIS_ROT = CFrame.lookAt(Vector3.zero, PIS_DIR, Vector3.new(-0.7, 0, -0.7))
+-- the flintlock: the left fist's centre GRIP_L, held normally at his side, the muzzle pointing down and forward; the top
+-- of the gun up
+local GRIP_L = Vector3.new(-1.12, 3.62, -0.26)
+local PIS_DIR = Vector3.new(-0.1, -0.72, -0.68).Unit
+local PIS_ROT = CFrame.lookAt(Vector3.zero, PIS_DIR, Vector3.new(0, 1, 0))
 local GC_LOCAL = Vector3.new(0, -0.34, 0.3) -- the fist's centre on the grip, in the gun's frame (origin = the breech)
 local PIS = PIS_ROT + (GRIP_L - PIS_ROT:VectorToWorldSpace(GC_LOCAL))
 local function PS(x, y, z)
 	return (PIS * CFrame.new(x, y, z)).Position
 end
-local palmSign = PIS.RightVector.X > 0 and 1 or -1 -- the gun's side towards his body takes the palm
-local LOCK = -palmSign -- the lock, pan and cock face outwards
+local palmSign = PIS.RightVector.X > 0 and -1 or 1 -- the palm sits on the outer side of the grip (back of the hand out)
+local LOCK = palmSign -- the lock, pan and cock face outwards too
 local pisAxis = PIS:VectorToWorldSpace(Vector3.new(0, 0.894, -0.447)) -- up the grip, towards the trigger
 local pisWrist = PIS:VectorToWorldSpace(Vector3.new(0, 0.447, 0.894))
 local pisPalm = PIS.RightVector * palmSign
@@ -704,7 +706,7 @@ end
 local rHand, rUpper = arm("R", R_SHOULDER, WRIST_R, Vector3.new(0.5, 0, 0.85))
 fist(rHand, GRIP_R, CUT_DIR, cutPalm, cutWrist, WRIST_R, 1)
 local lHand, lUpper = arm("L", L_SHOULDER, WRIST_L, Vector3.new(-0.5, 0, 0.85))
-fist(lHand, GRIP_L, pisAxis, pisPalm, pisWrist, WRIST_L, 1.25, PS(palmSign * 0.1, -0.07, -0.34))
+fist(lHand, GRIP_L, pisAxis, pisPalm, pisWrist, WRIST_L, 1.25) -- (all four fingers curled round the grip)
 
 -- the epaulettes: a round board with a brass rim and boss, a strap towards the collar, a fringe under the outer edge
 cat = "Epaulettes"
@@ -946,8 +948,11 @@ for k = 0, 3 do
 	deco(compass, "CompassMark", Vector3.new(0.025, k == 0 and 0.06 or 0.04, 0.012), COMPASS * CFrame.Angles(0, 0, a) * CFrame.new(0, 0.1, -0.058), k == 0 and BRASS_LIGHT or BRASS, METAL)
 end
 local needle = COMPASS * CFrame.Angles(0, 0, math.rad(-28))
-glow(compass, "CompassNeedle", Vector3.new(0.03, 0.1, 0.012), needle * CFrame.new(0, 0.05, -0.062), SOUL, 0.05)
-deco(compass, "CompassNeedleTail", Vector3.new(0.03, 0.09, 0.012), needle * CFrame.new(0, -0.045, -0.062), IRON, METAL)
+-- the needle on its own joint (CompassNeedle: CompassRoot -> CompassNeedle, turning about the face normal, Z) so it can twitch
+local needlePart = part("CompassNeedle", Vector3.new(0.03, 0.1, 0.012), needle * CFrame.new(0, 0.05, -0.062), SOUL, NEON)
+needlePart.Transparency = 0.05
+motor("CompassNeedle", compass, needlePart, needle * CFrame.new(0, 0, -0.062))
+deco(needlePart, "CompassNeedleTail", Vector3.new(0.03, 0.09, 0.012), needle * CFrame.new(0, -0.045, -0.062), IRON, METAL)
 cyl(compass, "CompassPin", CP(0, 0, -0.065), cfwd, 0.02, 0.035, BRASS_LIGHT, METAL)
 deco(compass, "CompassStem", Vector3.new(0.05, 0.06, 0.05), COMPASS * CFrame.new(0.17, 0.07, 0) * CFrame.Angles(0, 0, math.rad(-65)), BRASS, METAL)
 cyl(compass, "CompassBow", CP(0.22, 0.09, 0), cfwd, 0.02, 0.09, BRASS_DARK, METAL)
@@ -1157,6 +1162,7 @@ for _, p in ipairs(partsList) do
 end
 local height = maxV.Y - minV.Y
 model:SetAttribute("Rig", "Procedural")
+model:SetAttribute("Pose", "Admiral") -- (UnitAnimator's Admiral branch: the sea-legs idle and gestures)
 model:SetAttribute("RootHeight", math.floor((HIP_Y - minV.Y) * 1000 + 0.5) / 1000)
 model:SetAttribute("Height", math.floor(height * 100 + 0.5) / 100)
 model:SetAttribute("BuiltBy", BUILT_BY)
