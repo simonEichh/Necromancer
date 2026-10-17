@@ -156,6 +156,13 @@ anchors on catheads with short chains, lanterns along the rails. Extra attachmen
 where Orvoss stands), `HawseL` / `HawseR` (the anchor rings). Not checked up close: the figurehead, the stern, the
 emblem. Not yet: the separate anchor + chain model for the finisher, the ghost cannon.
 
+**The anchor and the chain link** (built 2026-10-17, approved): `tools/studio/build_blackwake_anchor.lua` ->
+`ReplicatedStorage.ShipModels.BlackwakeAnchor` (92 parts, ~25 studs ring to crown tip; a drowned admiralty anchor, the
+stock square to the arms as on a real one, the user's call to keep it; origin = the ring's centre, attachments `Ring`
+and `Crown` on Root, attribute Height) and `BlackwakeChainLink` (12 parts, long axis +Y; lay a chain by stepping the
+attribute `Pitch` and turning every other link 90 degrees about Y). `Workspace.AnchorPreview` is a staged preview
+(**delete before publishing**).
+
 ## Finisher models (estimate, 2026-10-17)
 
 New: the flagship (hero model, detailed broadside with stacked gun decks, ports lighting bow to stern; the biggest job,
