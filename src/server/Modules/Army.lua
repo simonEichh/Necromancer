@@ -1630,6 +1630,8 @@ local function update(now, dt)
 				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
 					if u.model then
+						-- (AttackAt: server time this attack starts, for clients that time a performance to the hit)
+						u.model:SetAttribute("AttackAt", workspace:GetServerTimeNow())
 						u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
 					end
 					if u.attackTrack then u.attackTrack:Play() end

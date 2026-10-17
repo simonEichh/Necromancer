@@ -106,7 +106,20 @@ Agreed with the user: the base layer plus gestures 1, 3 and 4 (the hammer check 
   the same joint. The army walk can stay generic for now.
 - Also look at the coat tails from behind first: they were widened after the last rear screenshot.
 
-## Basic attack (the user's idea, 2026-10-17, not built)
+## Basic attack: DOUBLE REPORT (built 2026-10-17, first pass approved for now)
+
+Name and the cannon's side (his left, a little behind) chosen by the user. Shared `AdmiralTimeline` (beats in s after
+the server's `AttackAt`, a model attribute the generic attack in `Army` now sets for every unit): aim 0.1-1.0, the
+cannon forms 0.4-1.6 (barrel, then carriage, rising out of fog with upward drips), hammer 1.7-2.05, fuse 1.8, FIRE
+2.4, IMPACT 2.6 (= `Units.Orvoss.hitDelay`, ONE hit; a fast flight, the user's call), the cannon sinks 3.2-4.4, the pistol lowers 3.0-5.0;
+attackCD 7, damage 595K (85K DPS). Body: `AdmiralAnimator` (side-on turn over planted feet, left arm IK lays the
+barrel on `AimPos`, cutlass arm sinks back, hammer joint `PistolHammer`, the kick throws the muzzle up and rocks him
+back). Effects: client `DoubleReport.lua` (one ghost cannon per unit, see-through sea-green parts with a Highlight
+outline; fog, drips, fuse sparks, muzzle flashes, smoke and sparks, the ball and the pistol shot with trails, the
+big impact: flashes, a soul-green fireball, a shockwave ring on the wall, sparks, a dust cloud, stone chunks; `hitFx = "DoubleReport"` so HitEffects draws nothing). No sounds yet. Reviewed by the user
+(fine for now): fixed the cannon dipping while it formed and the flintlock aiming too low.
+
+### The original idea (the user's, 2026-10-17)
 
 He takes aim and fires the flintlock while a ghostly cannon forms beside him and fires at the same moment. Proposed beats
 (first pass slow, one attack every ~7 s): the pistol swings up and levels at the wall, side-on like a duellist (0-1 s);

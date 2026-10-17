@@ -21,9 +21,15 @@
 -- stride and the chest counters them, leaning forward; the skull nods a little late after each step, and the arms swing
 -- on their soft springs with a jolt at every footfall.
 --
+-- His basic attack, DOUBLE REPORT (shared AdmiralTimeline; DoubleReport.lua draws the ghost cannon and the shots): a
+-- new AttackCount starts it at the server's AttackAt. He turns side-on like a duellist over his planted feet, the left
+-- arm comes straight out and lays the flintlock's barrel on the aim point (IK), the cutlass arm sinks back; the thumb
+-- draws the hammer, both fire, the kick throws the muzzle up and rocks him back, then he lowers it slowly.
+--
 -- All of it is worked out in the root's build space (RS: the HumanoidRootPart at the origin, model axes), where every
 -- body joint frame is axis-aligned, so a Motor6D.Transform there is just the rotation itself.
 local ANGLES = CFrame.Angles
+local AT = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("AdmiralTimeline"))
 local Admiral = {}
 
 local ROLL_PERIOD = 6.6 -- seconds per deck roll
@@ -250,6 +256,22 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	-- the footfall: the pelvis drops fast into it and climbs back out slowly
 	local thud = ease(stepF, 0, 0.14) * (1 - ease(stepF, 0.14, 0.62)) * wk
 
+	-- ── Double Report: the attack's clock (server time since AttackAt)
+	local count = model:GetAttribute("AttackCount") or 0
+	if ad.atkCount == nil then
+		ad.atkCount = count -- (a count he already had when he appeared is not a new attack)
+	elseif count ~= ad.atkCount then
+		ad.atkCount = count
+		local at = model:GetAttribute("AttackAt")
+		local sn = workspace:GetServerTimeNow()
+		ad.atkStart = (type(at) == "number" and math.abs(sn - at) < 5) and at or sn
+	end
+	local ta = ad.atkStart and (workspace:GetServerTimeNow() - ad.atkStart) or 99
+	local aimT = ease(ta, AT.AIM_FROM, AT.AIM_TO) * (1 - ease(ta, AT.LOWER_FROM, AT.LOWER_TO))
+	local aim = spring(st, "aim", aimT, 14, 6.5, dt)
+	local kick = spring(st, "kick", (ta >= AT.FIRE and ta < AT.FIRE + 0.08) and 1 or 0, 180, 13, dt)
+	local cock = ta < AT.FIRE and ease(ta, AT.COCK_FROM, AT.COCK_TO) or 0 -- (the hammer falls at once when he fires)
+
 	-- ── gestures: pick one every GESTURE_GAP s, never the same twice in a row; walking cancels it
 	local forced = model:GetAttribute("DevGesture") -- (dev: 1 brim, 2 listen, 3 compass plays that gesture now)
 	if forced then
@@ -258,7 +280,7 @@ function Admiral.animate(model, rig, dt, now, ctx)
 		ad.side = math.random() < 0.5 and -1 or 1
 		ad.nextGesture = now + GESTURE_LEN[forced] + GESTURE_GAP[1]
 	end
-	if w > 0.3 then
+	if w > 0.3 or aimT > 0 then
 		ad.gesture = nil
 		ad.nextGesture = math.max(ad.nextGesture, now + 4)
 	elseif not ad.gesture and now >= ad.nextGesture then
@@ -311,14 +333,16 @@ function Admiral.animate(model, rig, dt, now, ctx)
 	local walkX = -0.12 * math.sin(wph) * wk
 	local walkRoll = 0.05 * math.sin(wph) * wk
 	local walkYaw = -0.1 * math.cos(wph) * wk
-	local rootCF = CFrame.new((rootX + walkX) * scale, (rootY + walkY) * scale, 0)
-		* ANGLES(rootPitch, rootYaw + walkYaw, rootRoll + walkRoll)
+	-- (Double Report: side-on, his left towards the wall; the kick rocks him back)
+	local rootCF = CFrame.new((rootX + walkX) * scale, (rootY + walkY) * scale, 0.08 * kick * scale)
+		* ANGLES(rootPitch, rootYaw + walkYaw - 0.32 * aim, rootRoll + walkRoll)
 	set(rig, "Root", rootCF)
 	local breathe = math.sin(t * 1.1) * 0.012
 	local waistRoll = 0.022 * math.sin(ph - 1.0) * still - 0.4 * walkRoll
 	local waistPitch = 0.012 * math.sin(ph * 0.63 + 0.2) + breathe - 0.07 * lookDown + 0.02 * brimArm
 		- 0.09 * wk - 0.05 * thud -- (leaning into the march, the chest nodding into each footfall)
-	local waistYaw = 0.1 * listen * side + 0.06 * brimArm - 0.7 * walkYaw
+		+ 0.07 * kick
+	local waistYaw = 0.1 * listen * side + 0.06 * brimArm - 0.7 * walkYaw - 0.28 * aim
 	local waistRot = ANGLES(waistPitch, waistYaw, waistRoll)
 	set(rig, "Waist", waistRot)
 	local chestRot = rootCF.Rotation * waistRot
@@ -339,9 +363,10 @@ function Admiral.animate(model, rig, dt, now, ctx)
 
 	-- ── the right arm hangs heavy: its swing lags the chest on a soft spring; the cutlass follows the hand
 	-- (walking: it swings against the left leg, and every footfall jolts it forward and out)
-	local rz = spring(st, "rz", -chestRoll * 0.8 + 0.05 * thud, 9, 2.2, dt)
+	-- (Double Report: it sinks back and out of the way)
+	local rz = spring(st, "rz", -chestRoll * 0.8 + 0.05 * thud + 0.1 * aim, 9, 2.2, dt)
 	local rx = spring(st, "rx", -chestPitch * 0.7 + 0.015 * math.sin(t * 1.1 - 0.5)
-		+ 0.26 * math.cos(wph) * wk + 0.06 * thud, 9, 2.2, dt)
+		+ 0.26 * math.cos(wph) * wk + 0.06 * thud - 0.18 * aim, 9, 2.2, dt)
 	set(rig, "RShoulder", ANGLES(rx, 0, rz))
 	set(rig, "RElbow", ANGLES(0.03 * math.sin(ph - 1.6) * still, 0, 0))
 	set(rig, "RWrist", CFrame.new())
@@ -375,12 +400,38 @@ function Admiral.animate(model, rig, dt, now, ctx)
 		handRot = pend:Lerp(rotG, math.clamp(k, 0, 1))
 		pole = pole:Lerp(BRIM_POLE.Unit, math.clamp(k, 0, 1))
 	end
+	if aim > 0.001 then
+		-- Double Report: the arm straight out, the barrel laid on the aim point (worked out in the chest's rest space);
+		-- the kick throws the muzzle up and back
+		local hrp = model.PrimaryPart
+		local aimPos = model:GetAttribute("AimPos")
+		local dirM = Vector3.new(0, 0, -1)
+		if hrp and typeof(aimPos) == "Vector3" then
+			local v = hrp.CFrame:VectorToObjectSpace(aimPos - hrp.CFrame:PointToWorldSpace(arm.S))
+			if v.Magnitude > 1 then
+				dirM = v.Unit
+			end
+		end
+		local d = chestRot:VectorToObjectSpace(dirM)
+		-- (+0.12: held a touch high, as a duellist does; straight at the low hit point it read as pointing down)
+		d = (d + Vector3.new(0, 0.12 + 0.55 * kick, 0.15 * kick)).Unit
+		local rotA = turnOnto(ad.pisDir, d)
+		local gripT = arm.S + d * (arm.a + arm.b) * 0.86
+		local WtA = gripT + rotA * (arm.W - ad.grip)
+		local k = math.clamp(aim, 0, 1)
+		Wt = Wt:Lerp(WtA, k)
+		handRot = handRot:Lerp(rotA, k)
+		pole = pole:Lerp(Vector3.new(-0.7, -0.7, 0.2).Unit, k)
+	end
 	solveLimb(arm, Wt, handRot, pole)
 	-- the flintlock's weight: its own lag in the grip, fading out while it works the brim
 	local pz = spring(st, "pisZ", chestRoll + lz, 24, 3.2, dt) - (chestRoll + lz)
 	local px = spring(st, "pisX", chestPitch + lx, 24, 3.2, dt) - (chestPitch + lx)
-	local pisLag = ANGLES(math.clamp(px, -0.1, 0.1), 0, math.clamp(pz, -0.1, 0.1)):Lerp(CFrame.new(), clamp01(brimArm))
+	local pisLag = ANGLES(math.clamp(px, -0.1, 0.1), 0, math.clamp(pz, -0.1, 0.1)):Lerp(CFrame.new(), clamp01(math.max(brimArm, aim)))
 	set(rig, "Pistol", ad.pisRot:Inverse() * pisLag * ad.pisRot)
+	if j.PistolHammer then
+		set(rig, "PistolHammer", ANGLES(-0.7 * spring(st, "cock", cock, 60, 9, dt), 0, 0)) -- (drawn back by the thumb)
+	end
 
 	-- ── the legs, by IK in the pelvis's rest space: standing, the feet stay planted; walking, each foot is planted in
 	-- front (-Z), carries him while it moves back at his ground speed (heel peeling off at the end), then swings forward

@@ -1,6 +1,7 @@
 -- Unit stats, rarity pools and drop-chance helpers shared by server and client.
 local Rarities = require(script.Parent.Rarities)
 local VEYR_SP = require(script.Parent.VeyrTimeline).SPECIAL -- (Veyr's special: the hit times live with his timeline)
+local ADMIRAL = require(script.Parent.AdmiralTimeline) -- (Orvoss's Double Report: when the ball lands)
 local BASE_ODDS = Rarities.BaseOdds
 
 local UNITS = {
@@ -392,17 +393,20 @@ local UNITS = {
 			army = { seconds = 24, hits = { { at = VEYR_SP.IMPACT, share = 0.8 }, { at = VEYR_SP.COLLAPSE, share = 0.2 } } } },
 	},
 	-- Orvoss, the Blackwake: the third Sovereign (docs/orvoss.md), a drowned skeletal admiral with a cutlass, a
-	-- flintlock and a ghost fleet. Unit def only so far (2026-10-17): the generic hit until his basic attack (the
-	-- flintlock + ghost cannon volley) is built; no special, trait, finisher or own pull cinematic yet (he gets Malak's).
+	-- flintlock and a ghost fleet. Basic attack DOUBLE REPORT (client AdmiralAnimator + DoubleReport, shared
+	-- AdmiralTimeline): he levels the flintlock while a ghost cannon forms at his left; both fire as one, ONE hit when
+	-- the ball lands. No special, trait, finisher or own pull cinematic yet (he gets Malak's).
 	Orvoss = {
 		sovereign = true,
 		title = "The Blackwake",
 		color = BrickColor.new("Really black"),
 		size = Vector3.new(2.4, 4, 2.4),
-		damage = 510000, -- 85K DPS like Malak and Veyr (placeholder until his kit is built)
+		damage = 595000, -- 85K DPS like Malak and Veyr (placeholder until his kit is built)
 		speed = 4.5, -- (a heavy march: his stride is long and slow, the cadence follows this speed; AdmiralAnimator)
 		attackRange = 25, -- stands 40 studs from the wall (Army.standDistance): a gunline, closer than Malak
-		attackCD = 6,
+		attackCD = 7, -- (the performance takes AdmiralTimeline.LOWER_TO = 5 s)
+		hitDelay = ADMIRAL.IMPACT,
+		hitFx = "DoubleReport", -- (DoubleReport.lua draws the shots and the impact; HitEffects draws nothing)
 		hitHeight = 4,
 	},
 }
@@ -706,6 +710,7 @@ local BASIC = {
 	Sigilwright = { "Sigil Darts", "Opens sigil circles in the air and fires a stream of darts at the wall" },
 	Malak = { "Orbital Tag", "Marks the wall with a red targeting laser, and a shell from orbit strikes it" },
 	Veyr = { "Dead Reckoning", "Focuses his sights and fires one spectral round through the wall's weak point" },
+	Orvoss = { "Double Report", "Levels his flintlock while a ghost cannon forms beside him; both fire as one" },
 }
 local function basicAttack(unitType)
 	local def = UNITS[unitType]

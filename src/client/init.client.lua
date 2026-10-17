@@ -203,6 +203,7 @@ require(Modules.FleetStrike) -- Malak's gate finisher: the server starts it for 
 require(Modules.VeyrShot) -- Veyr's basic attack: focusing sights, the round, the puncture, the weak point (his trait)
 require(Modules.VeyrSpecial) -- Veyr's special, The Long Goodbye: his shards open six sigils down the lane
 require(Modules.VeyrFinisher) -- Veyr's gate finisher, The Final Horizon: the server starts it for everyone (remote FinalHorizon)
+require(Modules.DoubleReport) -- Orvoss's basic attack: the ghost cannon, the two shots and the impact (AdmiralTimeline)
 require(Modules.RarePullBanner) -- the banner everyone else sees when someone pulls a Signature / Sovereign
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
 require(Modules.KnellFx) -- Knell's soul tolls and the colossal spectral bell

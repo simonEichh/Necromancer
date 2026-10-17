@@ -484,8 +484,8 @@ local function flash(position, forward, damage, isGhost, style)
 	if shadow then
 		style = style:sub(1, -7)
 	end
-	if style == "Arrow" or style == "Venom" or style == "Orbital" or style == "Marksman" then
-		return -- (projectiles draw their own impact when they arrive: ArrowFx, VenomFx, OrbitalStrike, VeyrShot)
+	if style == "Arrow" or style == "Venom" or style == "Orbital" or style == "Marksman" or style == "DoubleReport" then
+		return -- (projectiles draw their own impact when they arrive: ArrowFx, VenomFx, OrbitalStrike, VeyrShot, DoubleReport)
 	end
 	if style == "Slash" or style == "Claw" or style == "Crush" or style == "Screech" then
 		-- the cuts lie flat on the wall: sample the real (bumpy) surface across the area they cover and put them just in
