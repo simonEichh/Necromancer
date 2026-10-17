@@ -1,5 +1,6 @@
 -- Unit stats, rarity pools and drop-chance helpers shared by server and client.
 local Rarities = require(script.Parent.Rarities)
+local VEYR_SP = require(script.Parent.VeyrTimeline).SPECIAL -- (Veyr's special: the hit times live with his timeline)
 local BASE_ODDS = Rarities.BaseOdds
 
 local UNITS = {
@@ -352,6 +353,42 @@ local UNITS = {
 		-- not stack, the strongest counts)
 		aura = { damage = 0.10 },
 	},
+	-- Veyr, the Last Sight: the second Sovereign (docs/veyr.md), a hooded skeletal marksman with a long arcane rifle.
+	-- Basic attack DEAD RECKONING (model AttackStyle "Marksman", client MarksmanAnimator + VeyrShot): one deliberate shot
+	-- every attackCD; aim, focusing rings, a quiet beat, the shot at shared VeyrTimeline.FIRE. (First pass: the shot,
+	-- the mark, the special and the finisher are built in stages; numbers are provisional.)
+	Veyr = {
+		sovereign = true,
+		title = "The Last Sight",
+		color = BrickColor.new("Really black"),
+		size = Vector3.new(2.2, 4, 2.2),
+		damage = 637500, -- 85K DPS like Malak (placeholder, tuned in the attack stage)
+		speed = 10,
+		attackRange = 32,
+		-- a sniper's overwatch post (the user's call): like the Sigilwright he never marches after the front; he takes a
+		-- fixed post `postFwd` studs from the plot centre, just in front of the graves, and shoots every wall from there
+		-- (~70 studs to the first wall, ~270 to the gate; the round's flight grows with it, VeyrTimeline.impactAt)
+		infiniteRange = true,
+		postFwd = 30,
+		-- his perch (the user's call): at the post he rises `height` studs into the air and drifts `out` studs past the
+		-- lane's edge, shooting down at the wall diagonally. Only his model moves there (client MarksmanAnimator); his
+		-- unit stays inside the lane at lateral side x `laneLat` (Army). A second Veyr takes the other side.
+		perch = { height = 15, out = 9, laneLat = 16 },
+		attackCD = 7.5, -- (his performance takes VeyrTimeline.SETTLE_END = 6.4 s; nothing changes attackCD at runtime)
+		-- (no hitDelay: Army.fireMarksman lands the round at VeyrTimeline.impactAt(distance))
+		hitFx = "Marksman", -- (VeyrShot.lua draws the round and the impact; HitEffects draws nothing)
+		hitHeight = 4,
+		-- his unique trait, THE LAST SIGHT (Army.traitMultiplier): every round that lands exposes a weak point on that wall
+		-- for `duration` s, and the whole army deals +`damage` to it. One mark per plot: more Veyrs refresh it, never
+		-- stack it; the strongest `damage` counts. Cleared when the wall is replaced or the run resets.
+		trait = { kind = "mark", damage = 0.10, duration = 6 },
+		-- his special, THE LONG GOODBYE (client VeyrSpecial, docs/veyr.md): his shards fly down the lane and open six
+		-- sigils, the round passes through them all. `army`: one snapshot of the WHOLE army's ordinary DPS when it starts,
+		-- times `seconds`, split over the `hits` (the fracture and its delayed collapse), all on the wall he aimed at.
+		-- share = 0: his basic shots keep their full damage (they pause while it plays).
+		special = { kind = "LongGoodbye", cooldown = 150, share = 0, duration = VEYR_SP.END, hits = {},
+			army = { seconds = 20, hits = { { at = VEYR_SP.IMPACT, share = 0.8 }, { at = VEYR_SP.COLLAPSE, share = 0.2 } } } },
+	},
 }
 
 -- Which units belong to which rarity, each with a relative weight
@@ -404,6 +441,7 @@ local RARITY_UNITS = {
 		{ unit = "LastLantern", weight = 1 },
 		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
 		{ unit = "Malak", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: rarer than a Signature, and only from the Celestial grave (`graves`: Rolling skips the entry elsewhere, the wheel never gives him)
+		{ unit = "Veyr", weight = 0, graves = { Celestial = true } }, -- Sovereign: weight 0 (never rolled) until his own pull cinematic exists, then 0.05 like Malak
 	},
 }
 
@@ -455,6 +493,7 @@ local UNIT_EMOJIS = {
 	LastLantern = "",
 	Sigilwright = "",
 	Malak = "",
+	Veyr = "",
 }
 
 -- Base "1 in X" chance for a unit (uses BASE_ODDS only — no luck, always shown raw)
@@ -596,6 +635,7 @@ local DESCRIPTIONS = {
 	Knell = "The bell of a drowned chapel, rung once for every soul it buried. When the village was gone the bell kept tolling, and something answered. Now Knell walks, and the dead walk behind it in procession.",
 	Hush = "A child found in a sealed ward, still wearing the gas mask the nurses gave it. It never breathed again, and it never came down. It does not speak. It only points.",
 	Sigilwright = "A scribe of the old courts who wrote the sentences that kings would speak. Death took the kings; the scribe kept writing. Every verdict it writes is final, and every word of it burns.",
+	Veyr = "He was the marksman of a city that fell. He waited at his post for the one shot that would have saved it, and he was still waiting when the last bell stopped. Death did not end the wait. Now he sees the one point where any resistance can still break, and he is patient enough to wait beyond death for it.",
 	Malak = "An envoy of a High Command no one in this realm has ever seen. He arrived from a tear in the sky, aboard a warship that does not answer to the dead, and he did not come to serve. He came to negotiate, and his terms are written in orbital fire.",
 }
 
@@ -632,6 +672,7 @@ local BASIC = {
 	LastLantern = { "Soul Ray", "Burns the wall with a ray of captured souls" },
 	Sigilwright = { "Sigil Darts", "Opens sigil circles in the air and fires a stream of darts at the wall" },
 	Malak = { "Orbital Tag", "Marks the wall with a red targeting laser, and a shell from orbit strikes it" },
+	Veyr = { "Dead Reckoning", "Focuses his sights and fires one spectral round through the wall's weak point" },
 }
 local function basicAttack(unitType)
 	local def = UNITS[unitType]

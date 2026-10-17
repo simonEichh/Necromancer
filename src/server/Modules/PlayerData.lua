@@ -56,6 +56,7 @@ function PlayerData.create(player, saved)
 		wispLevel = 0, -- Soul Wisp speed level (Gem Shop, Economy.wispSpeed)
 		remoteForge = false, -- bought the Remote Forge (Gem Shop): the Forge works anywhere
 		fleetStrike = false, -- bought Malak's Fleet Strike finisher (Gem Shop / Codex)
+		finalHorizon = false, -- bought Veyr's The Final Horizon finisher (Gem Shop / Codex; separate from the Fleet Strike)
 		commanderSlots = 1, -- commander thrones (Signatures / Sovereigns); the second is bought with gems (GemShop)
 		settings = { master = 1, effects = 1, music = 1 }, -- the Settings panel: volumes 0..1 (saved)
 		saved = saved, -- raw saved data, for modules that restore their own state
@@ -82,6 +83,7 @@ function PlayerData.create(player, saved)
 		profile.wispLevel = math.floor(clampNumber(saved.wispLevel, 0, 0))
 		profile.remoteForge = saved.remoteForge == true
 		profile.fleetStrike = saved.fleetStrike == true
+		profile.finalHorizon = saved.finalHorizon == true -- (old saves: false)
 		profile.commanderSlots = math.clamp(math.floor(clampNumber(saved.commanderSlots, 1, 1)), 1, 2)
 		if type(saved.settings) == "table" then
 			for key in pairs(profile.settings) do
@@ -305,6 +307,7 @@ function PlayerData.snapshot(profile)
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
+		finalHorizon = profile.finalHorizon,
 		commanderSlots = profile.commanderSlots,
 		broker = { rot = profile.broker.rot, bought = table.clone(profile.broker.bought) },
 		settings = profile.settings,

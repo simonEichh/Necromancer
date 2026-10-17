@@ -200,6 +200,9 @@ require(Modules.FingerBeam) -- the finger-beam attack (Hush): magic circle at th
 require(Modules.OrbitalStrike) -- the orbital tag (Malak): red targeting laser from the sky, shell, impact
 require(Modules.RequisitionFx) -- Malak's special: the supply pod, the drone swarm
 require(Modules.FleetStrike) -- Malak's gate finisher: the server starts it for everyone (remote FleetStrike)
+require(Modules.VeyrShot) -- Veyr's basic attack: focusing sights, the round, the puncture, the weak point (his trait)
+require(Modules.VeyrSpecial) -- Veyr's special, The Long Goodbye: his shards open six sigils down the lane
+require(Modules.VeyrFinisher) -- Veyr's gate finisher, The Final Horizon: the server starts it for everyone (remote FinalHorizon)
 require(Modules.RarePullBanner) -- the banner everyone else sees when someone pulls a Signature / Sovereign
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
 require(Modules.KnellFx) -- Knell's soul tolls and the colossal spectral bell

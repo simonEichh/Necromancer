@@ -3,6 +3,21 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
+## Veyr, the Last Sight (third 2026-10-16 session, NOT committed; details in docs/veyr.md)
+
+Built: base + shadow models (`build_veyr.lua`, `build_veyr_shadow.lua`, published to UnitModels), `MarksmanAnimator`
+(IK grip, hover, low ready, aim, horizontal recoil, bolt), basic shot + the mark (`Army.fireMarksman`, `VeyrShot`,
+`VeyrSights`), the special The Long Goodbye (army-seconds, `VeyrSpecial`), the overwatch post + perch high off the
+lane, the finisher The Final Horizon (rebuilt to the user's version: aura, ascent, moon, eight giant rifles, lasers,
+quiet, impact frames, black hole; `VeyrFinisher`, `Army.checkFinisher` shared with Malak, `CinematicGuard`), the
+`finalHorizon` unlock (save/sync/BuyGemItem, 1000 gems), DEV: Tough wall button, Anim "Horizon". The user's test save
+has finalHorizon = true (bought with dev gems).
+
+**Next for Veyr:** watch / tune the finisher (black hole size, the 38-41 s framing, the ascent camera), then the pull
+cinematic (stage G: own arrival + SovereignArrival routing; his pool weight is 0 until then), the Gem Shop Skills card
+and Codex text (Abilities entries), sounds (the user may provide `sounds/veyr/`), the remaining checks in docs/veyr.md
+(two Veyrs, rotated plot, Skip / Watch with a second player, both Sovereigns' arbitration), docs/models.md + features.md.
+
 ## State at the end of the 2026-10-16 session (read this first)
 
 **Second 2026-10-16 session (all committed):**

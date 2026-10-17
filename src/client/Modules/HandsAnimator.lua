@@ -85,7 +85,7 @@ end
 -- Behaviour timelines: per hand lift (deg, round the rift), back (studs into the rift), wrist (deg), clench (0..1),
 -- weave (0..1, left hand only); plus the rifts' scale and the eyes' anger / darkness
 -- ============================================================
-local LENGTH = { SlamWeave = 10.4, Return = 7.6, Enter = 8.8, FleetStrike = 56 }
+local LENGTH = { SlamWeave = 10.4, Return = 7.6, Enter = 8.8, FleetStrike = 56, FinalHorizon = 45 }
 local HOLD = { Defeat = true, Waiting = true }
 
 local TL = {
@@ -141,6 +141,19 @@ local TL = {
 		squint = { { 0, 0 }, { 46.0, 0 }, { 46.15, 1 }, { 48.6, 1 }, { 49.2, 0.4 }, { 52.6, 0.4 } },
 		dark = { { 0, 0 }, { 50.0, 0 }, { 53.0, 0.85 } },
 		shudder = { { 0, 0 }, { 38.2, 0 }, { 38.7, 0.5 }, { 42, 0.5 }, { 43, 0 }, { 46.0, 0 }, { 46.2, 1 }, { 49.8, 1 }, { 51, 0.3 } },
+	},
+	-- (times = Veyr's Final Horizon, VeyrTimeline.FINISHER: the lasers lock 18, the shield 19.5, the charge 21, the
+	-- quiet 27, the hit 30.45, the gate erupts 38 (the server's break turns him to Defeat). He notices the lasers,
+	-- raises his hands over the gate as a shield, trembles through the charge, is blown back by the hit, then waits,
+	-- uneasy, his hands half raised)
+	FinalHorizon = {
+		anger = { { 0, 0 }, { 18.0, 0 }, { 18.8, 1 } },
+		squint = { { 0, 0 }, { 18.2, 0 }, { 18.6, 1 }, { 30.4, 1 }, { 30.6, 0.1 }, { 33, 0.6 } },
+		clench = { { 0, 0 }, { 19.2, 0 }, { 20.4, 0.15 }, { 27, 0.3 }, { 30.4, 0.3 }, { 30.6, 1 }, { 32, 0.6 } },
+		lift = { { 0, 0 }, { 19.3, 0 }, { 20.6, 48 }, { 27, 52 }, { 30.4, 52 }, { 30.7, 72 }, { 32.0, 30 }, { 37.8, 26 } },
+		wrist = { { 0, 0 }, { 19.3, 0 }, { 20.6, -40 }, { 30.4, -42 }, { 30.7, -10 }, { 32.5, -24 } },
+		back = { { 0, 0 }, { 30.4, 0 }, { 30.7, 9 }, { 32.5, 3 }, { 37.8, 2 } },
+		shudder = { { 0, 0 }, { 21, 0 }, { 22, 0.35 }, { 27, 0.35 }, { 27.4, 0.1 }, { 30.4, 0.1 }, { 30.6, 1 }, { 32, 0.4 }, { 37.8, 0.5 } },
 	},
 	Waiting = {
 		rift = { { 0, RIFT_CLOSED }, { 1, RIFT_CLOSED } },

@@ -429,10 +429,17 @@ end
 
 local function breakWall(plotState)
 	if plotState.wallLayer > NUM_WALLS then return end -- the gate already fell (late arrows, last barrage hits)
-	-- a Fleet Strike holds the gate until its beam lands (Army.checkFleetStrike): late hits cannot break it before
+	-- a finisher holds the gate until its moment (Army.checkFinisher): late hits cannot break it before
 	local fin = plotState.finisher
 	if fin and fin.holdHP and not fin.allowBreak then
 		plotState.wallHP = math.max(plotState.wallHP, fin.holdHP)
+		return
+	end
+	-- a gate about to fall from one big hit: if a finisher should take it, it starts now and holds the gate instead
+	-- (Army.checkFinisher; the finisher breaks it at its own moment)
+	if Economy.isGate(plotState.wallLayer) and not fin and plotState.tryFinisher and plotState.tryFinisher() then
+		plotState.wallHP = math.max(plotState.wallHP, plotState.finisher and plotState.finisher.holdHP or 1)
+		updateWallGui(plotState)
 		return
 	end
 	local brokenLayer = plotState.wallLayer

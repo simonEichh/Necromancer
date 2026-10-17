@@ -2,7 +2,8 @@
 -- HUD's Shop tile). Catalysts are bought with BuyCatalyst (UnitUpgrades); this module handles:
 --   BuyGemItem("RemoteForge")   one-time, Economy.REMOTE_FORGE_PRICE: the Forge works anywhere (ShopNpcs.nearForge)
 --   BuyGemItem("WispSpeed")     the next Soul Wisp speed level (needs the wisp; Economy.wispLevelPrice / wispSpeed)
---   BuyGemItem("FleetStrike")   one-time, Economy.FLEET_STRIKE_PRICE: Malak's gate finisher (Army.checkFleetStrike)
+--   BuyGemItem("FleetStrike")   one-time, Economy.FLEET_STRIKE_PRICE: Malak's gate finisher (Army.checkFinisher)
+--   BuyGemItem("FinalHorizon")  one-time, Economy.FINAL_HORIZON_PRICE: Veyr's gate finisher (separate from the above)
 --   BuyGemItem("CommanderSlot") one-time, Economy.COMMANDER_SLOT_PRICE: the second commander throne (Plots unseals it)
 -- Server authoritative: it checks the gems and the limits and changes the profile through PlayerData.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -51,6 +52,17 @@ function GemShop.buy(player, item)
 		profile.fleetStrike = true
 		PlayerData.changed(player)
 		Remotes.Notice:FireClient(player, "Fleet Strike unlocked: with Malak on your plot, the Absolution executes the gate at 20%.")
+	elseif item == "FinalHorizon" then
+		if profile.finalHorizon then
+			return
+		end
+		if not PlayerData.spendGems(player, Economy.FINAL_HORIZON_PRICE) then
+			Remotes.Notice:FireClient(player, "Not enough Gems (" .. Economy.FINAL_HORIZON_PRICE .. " needed).")
+			return
+		end
+		profile.finalHorizon = true
+		PlayerData.changed(player)
+		Remotes.Notice:FireClient(player, "The Final Horizon unlocked: with Veyr on a commander throne, he takes the gate at 20%.")
 	elseif item == "CommanderSlot" then
 		if (profile.commanderSlots or 1) >= Economy.MAX_COMMANDER_SLOTS then
 			return

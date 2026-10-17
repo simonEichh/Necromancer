@@ -30,6 +30,7 @@ local CollectionService = game:GetService("CollectionService")
 local mainGui = require(script.Parent.Gui)
 local Theme = require(script.Parent.Theme)
 local Sfx = require(script.Parent.Sfx)
+local CinematicGuard = require(script.Parent.CinematicGuard)
 
 local player = Players.LocalPlayer
 
@@ -1902,7 +1903,7 @@ function FleetStrike.play(opts)
 	local saved, controls
 	local hiddenGuis, hiddenBoards = {}, {}
 	local function takeOver()
-		if watching then
+		if watching or not CinematicGuard.claim("FleetStrike") then
 			return
 		end
 		watching = true
@@ -1955,12 +1956,17 @@ function FleetStrike.play(opts)
 		if controls then
 			pcall(function() controls:Enable() end)
 		end
+		CinematicGuard.release("FleetStrike")
 	end
 	if spectator then
 		watchBtn.root.Visible = true
 		watchBtn.button.Activated:Connect(takeOver)
 	else
 		takeOver()
+		if not watching then
+			watchBtn.root.Visible = true -- (another cinematic holds the camera: watch when it is free)
+			watchBtn.button.Activated:Connect(takeOver)
+		end
 	end
 
 	-- ── Run ──────────────────────────────────────────────────

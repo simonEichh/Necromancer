@@ -14,6 +14,7 @@ local Drops = require(script.Parent.Drops)
 local SharedUnits = require(ReplicatedStorage.Shared.Units)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
+local VeyrTimeline = require(ReplicatedStorage.Shared.VeyrTimeline)
 local GraveRune = require(script.Parent.GraveRune)
 
 local UNITS = SharedUnits.Stats
@@ -102,8 +103,14 @@ end
 --   duringSpecial  while the unit's special plays (Knell: its bell tolls)
 --   lowWall        while the wall is below `below` of its HP (Hush)
 --   afterSpecial   from `from` s after its special started, for `duration` s (the Sigilwright's marked wall)
+--   mark           Veyr's weak point (plotState.mark, set by fireMarksman when his round lands): on that one wall until
+--                  untilT; one mark per plot, counted once however many Veyrs keep refreshing it
 local function traitMultiplier(plotState)
 	local m = 1
+	local mark = plotState.mark
+	if mark and plotState.wall and mark.wall == plotState.wall and workspace:GetServerTimeNow() < mark.untilT then
+		m *= 1 + mark.damage
+	end
 	local t = tick() -- (the update loop's clock: u.specialStartedAt)
 	for _, u in ipairs(plotState.activeUnits) do
 		local tr = u.def and u.def.trait
@@ -1003,7 +1010,7 @@ local function startSpecial(u, plotState, lat, now)
 	local sp = u.def.special
 	local targetWall = plotState.wall
 	local cd = specialCooldown(u.def, plotState)
-	local aim = PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
+	local aim = PlotFrame.toWorld(plotState, u.def.perch and lat * 0.4 or lat, plotState.wallFaceFwd) + Vector3.new(0, 7, 0)
 	u.specialStartedAt = now -- (the traits that hang on the special: Knell, the Sigilwright)
 	if u.model then
 		u.model:SetAttribute("SpecialKind", sp.kind)
@@ -1021,6 +1028,32 @@ local function startSpecial(u, plotState, lat, now)
 	local total = (u.def.damage / u.def.attackCD) * sp.share * cd
 	if sp.swarm then
 		startSwarm(u, plotState, sp.swarm)
+	end
+	-- an army-seconds special aimed at one wall (Veyr's Long Goodbye): ONE snapshot of the whole army's ordinary DPS now
+	-- (every unit's damage already carries its level, ascension, aura, family and trait multipliers, once; no special's
+	-- damage is in it), times `seconds`, dealt at the `hits` on the wall it was aimed at. Nothing lands if that wall
+	-- broke, the run reset, a finisher started or the unit was removed meanwhile; the effect plays out where it was.
+	if sp.army then
+		local armyDps = 0
+		for _, other in ipairs(plotState.activeUnits) do
+			if other.def and other.block and other.block.Parent then
+				armyDps += other.def.damage / other.def.attackCD
+			end
+		end
+		local budget = armyDps * sp.army.seconds
+		u.lastSpecialBudget = budget -- (for tests)
+		for _, h in ipairs(sp.army.hits) do
+			task.delay(h.at, function()
+				if not plotState.wall or plotState.wall ~= targetWall then return end
+				if not u.block or not u.block.Parent or plotState.finisher then return end
+				local dmg = budget * h.share
+				plotState.wallHP = math.max(0, plotState.wallHP - dmg)
+				earnHitGold(plotState, u, dmg)
+				updateWallGui(plotState)
+				sendWallHit(plotState, aim, dmg, u.def.transparent, "Marksman") -- (VeyrSpecial draws the impact)
+				if plotState.wallHP <= 0 then breakWall(plotState) end
+			end)
+		end
 	end
 	for _, h in ipairs(sp.hits) do
 		task.delay(h.at, function()
@@ -1112,6 +1145,71 @@ local function fireCompanion(u, plotState)
 	end)
 end
 
+-- Veyr's basic attack, DEAD RECKONING (AttackStyle "Marksman", docs/veyr.md): one deliberate shot. The aim point and
+-- the timing are published BEFORE the trigger, so a client that sees the new ShotAt also sees this shot's AimPos and
+-- ShotImpact (never the previous shot's): AimPos (the spot on the wall), ShotImpact (server time the round lands =
+-- ShotAt + VeyrTimeline.impactAt(distance)), ShotAt (server time the performance starts), AttackCount. The damage is
+-- fixed when he fires (so the mark this round sets does not feed back into it) and lands at ShotImpact on the wall he
+-- aimed at: nothing if that wall broke, the run reset or he was recalled meanwhile. A round that lands exposes the
+-- weak point (his trait, plotState.mark: the whole army +damage on that wall for `duration` s; refreshed, not stacked).
+local function fireMarksman(u, plotState)
+	local wallAtStart = plotState.wall
+	local serverNow = workspace:GetServerTimeNow()
+	local fromPos = u.block.Position
+	local standLat = PlotFrame.toLocal(plotState, fromPos)
+	if u.def.perch then
+		standLat *= 0.4 -- (from his perch at the lane's edge he shoots towards the middle of the wall, not its end)
+	end
+	local hitY = (u.def.hitHeight or 4) * (0.95 + math.random() * 0.1)
+	local aim = PlotFrame.toWorld(plotState, standLat + (math.random() - 0.5) * 0.6, plotState.wallFaceFwd)
+		+ Vector3.new(0, hitY, 0)
+	-- (the round leaves the muzzle ~7 studs ahead of him; the client flies it from the real muzzle in the same time)
+	local scale = u.model and u.model:GetScale() or 1
+	-- (from where his model really is: up on his perch, out past the lane's edge)
+	local perch = u.def.perch
+	if perch then
+		local right = PlotFrame.rotation(plotState).RightVector
+		fromPos = fromPos + right * (u.perchSide or 1) * perch.out * scale + Vector3.new(0, perch.height * scale, 0)
+	end
+	local distance = math.max(0, (aim - fromPos).Magnitude - 7 * scale)
+	local delay = VeyrTimeline.impactAt(distance)
+	local damage = u.def.damage * (u.def.companion and (1 - u.def.companion.share) or 1)
+	if u.model then
+		u.model:SetAttribute("AimPos", aim)
+		u.model:SetAttribute("ShotImpact", serverNow + delay)
+		u.model:SetAttribute("ShotAt", serverNow)
+		u.model:SetAttribute("AttackCount", (u.model:GetAttribute("AttackCount") or 0) + 1)
+	end
+	task.delay(delay, function()
+		if not plotState.wall or plotState.wall ~= wallAtStart then return end -- (that wall broke / the run reset)
+		if not (u.block and u.block.Parent) then return end -- (recalled or removed while the round was in the air)
+		plotState.wallHP = math.max(0, plotState.wallHP - damage)
+		earnHitGold(plotState, u, damage)
+		updateWallGui(plotState)
+		sendWallHit(plotState, aim, damage, u.def.transparent, u.shadowForm and "MarksmanShadow" or "Marksman")
+		-- the weak point: one mark per plot on this wall; the strongest bonus counts, the timer is refreshed
+		local tr = u.def.trait
+		if tr and tr.kind == "mark" then
+			local mark = plotState.mark
+			local fresh = not (mark and mark.wall == wallAtStart and workspace:GetServerTimeNow() < mark.untilT)
+			plotState.mark = {
+				wall = wallAtStart,
+				untilT = workspace:GetServerTimeNow() + tr.duration,
+				damage = fresh and tr.damage or math.max(mark.damage, tr.damage),
+			}
+			if wallAtStart:FindFirstChild("WallModel") then
+				wallAtStart.WallModel:SetAttribute("MarkUntil", plotState.mark.untilT) -- (clients draw the exposed weak point)
+				wallAtStart.WallModel:SetAttribute("MarkPos", aim)
+			end
+			plotState.auraCheckAt = 0 -- (re-applies the army's damage next frame, and again when it runs out:)
+			task.delay(tr.duration + 0.05, function()
+				plotState.auraCheckAt = 0
+			end)
+		end
+		if plotState.wallHP <= 0 then breakWall(plotState) end
+	end)
+end
+
 -- Malak's Fleet Strike: where the fleeing army runs to (forward distance from the plot's centre: by the graves) and
 -- how much faster than their march they run
 local FINISHER_FLEE_FWD = 8
@@ -1178,60 +1276,96 @@ local function startFinisher(plotState, unit, fleeAt, length, on)
 	return finisher
 end
 
--- Malak's Fleet Strike (docs/envoy.md, client FleetStrike.lua): when the gate is down to Economy.FLEET_STRIKE_HP of its
--- HP, the owner has unlocked it and a Malak fights on the plot, the gate is HELD there, every client plays the
--- cutscene from the same server time (FleetStrike remote), and at FLEET_GATE_HIT s, when the beam reaches it, the gate
--- breaks for real (the keeper's Defeat, the loot, the portal: Walls.breakWall). Once per gate.
-local FLEET_FLEE_AT = 11
-local FLEET_LENGTH = 54
-local FLEET_GATE_HIT = 49.4
-local function checkFleetStrike(plotState, serverNow)
+-- The Sovereigns' gate finishers (docs/envoy.md, docs/veyr.md): when the gate is down to Economy.FLEET_STRIKE_HP of its
+-- HP and a commander who owns a finisher (the account bought it) leads the plot, the gate is HELD there, every client
+-- plays the cutscene from the same server time (its remote), the army flees at fleeAt, and at gateHit the gate breaks
+-- for real (the keeper's Defeat, the loot, the portal: Walls.breakWall). One finisher per gate, one at a time per plot.
+-- Who fires it, if both Sovereigns lead the plot: the commander thrones in order (throne 1 first); the first commander
+-- whose own finisher is unlocked wins. Dev-spawned units (Studio) only count when no throne has a winner.
+-- A hit big enough to take the gate from above the threshold straight to 0 also starts it (Walls.breakWall asks
+-- plotState.tryFinisher first), so a finisher is never skipped by one huge hit.
+local FINISHERS = {
+	Malak = { kind = "FleetStrike", unlock = "fleetStrike", fleeAt = 11, length = 54, gateHit = 49.4, remote = "FleetStrike" },
+	Veyr = { kind = "FinalHorizon", unlock = "finalHorizon", fleeAt = VeyrTimeline.FINISHER.FLEE,
+		length = VeyrTimeline.FINISHER.END, gateHit = VeyrTimeline.FINISHER.GATE_HIT, remote = "FinalHorizon" },
+}
+
+-- the unit whose finisher fires on this plot now (or nil), and its registry entry
+local function finisherCandidate(plotState, profile)
+	local function eligible(u)
+		local f = u and FINISHERS[u.unitType]
+		return f and profile[f.unlock] == true and u.model and u.block and u.block.Parent and f or nil
+	end
+	for k = 1, #(plotState.commanderSlots or {}) do
+		local slot = plotState.commanderSlots[k]
+		local u = slot and slot.occupied and slot.unitEntry
+		local f = eligible(u)
+		if f then
+			return u, f
+		end
+	end
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.dev then
+			local f = eligible(u)
+			if f then
+				return u, f
+			end
+		end
+	end
+	return nil
+end
+
+local function checkFinisher(plotState, serverNow, crossing)
 	local fin = plotState.finisher
-	if fin and fin.kind == "FleetStrike" then
+	if fin and fin.kind then
+		-- a real finisher holds the gate until its moment, then breaks it (exactly once)
 		if not fin.allowBreak then
-			plotState.wallHP = math.max(plotState.wallHP, fin.holdHP) -- (the gate holds)
-			if serverNow >= fin.start + FLEET_GATE_HIT and plotState.wall then
+			plotState.wallHP = math.max(plotState.wallHP, fin.holdHP)
+			if serverNow >= fin.start + fin.gateHit and plotState.wall and plotState.wall == fin.gate then
 				fin.allowBreak = true
 				plotState.wallHP = 0
 				updateWallGui(plotState)
 				breakWall(plotState)
+			elseif plotState.wall ~= fin.gate then
+				fin.allowBreak = true -- (the run reset under it: never break the next run's gate)
 			end
 		end
-		return
+		return false
+	end
+	if fin then
+		return false -- (a Studio preview is running)
 	end
 	local wall = plotState.wall
-	if not wall or not Economy.isGate(plotState.wallLayer) or plotState.fleetStrikeWall == wall then
-		return
+	if not wall or not Economy.isGate(plotState.wallLayer) or plotState.finisherWall == wall then
+		return false
 	end
 	local maxHP = plotState.WALL_MAX_HP or 0
-	if maxHP <= 0 or plotState.wallHP > maxHP * Economy.FLEET_STRIKE_HP then
-		return
+	if maxHP <= 0 or (not crossing and plotState.wallHP > maxHP * Economy.FLEET_STRIKE_HP) then
+		return false
 	end
 	local owner = Players:GetPlayerByUserId(tonumber(plotState.ownerId) or 0)
 	local profile = owner and PlayerData.get(owner)
-	if not profile or not profile.fleetStrike then
-		return
+	if not profile then
+		return false
 	end
-	local malak
-	for _, u in ipairs(plotState.activeUnits) do
-		if u.unitType == "Malak" and u.model and u.block.Parent then
-			malak = u
-			break
-		end
+	local unit, f = finisherCandidate(plotState, profile)
+	if not unit then
+		return false
 	end
-	if not malak then
-		return
-	end
-	plotState.fleetStrikeWall = wall -- (once per gate)
-	local started = startFinisher(plotState, malak, FLEET_FLEE_AT, FLEET_LENGTH)
-	started.kind = "FleetStrike"
+	-- reserved at once: one winner per gate
+	plotState.finisherWall = wall
+	local started = startFinisher(plotState, unit, f.fleeAt, f.length)
+	started.kind = f.kind
+	started.gateHit = f.gateHit
+	started.gate = wall
 	started.holdHP = math.max(1, plotState.wallHP)
 	local gate = PlotFrame.toWorld(plotState, 0, plotState.wallFaceFwd) + Vector3.new(0, 4, 0)
-	Remotes.FleetStrike:FireAllClients({
-		owner = plotState.ownerId, startAt = started.start, malak = malak.model, gate = gate,
-		malakCF = malak.model:GetPivot(),
+	Remotes[f.remote]:FireAllClients({
+		owner = plotState.ownerId, startAt = started.start, unit = unit.model, malak = unit.model, gate = gate,
+		malakCF = unit.model:GetPivot(), unitCF = unit.model:GetPivot(),
 	})
-	print("Fleet Strike on plot " .. tostring(plotState.plotIndex))
+	print(f.kind .. " on plot " .. tostring(plotState.plotIndex))
+	return true
 end
 
 -- Advances every plot's units one frame: walk to the formation slot facing the wall, then attack it.
@@ -1281,7 +1415,17 @@ local function update(now, dt)
 	local serverNow = workspace:GetServerTimeNow()
 	-- Unit AI — iterate over every player's plot
 	for _, plotState in pairs(playerPlots) do
-		checkFleetStrike(plotState, serverNow)
+		checkFinisher(plotState, serverNow)
+		-- (Walls.breakWall asks this before a gate falls: a hit that crosses the threshold straight to 0 starts the
+		-- finisher, which then holds the gate)
+		plotState.tryFinisher = plotState.tryFinisher or function()
+			return checkFinisher(plotState, workspace:GetServerTimeNow(), true)
+		end
+		-- Veyr's weak point belongs to one wall: gone the moment that wall is replaced or the run resets
+		if plotState.mark and plotState.mark.wall ~= plotState.wall then
+			plotState.mark = nil
+			plotState.auraCheckAt = 0
+		end
 		-- auras (Malak's +10% damage) and the families (SharedUnits.familyBonuses): re-apply the damage of every unit when the
 		-- strongest aura, a family tier, the gate or the Beasts' burst changes
 		if now - (plotState.auraCheckAt or 0) >= 1 then
@@ -1376,11 +1520,34 @@ local function update(now, dt)
 			local flatPos    = Vector3.new(pos.X, 0, pos.Z)
 			-- the unit's slot in the formation (falls back to the lane it was placed in until the first layout)
 			local lat = u.slotLat or u.lateral
+			-- Veyr's perch: his unit stands near the lane's edge on its own side (the model rises and drifts out from there)
+			if u.def.perch then
+				if not u.perchSide then
+					local taken = 0
+					for _, other in ipairs(plotState.activeUnits) do
+						if other ~= u and other.perchSide == 1 and other.block and other.block.Parent then
+							taken += 1
+						end
+					end
+					u.perchSide = taken == 0 and 1 or -1
+					if u.model then
+						u.model:SetAttribute("PerchSide", u.perchSide)
+					end
+					-- (his name / DPS label goes up to the perch with him)
+					local label = u.block:FindFirstChildOfClass("BillboardGui")
+					if label then
+						local scale = u.model and u.model:GetScale() or 1
+						label.StudsOffsetWorldSpace = PlotFrame.rotation(plotState).RightVector * u.perchSide * u.def.perch.out * scale
+							+ Vector3.new(0, (u.def.perch.height + (u.model and u.model:GetAttribute("Height") or 7) * 0.55) * scale, 0) -- (over his head)
+					end
+				end
+				lat = u.perchSide * u.def.perch.laneLat
+			end
 			-- the front wall advances down the lane as walls break and the army marches after it; a static unit (a tower)
 			-- cannot march, so it keeps the spot it rose at
 			local standFwd = plotState.wallTargetFwd - (u.slotStand or FORMATION_MIN_STAND)
 			if u.def.infiniteRange then
-				standFwd = INFINITE_RANGE_POST_FWD
+				standFwd = u.def.postFwd or INFINITE_RANGE_POST_FWD -- (Veyr's overwatch post is his own: postFwd)
 			end
 			if u.def.static then
 				u.staticFwd = u.staticFwd or standFwd
@@ -1450,8 +1617,16 @@ local function update(now, dt)
 						u.model:SetAttribute("AimPos", PlotFrame.toWorld(plotState, lat, plotState.wallFaceFwd)
 							+ Vector3.new(0, BEAM_AIM_HEIGHT, 0))
 					end
-				elseif u.def.special and plotState.wall and now >= u.specialReady then
+				elseif u.def.special and plotState.wall and now >= u.specialReady
+					and (attackStyle ~= "Marksman" or now - u.lastAttack >= VeyrTimeline.SETTLE_END) then
+					-- (Veyr never cuts into his own shot: the special waits until the last one has settled)
 					startSpecial(u, plotState, lat, now)
+				elseif attackStyle == "Marksman" then
+					-- Veyr's deliberate shot: everything a client needs is published before the trigger (fireMarksman)
+					if plotState.wall and now - u.lastAttack >= u.def.attackCD then
+						u.lastAttack = now
+						fireMarksman(u, plotState)
+					end
 				elseif now - u.lastAttack >= u.def.attackCD then
 					u.lastAttack = now
 					if u.model then
@@ -1541,7 +1716,7 @@ return {
 	standDistance = standDistance, -- (unit def) -> distance in front of the wall where the unit stands
 	standForward = function(plotState, def) -- (plotState, unit def) -> forward position (along the lane) where the unit stands
 		if def.infiniteRange then
-			return INFINITE_RANGE_POST_FWD
+			return def.postFwd or INFINITE_RANGE_POST_FWD
 		end
 		return plotState.wallTargetFwd - standDistance(def)
 	end,

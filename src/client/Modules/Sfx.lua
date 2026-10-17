@@ -72,6 +72,14 @@ Sfx.Sounds = {
 	reactor_lock = { id = "rbxassetid://109134827602753", volume = 0.8 },
 	cannon_charge = { id = "rbxassetid://136468737245177", volume = 0.45 },
 	main_beam = { id = "rbxassetid://95516675338021", volume = 1 },
+	-- Veyr (docs/veyr.md "Sound"): slots for his own sounds (empty id = silent until recorded; sounds/veyr/). Until
+	-- then the neutral rune click marks his sights opening and the shell impact is a low layer under his hit.
+	veyr_ring = { id = "rbxassetid://129592415819508", volume = 0.25 }, -- (= rune_click; wanted: a glassy optical tink)
+	veyr_crack = { id = "", volume = 1 }, -- a heavy rifle crack with a short supernatural tail
+	veyr_bolt = { id = "", volume = 0.6 }, -- the bolt worked: lift, back, forward, down
+	veyr_impact = { id = "rbxassetid://81958184521977", volume = 0.45 }, -- (= shell_impact; wanted: a sharp puncture + a low tail)
+	veyr_charge = { id = "", volume = 0.6 }, -- (special / finisher) a rising inward charge tone
+	veyr_collapse = { id = "", volume = 0.9 }, -- (special / finisher) the deep implosion of the fracture
 	keeper_roar = { id = "rbxassetid://130529185820696", volume = 0.8 },
 	gate_collapse = { id = "rbxassetid://79285090609348", volume = 1 },
 	warp_out = { id = "rbxassetid://77036647861580", volume = 0.8 },

@@ -258,6 +258,9 @@ Economy.REMOTE_FORGE_PRICE = 250
 -- Malak's Fleet Strike (docs/envoy.md): a one-time Gem Shop unlock (per account: any Malak can use it); at this share of
 -- the gate's HP, with a Malak on the plot, the Absolution executes the gate (server Army.checkFleetStrike)
 Economy.FLEET_STRIKE_PRICE = 1000
+-- Veyr's The Final Horizon (docs/veyr.md): its own one-time unlock, separate from the Fleet Strike; the same gate share
+-- (Economy.FLEET_STRIKE_HP) triggers it (server Army.checkFinisher)
+Economy.FINAL_HORIZON_PRICE = 1000
 -- the second commander slot (the throne for a second Signature / Sovereign; Design.md "the commander slot")
 Economy.COMMANDER_SLOT_PRICE = 500
 Economy.MAX_COMMANDER_SLOTS = 2

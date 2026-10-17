@@ -129,6 +129,15 @@ Remotes.DevGateLow.OnServerEvent:Connect(function(player)
 	end
 end)
 
+-- the wall being fought gets a huge HP pool, so attacks, Veyr's weak point and specials can be watched on one wall
+Remotes.DevToughWall.OnServerEvent:Connect(function(player)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState or not plotState.wall then return end
+	plotState.WALL_MAX_HP = 1e15
+	plotState.wallHP = 1e15
+	Walls.updateWallGui(plotState)
+end)
+
 -- every wall of the run including the gate (loot and all): the gate falls and ascending unlocks
 Remotes.DevBreakAll.OnServerEvent:Connect(function(player)
 	local plotState = PlotRegistry.getPlot(player)
@@ -152,6 +161,21 @@ Remotes.DevFleetStrike.OnServerEvent:Connect(function(player, on)
 		end
 	end
 	Army.startFinisher(plotState, malak, 11, 54, on ~= false) -- (FleetStrike.lua: the army flees at 11 s, 54 s long)
+end)
+
+-- a Final Horizon preview (client VeyrFinisher.lua): the plot's army holds, then flees, Veyr stays on his perch. No
+-- gate hold and no break: the preview only hides the gate on that player's screen.
+Remotes.DevFinalHorizon.OnServerEvent:Connect(function(player, on)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local veyr
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.unitType == "Veyr" then
+			veyr = u
+		end
+	end
+	local F = require(ReplicatedStorage.Shared.VeyrTimeline).FINISHER
+	Army.startFinisher(plotState, veyr, F.FLEE, F.END, on ~= false)
 end)
 
 Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)

@@ -19,6 +19,8 @@
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
+local MarksmanAnimator = require(script.Parent.MarksmanAnimator) -- (Veyr, Pose "Marksman")
+
 local TAG = "ProceduralUnit"
 local rigs = {} -- [model] = state table
 
@@ -1676,6 +1678,12 @@ local function animate(model, rig, dt, now)
 				blend("Root", CFrame.new(0, float + rise + rise2 * scale, 0) * ANGLES(0, wy * 0.4, 0))
 			end
 		end
+	end
+
+	-- "Marksman" pose (Veyr, build_veyr.lua): his own module sets every joint (MarksmanAnimator.lua)
+	if model:GetAttribute("Pose") == "Marksman" then
+		MarksmanAnimator.animate(model, rig, dt, now, { state = state, scale = scale, set = set })
+		return
 	end
 
 	-- "Envoy" pose (Malak, build_malak.lua): the rig is BUILT in his nonchalant pose (left hand behind the back, right

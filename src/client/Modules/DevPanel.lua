@@ -240,7 +240,7 @@ graveBtn.MouseButton1Click:Connect(function()
 	previewGrave = GRAVE_ORDER[index % #GRAVE_ORDER + 1]
 	graveBtn.Text = graveLabel()
 end)
-local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet", "Arrival", "Ascend" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed), Malak's pull (SovereignArrival)
+local ANIMS = { "Grave", "Star", "Descent", "Overlay", "Fleet", "Horizon", "Arrival", "Ascend" } -- grave cinematic, star summon, The Descent, the short Auto Roll overlay, Malak's Fleet Strike (needs your Malak placed), Malak's pull (SovereignArrival)
 local previewAnim = 1
 local animBtn = makeButton(panel, "Anim: " .. ANIMS[previewAnim], Color3.fromRGB(230, 200, 255))
 animBtn.Size = UDim2.new(0.4, -8, 0, 28)
@@ -283,6 +283,12 @@ playBtn.MouseButton1Click:Connect(function()
 		if not require(script.Parent.FleetStrike).play({ preview = true, onDone = function() panel.Visible = true end }) then
 			panel.Visible = true
 		end
+	elseif anim == "Horizon" then
+		-- Veyr's The Final Horizon (needs your Veyr in the world; the army is held, the gate only hidden on this screen)
+		panel.Visible = false
+		if not require(script.Parent.VeyrFinisher).play({ preview = true, onDone = function() panel.Visible = true end }) then
+			panel.Visible = true
+		end
 	else
 		GachaReveal.play(randomResults(1, previewRarity), { graveType = previewGrave })
 	end
@@ -310,7 +316,7 @@ goldX10.MouseButton1Click:Connect(function()
 end)
 -- specials: fast (10 s charge, to test them) or real (the units' own cooldowns and damage per special)
 local specialsBtn = makeButton(panel, "", Color3.fromRGB(255, 170, 190))
-specialsBtn.Size = UDim2.new(0.6, -8, 0, 28)
+specialsBtn.Size = UDim2.new(0.4, -8, 0, 28)
 specialsBtn.Position = UDim2.fromOffset(8, 202)
 local function paintSpecials()
 	local fast = workspace:GetAttribute("DevFastSpecials") ~= false
@@ -320,6 +326,14 @@ paintSpecials()
 workspace:GetAttributeChangedSignal("DevFastSpecials"):Connect(paintSpecials)
 specialsBtn.MouseButton1Click:Connect(function()
 	fastSpecialsEvent:FireServer(not (workspace:GetAttribute("DevFastSpecials") ~= false))
+end)
+-- the wall being fought gets a huge HP pool (DevToughWall): to watch attacks, Veyr's mark and specials on one wall
+local toughBtn = makeButton(panel, "Tough wall", Color3.fromRGB(190, 200, 255))
+toughBtn.Size = UDim2.new(0.2, -4, 0, 28)
+toughBtn.Position = UDim2.new(0.4, 4, 0, 202)
+toughBtn.MouseButton1Click:Connect(function()
+	local r = game:GetService("ReplicatedStorage"):FindFirstChild("DevToughWall")
+	if r then r:FireServer() end
 end)
 -- the gate at 21% HP (breaks the walls before it): to test Malak's Fleet Strike trigger
 local gateLowBtn = makeButton(panel, "Gate 20%", Color3.fromRGB(255, 190, 160))

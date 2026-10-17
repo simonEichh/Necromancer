@@ -73,6 +73,7 @@ local function collect(player, profile)
 		wispLevel = profile.wispLevel,
 		remoteForge = profile.remoteForge,
 		fleetStrike = profile.fleetStrike,
+		finalHorizon = profile.finalHorizon,
 		commanderSlots = profile.commanderSlots,
 		broker = profile.broker,
 		settings = profile.settings,

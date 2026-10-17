@@ -37,8 +37,20 @@ local function rune(folder, size)
 	return p
 end
 
+-- the box the rings are sized to: the model's bounding box, or (model attributes StunCore = a part's name, StunSize) a
+-- box round that part, for models whose bounding box is not their body (Veyr: his long rifle, and he floats high
+-- above his root part on his perch)
+local function bounds(model)
+	local coreName = model:GetAttribute("StunCore")
+	local core = coreName and model:FindFirstChild(coreName)
+	if core and core:IsA("BasePart") then
+		return CFrame.new(core.Position), (model:GetAttribute("StunSize") or Vector3.new(3, 6, 3)) * model:GetScale()
+	end
+	return model:GetBoundingBox()
+end
+
 local function bind(model, untilT)
-	local cf, size = model:GetBoundingBox()
+	local cf, size = bounds(model)
 	local folder = Instance.new("Folder")
 	folder.Name = "StunFx"
 	folder.Parent = workspace
@@ -114,7 +126,7 @@ RunService.RenderStepped:Connect(function()
 		if not model.Parent or serverNow >= a.untilT then
 			release(model, model.Parent ~= nil)
 		else
-			local cf = model:GetBoundingBox()
+			local cf = bounds(model)
 			a.centre = cf.Position
 			for _, ring in ipairs(a.rings) do
 				local n = #ring.parts
