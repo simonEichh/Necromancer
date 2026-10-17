@@ -210,5 +210,65 @@ Keep Orvoss tiny in the foreground for scale. Ships face their gun sides toward 
 firing corridor looking diagonally along several broadsides. Track alongside the flagship as gun ports ignite from
 bow to stern. This replaces the earlier emphasis on an upside-down overhead ocean/underside reveal.
 
+**Agreed 2026-10-17 (the user):** the army does not withdraw: the units are simply hidden on this screen for the
+finisher (as in Veyr's). **The travelling broadside:** the volley does not fire all at once; it starts at the farthest
+ship and rolls towards the camera like a wave, ship after ship and port after port (the ports' `Deck` / `Index` /
+`Side` tags, bow to stern), until the flagship fires last and loudest beside Orvoss. Other ideas offered and not
+picked (for now): the gate dragged UP into the sky ocean, the figurehead's eyes and blade igniting with his order, a
+frozen held breath with one bell before the order, screaming soul skulls as the flagship's last rounds.
+
+### Build state (2026-10-17, stages 1-3 built and committed, first pass)
+
+Client `src/client/Modules/LastBroadside.lua` (on the shared clock `AdmiralTimeline.FINISHER`); server: Army FINISHERS
+`Orvoss` (kind LastBroadside, unlock `lastBroadside`, the army never flees: fleeAt past the end, the clients hide the
+owner's units on watching screens), remotes `LastBroadside` / `DevLastBroadside`, profile flag `lastBroadside` (saved,
+synced as `State.lastBroadside`), `Economy.LAST_BROADSIDE_PRICE` 1000, GemShop `BuyGemItem("LastBroadside")`, a
+Finisher entry on his Codex page (with its buy button). No Gem Shop panel card yet. Studio preview: DEV panel, Anim
+"Broadside" (in the preview the "gate" is the wall being fought).
+- Built: the take-over (bars, Skip, Watch for other players, Studio beat caption), every camera shot, the fog banks
+  rolling down the lane (lightened after the user said it was too dark), ship shadows, upward drips, a soft soul light
+  on him; the anchor falling on its chain beside the gate (flash, ring, cracks, dust, sparks, shake, a green glow);
+  the sky ocean (a huge dark disc with a ForceField sheen, tilted at the battlefield); the five fleet ships gliding
+  STRAIGHT out of it to their stations (two tiers on the lane's right; no sideways turning, the user found curves too
+  fast/funky), the flagship in one gentle curve past him to his left; all hidden until they emerge; at station each
+  hull turns and rolls so its firing side looks straight at the gate (the user's idea; balls fly straight); the ports
+  load deck by deck; the travelling broadside (farthest ship first, each stern to bow, the flagship last at FLAG_FIRE,
+  flares, muzzle flashes, smoke, one ball per column, hits with flash / sparks / dust / soul cracks / shake); the ships
+  drift back into the sea stern first (no turning) and it closes; the subtitle "GIVE THEM THE DEEP."; sounds: bell,
+  chain, anchor, sea, cannon per volley, the ambience bed (ducked for the order).
+- **Known issue (the user, 2026-10-17): at a real gate the ships clip through the outer (coliseum) wall.** The
+  stations are fixed offsets from the gate (FLEET / FLAGSHIP_STATION / OCEAN at the top of LastBroadside.lua) and the
+  lanes end near the rim, so they need work when it is triggered at the gate: e.g. stations measured from the lane's
+  end and the rim (fleet higher and over the lane instead of beside it), or the outer wall hidden on watching screens
+  for the finisher.
+- Not built: his poses (compass, rising on the rigging, cutlass, hat catch; AdmiralAnimator reads FinisherAt), the
+  drag (chains to the ruins) and the whirlpool, the held gate / ruins handling at GATE_HIT (the server's normal break
+  plays), the voice line, the creak / whirlpool / gate break sounds, the Gem Shop card. Not tested: a real trigger at
+  20%, other players watching, a rotated plot.
+
+### Beat sheet (approved 2026-10-17; ~67 s, first pass deliberately slow)
+
+Everything in the plot's frame (the lane forward, the gate at its end). The army is hidden on this screen from 0 to
+the end; Orvoss stays where he stands in the formation. The gate is executed (server GATE_HIT) when the flagship's
+last shots land.
+
+| s | Beat | Camera |
+|---|------|--------|
+| 0-4 | **The call.** Orvoss snaps his compass shut, lifts his head to the sky. A distant bell. | Close three-quarter on him, low. |
+| 4-9 | **The omen.** Water drips upwards off his coat; black fog rolls from the gate down the lane towards him; huge ship shadows glide over the ground under the fog. | Low behind him, down the lane to the gate, the fog coming at us. |
+| 9-13 | **The anchor.** An anchor falls out of the clouds and slams into the ground beside the gate (dust, a ring of cracks, shake); its chain runs up into the sky. | Wide from the side of the gate, the anchor dropping into frame. |
+| 13-20 | **The sea opens.** High beyond the gate a black ocean spreads across the sky, tilted towards the battlefield, soul-green light under its surface. The fleet breaks out of it one ship after another, bows first, water pouring off them upwards. | Slow tilt up from the gate to the sky ocean. |
+| 20-28 | **The flagship.** It tears out last and crosses in front of Orvoss, a little overhead and to one side: the bow, then the long broadside sliding past. | Low three-quarter from behind Orvoss, him tiny in the foreground. |
+| 28-34 | **Into line.** The fleet swings round, every ship turns its broadside on the gate; the ports glow up dimly deck by deck (loading). Creaking timber. | Wide, outside the line of fire, diagonally along several broadsides. |
+| 34-40 | **The order.** Spectral rigging drops from the flagship; he rises on it, raises his cutlass. Silence: every sound drops out. "Give them the deep." | Close and low on him, the flagship's hull behind. |
+| 40-52 | **The travelling broadside.** It starts at the farthest ship and rolls towards the camera: port after port bow to stern, ship after ship, each volley's balls slamming into the gate (flashes, chunks, cracks spreading). The flagship fires last and loudest, all three decks. | Diagonal along the line as the wave comes at us; at ~48 cut to tracking alongside the flagship as its ports ignite bow to stern. |
+| 52 | **The gate breaks** (GATE_HIT). | Wide on the gate. |
+| 52-58 | **The drag.** The anchor's chain and new ones from the ships pull taut; the fleet sails back into the sky ocean, dragging the ruined gate into a whirlpool of black water opening where it stood. | Wide from behind Orvoss. |
+| 58-63 | **The ocean closes.** The whirlpool swallows the last stones, the sky ocean fades, the fog lifts. | Slow pull back. |
+| 63-67 | **The hat.** Orvoss drops back to the ground; his hat falls after him, he catches it and sets it back on. | Close on him; then back to the normal camera, the army reappears. |
+
+Open: exact timings after the first build, the sky ocean and whirlpool look (effects), the voice line recording, the
+Gem Shop price (like the Fleet Strike / Final Horizon), sounds.
+
 Future implementation must use the existing server-authoritative gate finisher arbitration and plot-local geometry;
 the model brief does not implement or change either system.
