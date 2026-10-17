@@ -6,8 +6,8 @@
 --          (BuyGemItem "RemoteForge" | "WispSpeed" | "CommanderSlot")
 --   Outfit the Outfit of the Day (shared OutfitSets: one set a day for everyone): every piece or the whole set
 --          (BuyOutfit(what, day), server OutfitOfTheDay); the mannequin at the stall wears it
---   Skills unlockable skills and finishers: Malak's Fleet Strike (BuyGemItem "FleetStrike"; also sold on his Codex
---          page); the necromancer's spells join it later
+--   Skills unlockable skills and finishers: Malak's Fleet Strike and Veyr's The Final Horizon (BuyGemItem "FleetStrike"
+--          | "FinalHorizon"; also sold on their Codex pages); the necromancer's spells join it later
 -- Opened by the Shop tile in the right HUD column (works anywhere, a plain centred panel) and at the Soul Broker stall
 -- (its prompt, OpenBroker, or a click on a portrait, via BrokerKeeper): there `openAtStall` makes it an in-world view like
 -- the Forge: the camera glides to the counter, the stall fills the left of the screen, the panel stands on the right, the
@@ -215,8 +215,9 @@ buyButton(setCard, outfitBuy("Set"))
 -- Skills: unlockable skills and finishers
 -- ============================================================
 local fleetCard = itemCard(pages.skills, 1, "Fleet Strike", Theme.Image.Icon.Gems, "FleetStrike")
+local horizonCard = itemCard(pages.skills, 2, "The Final Horizon", Theme.Image.Icon.Gems, "FinalHorizon")
 local skillsHint = Theme.label(pages.skills, { text = "More finishers and the necromancer's own spells will be sold here.", size = "Small", color = C.BoneDim, frameSize = UDim2.new(1, -24, 0, 24) })
-skillsHint.Position = UDim2.fromOffset(14, CARD_H + CARD_GAP + 6)
+skillsHint.Position = UDim2.fromOffset(14, 2 * (CARD_H + CARD_GAP) + 6)
 skillsHint.ZIndex = Z + 2
 
 -- ============================================================
@@ -284,6 +285,14 @@ local function paintSkills(gems)
 	else
 		fleetCard.desc.Text = "Malak's finisher: with Malak on your plot, his warship the Absolution executes the gate at 20%. Everyone in the server sees it. One-time."
 		setButton(fleetCard, Economy.FLEET_STRIKE_PRICE .. " Gems", gems < Economy.FLEET_STRIKE_PRICE)
+	end
+	local hp = math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5)
+	if State.finalHorizon then
+		horizonCard.desc.Text = "Owned. With Veyr on your plot, he executes the gate at " .. hp .. "%."
+		setButton(horizonCard, "Owned", true)
+	else
+		horizonCard.desc.Text = "Veyr's finisher: with Veyr on your plot, he rises into the sky and fires a wheel of giant rifles at the gate at " .. hp .. "%. The gate turns to ash. Everyone in the server sees it. One-time."
+		setButton(horizonCard, Economy.FINAL_HORIZON_PRICE .. " Gems", gems < Economy.FINAL_HORIZON_PRICE)
 	end
 end
 

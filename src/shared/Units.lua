@@ -362,7 +362,8 @@ local UNITS = {
 		title = "The Last Sight",
 		color = BrickColor.new("Really black"),
 		size = Vector3.new(2.2, 4, 2.2),
-		damage = 637500, -- 85K DPS like Malak (placeholder, tuned in the attack stage)
+		-- 93K DPS nominal: his basics pause for the special (~91 % of nominal), so ~85K in practice like Malak (2026-10-17)
+		damage = 700000,
 		speed = 10,
 		attackRange = 32,
 		-- a sniper's overwatch post (the user's call): like the Sigilwright he never marches after the front; he takes a
@@ -387,7 +388,8 @@ local UNITS = {
 		-- times `seconds`, split over the `hits` (the fracture and its delayed collapse), all on the wall he aimed at.
 		-- share = 0: his basic shots keep their full damage (they pause while it plays).
 		special = { kind = "LongGoodbye", cooldown = 150, share = 0, duration = VEYR_SP.END, hits = {},
-			army = { seconds = 20, hits = { { at = VEYR_SP.IMPACT, share = 0.8 }, { at = VEYR_SP.COLLAPSE, share = 0.2 } } } },
+			-- (24 army-seconds + the mark's ~+8 % against Malak's Requisition 25 s + aura +10 %: about level, 2026-10-17)
+			army = { seconds = 24, hits = { { at = VEYR_SP.IMPACT, share = 0.8 }, { at = VEYR_SP.COLLAPSE, share = 0.2 } } } },
 	},
 }
 
@@ -441,7 +443,7 @@ local RARITY_UNITS = {
 		{ unit = "LastLantern", weight = 1 },
 		{ unit = "Sigilwright", weight = 0.2 }, -- Signature: very low weight
 		{ unit = "Malak", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: rarer than a Signature, and only from the Celestial grave (`graves`: Rolling skips the entry elsewhere, the wheel never gives him)
-		{ unit = "Veyr", weight = 0, graves = { Celestial = true } }, -- Sovereign: weight 0 (never rolled) until his own pull cinematic exists, then 0.05 like Malak
+		{ unit = "Veyr", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: like Malak (his own pull cinematic, VeyrArrival, approved 2026-10-17)
 	},
 }
 
@@ -598,6 +600,20 @@ local ABILITIES = {
 			return ("When the gate falls below {%d%%} HP, Malak calls in the Absolution: the fleet tears out of the sky and its main cannon brings the gate down. Everyone on the server sees it.")
 				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
 		end, unlock = { state = "fleetStrike", price = "FLEET_STRIKE_PRICE", buy = "FleetStrike" } },
+	},
+	Veyr = {
+		{ name = "The Last Sight", kind = "Passive", text = function(def)
+			return ("Every round he fires marks the wall's weak point: your whole army deals {+%d%%} damage to it for {%d s}. A second Veyr refreshes the mark, it does not stack.")
+				:format(math.floor(def.trait.damage * 100 + 0.5), def.trait.duration)
+		end },
+		{ name = "The Long Goodbye", kind = "Special", text = function(def)
+			return ("Every {%d s} Veyr sends his shards down the lane to open six sights and fires one round through all of them, dealing {%d s} of your whole army's damage.")
+				:format(def.special.cooldown, def.special.army.seconds)
+		end },
+		{ name = "The Final Horizon", kind = "Finisher", text = function(_, Economy)
+			return ("When the gate falls below {%d%%} HP, Veyr rises into the sky, opens a wheel of giant rifles and fires them all at once. The gate stands a moment longer, then turns to ash. Everyone on the server sees it.")
+				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
+		end, unlock = { state = "finalHorizon", price = "FINAL_HORIZON_PRICE", buy = "FinalHorizon" } },
 	},
 }
 
