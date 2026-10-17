@@ -3,6 +3,12 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
+## Orvoss, the Blackwake (2026-10-17: model built, awaiting the user's visual review)
+
+`tools/studio/build_orvoss.lua` built 716 parts into `ServerStorage.Models.Orvoss` (state, rig contract and checks in
+docs/orvoss.md). The review copy is in `Workspace.OrvossPreview` (delete it before publishing). UnitModels was
+rebuilt. Next: the user's visual feedback, then a unit def, an idle/animator branch, the kit and the awakened form.
+
 ## Veyr, the Last Sight (2026-10-17: done but for sounds; details in docs/veyr.md)
 
 Built and committed: base + shadow models, `MarksmanAnimator`, basic shot + the mark, the special The Long Goodbye, the

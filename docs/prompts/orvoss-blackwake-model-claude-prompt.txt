@@ -1,0 +1,394 @@
+BUILD ORVOSS, THE BLACKWAKE: AROUND 700 PARTS, SOVEREIGN CHARACTER MODEL
+
+Work in C:\RobloxGames\Necromancer.
+
+Build the actual Roblox character model for ORVOSS, THE BLACKWAKE, using the approved character sheet:
+
+Images/Concept/Unit/Orvoss-the-Blackwake-concept-v1.png
+
+Open and inspect that image directly before writing the builder. It contains a large front three-quarter view, a rear three-quarter view, and a head detail. The image is the approved visual direction. Reproduce its character, proportions, equipment, material hierarchy, and silhouette through carefully designed procedural Roblox geometry.
+
+Orvoss is a Sovereign: an extremely rare undead pirate admiral whose drowned ghost fleet still obeys him. His model must stand beside Malak and Veyr as a character of comparable visual investment. Target approximately 700 BaseParts in the finished BASE CHARACTER, including his equipped weapons. Those parts should buy visible craft: a convincing skull, a shaped tricorn, layered naval clothing, articulated skeletal hands, readable weapons, and deliberate nautical ornament.
+
+This assignment is the character model and its animation-ready rig, with an inspectable Studio preview and verification. Complete that model before handing it back for visual review. The ships, fleet, cannon barrage, complete gameplay kit, pull cinematic, finisher implementation, economy, and awakened variant are later stages. Keep their future requirements in mind when designing the rig, but do not let them consume this model-building pass. Do not count any preview stage, ship, sea effect, or duplicate model toward the 700-part target.
+
+Produce and execute a reusable builder; a written proposal or an unexecuted script does not complete this assignment when Studio is available. Do not publish the game or commit unless asked. Preserve the user's current work.
+
+1. READ THE PROJECT AND ITS CURRENT CONTRACTS
+
+Read CLAUDE.md first, as AGENTS.md requires, then AGENTS.md if present. Read the unit art direction in Design.md, docs/models.md, docs/orvoss.md, the current state in docs/backlog.md, and the character/model sections of docs/envoy.md and docs/veyr.md.
+
+Inspect these implementations rather than guessing how models work:
+
+- tools/studio/build_malak.lua: a richly detailed Sovereign with a long coat, hand equipment, secondary joints, and a readable dark silhouette.
+- tools/studio/build_veyr.lua: a roughly 700-part procedural character, detailed hands and weapon, layered cloth, consistent helpers, and useful attachments.
+- tools/studio/build_malak_shadow.lua and build_veyr_shadow.lua: reference for keeping base geometry and future awakened conversion compatible. Do not build Orvoss's awakened form in this pass.
+- tools/studio/build_skelly.lua: skull, skeletal anatomy, and wrist-mounted weapon ideas, without reducing Orvoss to that simpler unit's detail level.
+- src/client/Modules/UnitAnimator.lua: procedural joint discovery, standard names, rest-space conventions, and the Envoy, Marksman, and Bellbearer branches.
+- src/client/Modules/MarksmanAnimator.lua: modular animation structure if needed later; do not reuse the marksman's rifle performance for Orvoss.
+- src/server/Modules/Army.lua, specifically procedural spawning: scaling, RootHeight, Height, the movement block, and the root-only weld.
+- src/client/Modules/UnitPortrait.lua and tools/studio/publish_unit_models.lua: static versus animated portrait anchoring and how models reach clients.
+
+For any animation or VFX work actually needed for the preview, read the available roblox-animation / roblox-vfx skills. The project's existing procedural Motor6D system takes priority over generic recommendations to replace it with uploaded animations or a new movement architecture.
+
+Check git status before editing. The repository may contain unfinished Veyr work and user-owned art/sounds. Avoid rewriting or reverting those files. Inspect current code because older documentation can lag the actual implementation.
+
+2. IDENTITY AND THE APPROVED IMAGE
+
+Name: Orvoss.
+Title: The Blackwake.
+Internal model key: Orvoss.
+Class: Sovereign.
+
+His presence is a proud naval commander who has spent centuries on the bottom of the sea. He is composed, aristocratic, severe, and unmistakably dead. His wealth appears in the cut of his coat and the craftsmanship of his equipment; the sea has ruined those objects without erasing their quality.
+
+The immediately readable features are:
+
+- Broad, battered tricorn with a skull-and-anchor insignia.
+- Fully skeletal face, with deep sockets and cold sea-green eyes.
+- Tall, flared officer's collar framing the skull.
+- Layered dark naval greatcoat with antique brass trim and epaulettes.
+- Open chest revealing a skeletal ribcage and green soul fire.
+- Diagonal baldric, waist belt, nautical compass, and restrained chains.
+- Very long, torn coat tails with dark sea-green lining.
+- Forearm armour, exposed skeletal fingers, tall buckled boots.
+- A curved cutlass in his RIGHT hand, lowered outward.
+- An antique heavy flintlock pistol in his LEFT hand, lowered.
+- Barnacles, a few hanging seaweed strands, and corrosion concentrated in readable patches.
+
+Treat the large front view as authoritative for the resting pose and handedness. Interpret small inconsistencies between generated views sensibly and keep the final model internally consistent. Do not mirror the character accidentally: with front = -Z, his anatomical right is +X, regardless of where it falls on screen.
+
+Do not add a beard, fleshy face, eyepatch covering the defining eyes, oversized comic hook, peg leg, parrot, ship's wheel backpack, modern gun, sci-fi hologram, or giant shoulder cannon. The approved image already supplies enough personality.
+
+3. SILHOUETTE AND PROPORTIONS BEFORE MICRODETAIL
+
+Start with a strong blockout and inspect it from front, three-quarter, side, and rear before spending the full detail budget. Continue refining within this authorized model scope; routine internal stages do not need a new permission question.
+
+Use approximately 7.5-8.5 studs from boot sole to the highest hat point as a starting size, adjusting to match the image and compare sensibly with the existing Sovereigns. Treat these as art proportions, not a new gameplay size or balance decision. Measure the finished rig rather than copying another unit's height attributes.
+
+Keep him tall and lean. The coat shoulders and hat provide breadth; the waist narrows; the coat tails flare back and outward. He has a narrow ribcage and long limbs, not a barrel-shaped armoured torso. Hands can be slightly enlarged so their skeletal construction and weapon grips remain legible.
+
+The hat is broad enough to read instantly, but should not force every portrait to zoom so far out that the skull disappears. The cutlass extends down and out with clear negative space from the leg. Keep its tip above the ground in the rest pose. The pistol's muzzle, stock, and grip must be readable outside the coat silhouette.
+
+The coat must have thickness and a designed volume. Its tails can suggest underwater drift through their rest shape, but should not form a rigid circular cone or huge horizontal fan. Leave believable room for knees, elbows, wrists, and weapon movement.
+
+Keep all equipment within an intentional bounding box. Invisible handles, attachments, or debug geometry must not sit dozens of studs away and ruin portrait framing.
+
+4. THE PART BUDGET: ABOUT 700 BASEPARTS
+
+Count actual BasePart descendants, including hidden rig carriers. Motor6Ds, WeldConstraints, Attachments, emitters, lights, folders, and scripts are not BaseParts and do not inflate this number. A static duplicate, a preview floor, or hundreds of fake particles do not count as character detail.
+
+Aim for roughly 650-750 BaseParts, with 700 as the planning target. Small deviations are acceptable if they visibly improve the model; explain any significant deviation. Do not pad the model to an exact number or reduce the whole silhouette to a handful of blocks merely to stay cheap.
+
+Suggested allocation, summing to 700:
+
+  Structural carriers / rig roots                         28
+  Skull, jaw, teeth, eyes, exposed neck                    64
+  Tricorn, brim, band, insignia, local hat ornament         62
+  Ribcage, spine, sternum, chest soul geometry             58
+  Upper greatcoat, collar, lapels, straps, belt             92
+  Lower coat, segmented tails, lining, torn hems          112
+  Epaulettes and shoulder layers                          42
+  Arms, bracers, skeletal hands                           78
+  Legs, boots, buckles, soles                             52
+  Complete cutlass                                        44
+  Complete flintlock                                      38
+  Compass and remaining chains / sea growth               30
+                                                        ---
+                                                        700
+
+This is an allocation guide, not a requirement to cut a good skull down to precisely 64 parts. Move parts between categories as needed. Count barnacles or trim within the region where they are built; do not double-count them in the final 30. Include your measured final category totals in the handoff.
+
+Make most of the geometry serve major and medium forms. Limit tiny rivets, repeated teeth, chain segments, and edge strips where their cost exceeds their visible benefit. A sovereign's detail should still look intentionally designed at normal playing distance.
+
+5. THE SKULL AND FACE
+
+Give the skull real structure in three dimensions:
+
+- A shaped cranial mass with a forehead, temporal sides, and rear volume.
+- Dark recessed sockets with brow overhangs and separate angular cheekbones.
+- A tapered nasal cavity, not a round nose or two painted dots.
+- A maxilla and a separate lower jaw with visible negative space.
+- A readable row of teeth, with a few grouped pieces where sensible; avoid a smooth white smiling rectangle.
+- A chin, mandibular corners, and a narrow skeletal neck with a few vertebral forms.
+
+Build cavities by arranging pale bone around dark inset geometry. The head must remain recognizably skeletal with the eye glow off. Avoid an ivory sphere with two bright dots, a friendly grin, or a fleshy face painted white.
+
+The eyes sit back in the sockets. Use small, saturated sea-green luminous shapes with a controlled brighter centre rather than two enormous Neon balls spilling out of the head. Brow shape and socket depth should give him a severe expression without animated cartoon eyebrows.
+
+The jaw should have its own Motor6D at an anatomical hinge. It can remain still for this pass, but the later finisher line must not require rebuilding his head. Teeth on the lower jaw belong to the jaw assembly. Teeth on the upper jaw belong to the skull.
+
+Use weathered ivory with a darker bone shade beneath cheekbones and around recesses. Keep the face brighter than the coat so it reads under actual game lighting. Avoid using excessive white Neon to simulate bone.
+
+6. THE TRICORN: HIS MOST IMPORTANT DISTANT READ
+
+Construct a convincing three-cornered hat with a visible crown, raised and folded brim, asymmetrical battered tips, and thickness. A flat triangular plate balanced on the skull is insufficient.
+
+Use a small number of substantial wedge/plate groups to establish the crown and brim, then a restrained segmented brass edge. Break or interrupt the trim where the hat is damaged. One corner can droop or split slightly more than the others, as in the image.
+
+The front skull-and-anchor insignia should read as a deliberate badge: an anchor shank, crossbar, curved/fluked ends, and a small skull. It should remain recognizable without requiring a texture or external image asset. Keep it flatter and smaller than the main face.
+
+Add the hatband, a few small rings or chain links, and a clustered barnacle patch near one upper side. Seaweed can hang from a damaged edge. Protect the clean outer tricorn silhouette; a mass of uniform spikes or growth on every edge would obscure it.
+
+Mount the entire hat on its own Hat Motor6D from the skull. Its rest pose is seated naturally on the head, not hovering. Put all hat trim and attached growth under that assembly so the future hat catch can move the complete object. This stage only needs a clean detachable assembly; do not implement the entire finisher or an elaborate runtime reparenting system.
+
+7. RIBCAGE AND THE DROWNED SOUL
+
+The coat opening must reveal an actual skeletal chest with a sternum, paired ribs, dark internal space, and a suggestion of spine behind it. Use curved-looking ribs made from economical angled segments, thick enough to read and separated by visible gaps.
+
+Keep the ribs narrow and anatomically suggestive. Do not replace the chest with a green crystal glued over a solid breastplate. The viewer should see ghost light through the bones.
+
+Build a compact, irregular green soul core behind the sternum and a few subordinate luminous slivers deeper in the chest. The geometry should suggest an internal flame or captive soul without making the whole torso transparent. If a subtle emitter is used, the chest must still work with that emitter disabled and inside a ViewportFrame.
+
+Dark inner carriers must conceal holes in the construction when seen from the side while preserving intended rib gaps from the front. Keep shoulder and waist motion from exposing a giant featureless block behind the open chest.
+
+8. GREATCOAT, COLLAR, LAPELS, AND BELTS
+
+The coat is a ruined officer's garment with a clear tailoring hierarchy:
+
+- A high flared collar behind and beside the skull, with a dark lining and a narrow edge treatment.
+- Broad lapels that turn outward and reveal thickness instead of sitting as coplanar rectangles.
+- A shaped upper back and shoulder yoke visible in the rear view.
+- Front opening framing the chest; substantial brass fastening tabs on one side and a coherent corresponding structure on the other.
+- A diagonal leather baldric with a buckle crossing the exposed chest without hiding the soul core completely.
+- A waist belt that actually wraps around the body, with a buckle, loops, and holster attachment points.
+- A few torn sleeve edges, overlapping cuffs, and controlled material changes.
+
+Use broad overlapping panels, shallow wedges, folded edge strips, and partial trim. Vary panel values enough that black-on-black layers remain visible. Make cloth tears through silhouette changes and deliberate gaps; random bright shards sprinkled over a slab will not read as torn fabric.
+
+Put torso details on the torso, belt details on the pelvis/belt assembly, and sleeve details on the corresponding arm segment. Do not weld a decorative cross-body strap to both independently moving body sections. If a strap crosses the waist, split it visually at a buckle or overlap so the rig can bend naturally.
+
+Keep brass old and restrained. There should be warm metal at buttons, trim, buckles, guard, and badge, with small greener corrosion patches. A bright gold outline around every coat panel would flatten the material hierarchy.
+
+9. THE LONG COAT TAILS AND UNDERWATER DRIFT
+
+The lower coat is a major part of the 700-part investment. Study the rear view: layered hanging tails, overlapping lengths, torn ends, and sea-green interior surfaces.
+
+Use around 8-12 major tail panels distributed around the hips, with the front opening clear. Give the most visible longer panels a second articulated lower segment. Small intermediate strips can be welded detail rather than separate physics objects. Aim for roughly 16-24 cloth joints overall if that produces the best result; the precise count is less important than a coherent rig and affordable secondary motion.
+
+Each panel needs a physical role: outer cloth mass, lining where exposed, one or two fold forms, selected edge trim, and a jagged hem. Avoid coplanar front/back layers that flicker. Shape the tails with a little sweep and taper so they feel waterlogged and suspended, rather than like identical straight rectangular boards.
+
+Use asymmetry in damage, lengths, and growth. Keep the garment's overall balance and the recognizability of an officer's coat.
+
+The tail rig must support gentle lag during turns, a wider spread during future ascent, and a gradual settle. Adjacent panels should not all swing as one synchronized fan. In the finished rest pose, they should not intersect the calves, boot soles, pistol, or cutlass. Test the actual limb/cloth sweep rather than judging only the builder's default camera.
+
+10. EPAULETTES, ARMS, BRACERS, AND SKELETAL HANDS
+
+Build substantial officer epaulettes with a shaped backing plate, rim, and a small grouped fringe. Brass fingers/fringe can be short repeated rods or tapered shapes; keep them clustered under the shoulder edge instead of making giant spiky pauldrons.
+
+Shoulder pieces must follow the correct arm or torso section, with sufficient clearance for the pistol aim and the raised-cutlass order. They should not pass through the high collar when the arm lifts.
+
+Sleeves are fitted at the upper arms, worn at the elbows, and interrupted by blackened metal bracers. Give each bracer an outer plate, smaller overlapping sections, bands or straps, and a few legible rivets. Preserve the distinction between cloth and metal.
+
+Hands are visibly skeletal: palm/metacarpal structure, four fingers and a thumb, separated knuckle shapes, and a believable curved grip. Keep detail concentrated on the visible knuckles and finger segments. You do not need a Motor6D for every phalanx, but a rigid anonymous mitten is insufficient for this unit.
+
+Model fingers curled around the cutlass handle and pistol grip, with the thumb opposing the fingers. The weapon must contact the hand correctly in side view as well as front view. Keep fingertips out of the trigger guard/barrel and preserve a visible trigger area. Future hand pose changes can be supported by one economical grip/finger control if useful; do not add dozens of idle per-finger animations merely to inflate the rig.
+
+11. LEGS AND BOOTS
+
+The lower body should feel narrow and load-bearing. Use shaped thigh and shin carriers under worn trousers, dark cloth between boot and coat, and separated knees that can bend.
+
+Boots need a cuff, layered shaft, several substantial straps/buckles, a shaped instep, a forward toe, a heel, and a visible sole. Use shallow layered geometry to imply worn leather. A long rectangular block with three gold squares on it is not a finished boot.
+
+Keep the soles on the intended floor plane in the static reference stance. The coat may drift but his neutral model stands with weight. Any later finisher ascent is a performance state, not a permanent enormous hover offset. Add a small barnacle patch to one boot as in the art, without covering every surface.
+
+Use ankle joints if they materially help the later ascent and grounding. Set the initial pivots sensibly and keep the heel/toe geometry with its foot assembly.
+
+12. THE CUTLASS
+
+This is the RIGHT-hand weapon and the future finisher command prop. Build it as a separate complete assembly on a CutlassRoot, with a Cutlass Motor6D from RHand.
+
+Give it:
+
+- A substantial curved blade built from a few deliberately aligned segments and wedges.
+- A clear spine, thinner cutting edge, taper, and an intentionally shaped tip.
+- A darker blade body with a thin restrained sea-green supernatural edge.
+- A tarnished brass basket/knuckle guard with enough open space to see the hand.
+- A textured-looking grip through a few diagonal wraps or bands, a pommel, and the guard-to-grip connection.
+- A little corrosion or age, placed coherently rather than random black/green noise.
+
+The edge should remain continuous when viewed close up. Avoid gaps between blade segments, overlapping transparent glow slabs, a sword as thick as his forearm, or a blade bent like a serrated stairway.
+
+Add attachments BladeBase, BladeTip, and CommandPoint, named and oriented consistently. They provide future trail and gesture hooks, but their existence does not mean trails should always be on. Keep the weapon at a lowered outward diagonal in the reference rest pose, clear of the leg and floor.
+
+13. THE FLINTLOCK
+
+This is the LEFT-hand weapon. Build it as its own assembly on PistolRoot, with a Pistol Motor6D from LHand. It should be an old, heavy, prestigious naval pistol, visibly distinct from Veyr's arcane rifle or a modern handgun.
+
+Include a shaped wood/dark stock, curved grip, butt cap, lock plate, cock/hammer, flint suggestion, frizzen/pan silhouette, trigger guard, barrel bands, and a thick barrel with a properly recessed dark muzzle. Use an economical segmented ring or surrounding metal plus a black inset for the muzzle; an exposed solid cylinder end is not a convincing bore.
+
+Antique brass and worn iron should read independently. The barrel can be a little oversized to suit the proposed supernatural cannon shot, but remains a pistol, not a shoulder cannon permanently attached to his arm.
+
+Use an independent PistolHammer joint if the small moving mechanism is worth animating later. Put Muzzle and Grip attachments in useful local frames. The muzzle's forward direction must be documented; if the project's effects assume -Z, conform to that rather than silently choosing another axis.
+
+At rest the pistol points safely down and slightly away from the body, matching the image. It must be possible to raise it to a firing pose without the hammer clipping the collar or the muzzle passing through the opposite arm. Add an unobtrusive left-side holster/socket for future stowing before the compass gesture. Do not build a duplicate hidden pistol solely to fake that future operation.
+
+The earlier brainstorm called his basic attack Dead Reckoning, but Veyr already uses that name in the current repository. Do not add a duplicate ability name to shared data; this model stage does not decide the final basic-attack name.
+
+14. COMPASS, CHAINS, BARNACLES, AND SEAWEED
+
+The compass is a small hero prop at the waist. Give it a brass housing, dark face, a simple cardinal/needle construction that reads at close range, and a hinged lid. Put it on a CompassRoot connected to the belt/pelvis, with a separate CompassLid joint and a documented left-hand grip/socket attachment for later transfer.
+
+This does not need runtime hand transfer in the current pass. It does need to be a coherent object, rather than a decal-like disc trapped inside the belt. Budget a real lid so the future finisher's closing-compass beat is possible.
+
+Use a few meaningful chain runs: a waist/compass chain, a short hat chain, perhaps a damaged loop beside the hip. Model readable links in visible places, with simplified links or bars where tiny. Use curved segment placement with slight irregularity, not a long perfectly straight ladder. Weld each run to its intended carrier or use a small number of controlled secondary joints; do not introduce physical dangling constraints across the whole character.
+
+Barnacles should look like marine growth: a few short tapered or faceted pale shells with darker recessed centres, differing sizes, growing in patches on plausible exposed surfaces. They should not become white polka dots or a uniform necklace of identical spheres. Group them on hat, one shoulder, and a boot, with only a little growth elsewhere.
+
+Seaweed should be sparse, flat, torn, and desaturated. Use a few thin strips from selected hat/shoulder/hem points, welded or given economical joints if they improve the preview. Keep the skull, chest, and hand silhouettes clear. The model must remain a captain wearing a coat, not a walking bush of kelp.
+
+15. MATERIALS, PALETTE, AND REAL LIGHTING
+
+Match the approved art through a controlled hierarchy. Suggested starting colours, to tune in the actual scene:
+
+- Main coat: charcoal around RGB 20, 25, 26.
+- Raised cloth panels: RGB 34, 42, 42.
+- Deep recesses: RGB 10, 15, 17.
+- Inner lining: desaturated dark sea green around RGB 25, 65, 59.
+- Bone: aged ivory around RGB 184, 179, 151, with darker recessed bone.
+- Brass: weathered ochre around RGB 137, 111, 64, with selective lighter edges.
+- Blackened iron: dark grey around RGB 42, 48, 48.
+- Verdigris: muted green around RGB 50, 90, 77.
+- Supernatural sea green: saturated mid-value green/cyan, with a small pale hot core.
+
+These are starting values, not approved exact swatches. The actual scene's lighting and bloom decide the final tuning. Separate dark surfaces by value and geometry. Do not let the coat collapse into a featureless black silhouette, or compensate by making all brass white and all dark panels light grey.
+
+Prefer the project's existing Part / WedgePart / Cylinder / Ball approach, using SmoothPlastic, Fabric, and restrained Metal where appropriate. Material choice should support readable forms. Use modest reflectance; inventory portraits remove reflectance, so geometry and colour must carry their own contrast.
+
+Most surfaces stay opaque. Neon is concentrated in eye sockets, the chest interior, and a thin sword edge. Avoid transparent full-body duplicates in the base form. His base form already has ghostly green energy; the separate level-10 awakened form will later use the game's violet shadow vocabulary while retaining his sea-green identity accent.
+
+16. RIG, HIERARCHY, AND ENGINE CONTRACTS
+
+Follow the project's procedural rig conventions exactly where they exist:
+
+- Front = local -Z; anatomical right = local +X; up = +Y.
+- HumanoidRootPart is the model's PrimaryPart.
+- The design floor is y = 0; root height is measured from that floor to the root's actual rest position.
+- Motor6D rest relations must reconstruct the built pose at identity Transform. Bake the intended stance into geometry/C0/C1 consistently; do not require animation code to rescue a broken rest pose.
+- Use unique joint names: the animator indexes joints by name, so duplicated generic names can silently overwrite entries.
+- Standard joints: Root, Waist, Neck, LShoulder, RShoulder, LElbow, RElbow, LWrist, RWrist, LHip, RHip, LKnee, RKnee, and optional LAnkle/RAnkle.
+- Additional joints: Jaw, Hat, Cutlass, Pistol, optional PistolHammer, Compass, CompassLid, and systematically named coat/seaweed controls.
+- Every decorative group has one clear carrier. A piece should not have competing welds to both sides of a Motor6D.
+- Root and limb carriers are compact, invisible where appropriate, and included in the actual part count.
+
+Suggested skeleton layout, adapting names to existing code as needed:
+
+HumanoidRootPart -> Root -> Hips/Pelvis -> Waist -> Torso
+Torso -> Neck -> Skull -> Jaw and Hat
+Torso -> each Shoulder -> UpperArm -> Elbow -> Forearm -> Wrist -> Hand
+RHand -> Cutlass -> CutlassRoot and all blade/guard details
+LHand -> Pistol -> PistolRoot and all pistol details
+Pelvis -> each Hip -> Thigh -> Knee -> Shin -> Ankle -> Foot
+Pelvis -> Compass -> CompassRoot -> CompassLid
+Pelvis/appropriate cloth carrier -> indexed coat-panel joint chains
+
+Set Rig = "Procedural", BuiltBy = "build_orvoss", and accurately measured RootHeight / Height attributes. If you add Pose = "Admiral", implement the minimal corresponding handler or explicitly leave the preview untagged and static; an invented string is not a working animation system. Do not set AttackStyle to an existing unrelated style merely to make it move.
+
+Keep proposed future AttackStyle names out of active runtime dispatch until implemented. In the model-only pass, the correct result can have no AttackStyle at all. StunCore/StunSize may be supplied if measured and useful, but do not copy a rifle-oriented bounding box from Veyr.
+
+Runtime model parts must be noncolliding, massless where expected, unanchored, and connected through the correct welds and motors. Use CanTouch=false and CanQuery=false for cosmetic geometry. For a static staged preview, anchor only its root so the rig can still be inspected; do not bake all limbs permanently anchored into the source model. Existing publish_unit_models.lua anchors published portrait copies, and UnitPortrait unanchors animated copies; respect those distinct use cases.
+
+Do not add a Humanoid, per-limb BodyMovers, individual collision hulls, or a script inside the model. Do not weld all limbs directly to the root. The production Army already supplies the movement block and attaches the root; never create a competing movement system for Orvoss.
+
+17. FUTURE ANIMATION REQUIREMENTS TO SUPPORT NOW
+
+Make room in the rig for these beats without implementing their complete gameplay:
+
+- Quiet, proud standing idle; only slight head/body settling.
+- Left-arm pistol raise, recoil, and relaxed return.
+- Right-arm cutlass lift above shoulder height, hold, then a decisive lowering gesture.
+- Head look upward toward the fleet.
+- Compass held/closed with the left hand after stowing the pistol.
+- Complete hat lifted from the skull and later caught/reseated.
+- Whole-body ascent with long coat tails spreading and boots hanging below.
+- Smooth return to a grounded rest pose.
+
+Perform limited joint-pose checks on disposable preview clones, then restore them. Verify the cutlass can clear the hat brim, the high collar allows the pistol aim, and the sleeves/epaulettes do not break at raised shoulders. Use realistic intermediate angles; do not judge only two static endpoints.
+
+If you add a small idle preview, use the existing client animation ownership and keep it self-contained. Follow Knell's momentum rule: springs or continuous smooth curves, cloth lag, no snapping back to rest. Never let a separate preview loop and UnitAnimator both write the same joint. A small static preview with rigorous pose checks is better than quietly claiming a complete animation kit that does not exist.
+
+18. THE FINISHER CONTEXT: MODEL HOOKS, NOT THIS BUILD'S DELIVERABLE
+
+The agreed finisher concept is THE LAST BROADSIDE, roughly 65 seconds. Orvoss closes his compass; black fog and a spectral ocean appear; his drowned fleet rises into the sky; he commands a rolling cannon barrage with his cutlass; anchors drag the ruined gate into the deep; he catches/reseats his hat after landing.
+
+The user specifically corrected the staging: ships must show their enormous BROADSIDES and stacked gun decks. The ocean/horizon is high beyond the gate and angled toward the battlefield; the flagship crosses in front and slightly overhead, with a clear low three-quarter view of its hull side. The eventual camera must not spend the reveal staring only at the bottoms of ships. Keep this as documented future direction.
+
+For this character build, the useful consequences are simply clear command poses, readable skull/hat silhouette from a low angle, an articulated cutlass hand, a stowable pistol assembly, a closing compass lid, a detachable hat assembly, and cloth that can trail during ascent. Do not attach a permanent miniature armada or giant sea plane to the character model.
+
+19. REUSABLE BUILDER AND SAFE ITERATION
+
+Write tools/studio/build_orvoss.lua. Keep the implementation readable with local palette/proportion constants, helper functions, tab indentation, and the project's -- ==== section banners. Prefer named construction stages over hundreds of unexplained coordinates in one block.
+
+Use deterministic random placement where small organic variations are useful. Re-running the builder should reproduce the same designed character, not a completely different field of barnacles every time.
+
+Use semantic names or a lightweight category attribute so details can be selected and counted. Give joint names and attachment names a stable contract. Document the assembly parent and local forward axis for each hero prop near its construction code.
+
+Build the replacement off-tree and validate it before replacing ServerStorage.Models.Orvoss. If a hand-edited or unrecognized existing Orvoss is present, preserve it once as Orvoss_Old, following the project's established provenance pattern. Replace only the builder's own prior output on normal reruns. Do not delete unrelated models, previews, or assets.
+
+Resolve all function/local declaration order correctly; Luau functions cannot use a later local binding as though it were already in scope. Handle zero-length vectors and near-parallel lookAt/up vectors in bar/chain helpers. Use intentional offsets between layered surfaces to avoid z-fighting.
+
+Use native primitive geometry and existing project textures where appropriate. Do not quietly substitute a Creator Store pirate, an externally uploaded mesh, unlicensed texture, or a single textured shell for the requested detailed model. External asset uploads and dependencies are not necessary for this pass.
+
+Return a concise build report with actual BasePart, Motor6D, attachment, and emitter counts plus bounding dimensions and missing-connection diagnostics. Report what exists, not just the planned totals in a comment.
+
+20. STUDIO PREVIEW, PUBLICATION COPY, AND SCREENSHOTS
+
+Run the builder through Roblox Studio MCP in Edit mode following CLAUDE.md. Scripts belong in tools/studio or src as appropriate; do not edit Rojo-owned Source through Studio.
+
+Stage a disposable clone in a clearly named Workspace.OrvossPreview folder at a deliberate safe display position. Do not change the production model's local modelling coordinates to place the preview. A simple existing floor and lighting are enough. Avoid changing the whole game's Lighting or rebuilding the plaza just to make a screenshot look good.
+
+Capture useful images with the Studio window visible:
+
+1. Full-body front three-quarter, near the approved art's view.
+2. Rear three-quarter showing coat tails and yoke.
+3. Head/hat/collar close-up.
+4. Hands and both weapons close-up.
+5. A scale comparison alongside disposable Malak/Veyr clones if available.
+6. At least one normal gameplay-distance view under the actual scene lighting.
+
+Assess screenshots yourself and fix significant shape, palette, grip, and clipping problems before handing the model back. A returned screenshot alone does not prove the details were checked.
+
+Run tools/studio/publish_unit_models.lua after the finished model is built, so ReplicatedStorage.UnitModels.Orvoss exists. This updates the in-place client model library; it is not permission to publish the experience to Roblox. Inspect the current publisher before running it, since it rebuilds the client model folder.
+
+Use an isolated portrait preview to exercise UnitPortrait with Orvoss, including static framing and an animated WorldModel if an idle handler exists. Do not add fake production inventory records or permanently alter the player's save just to view the art. With no gameplay definition, do not claim the production hotbar/held placement/army path has been fully tested. Verify the model contracts through disposable clones and accurately list remaining integration work.
+
+21. MEANINGFUL VERIFICATION
+
+Complete the following checks in Studio, preferably summarized by a reusable small validation helper rather than a large new test framework:
+
+- Actual base-model BasePart count is around 700, with sensible category totals and no filler geometry.
+- PrimaryPart and expected rig attributes exist and are internally consistent.
+- All parts are connected to the root through the intended rigid/motor assembly graph; no orphan teeth, floating cuffs, detached barnacles, or second anchored islands.
+- Joint and attachment names expected to be unique are unique.
+- No prohibited model scripts, Humanoid, accidental collision, or wrong anchored state in the source template.
+- Boot soles meet the intended y=0 floor plane in the rest stance; RootHeight / Height agree with measured geometry and production conventions.
+- The model clones, PivotTo-transforms, and ScaleTo-scales without leaving decorations behind; check at least one smaller portrait-scale copy.
+- Rotating the whole model about Y preserves all attachments and geometry relationships. Avoid world-axis assumptions.
+- Right wrist/cutlass, left wrist/pistol, hat, jaw, and compass lid each move their correct complete assembly on a disposable test copy.
+- Coat segment pivots are at plausible hems/hinges, and adjoining pieces remain attached through the test range.
+- Part count, hierarchy, and appearance remain stable after a second builder run; no duplicate Orvoss entries or accumulating preview clones.
+- Eyes and chest remain legible with particles off; weapons and face remain readable in the existing portrait renderer.
+- Real game lighting preserves coat folds, dark metal, bone, and brass; no dramatic bloom clipping or flickering coplanar trim.
+
+If src changes are needed, wait for Rojo sync before starting play, then check get_console_output after the test and stop play. Inspect runtime state through instances; requiring a module via MCP gives a fresh module instance rather than the live singleton. Do not modify/save-reset the user's test profile unless separately authorized.
+
+If Studio is genuinely unavailable, finish the builder, static review, and documentation, then clearly state that execution, visual inspection, and runtime checks remain unverified. Do not describe a model as built in Studio when only its script exists.
+
+22. DOCUMENTATION AND HANDOFF
+
+Update docs/orvoss.md with the implemented state: builder path, actual counts/dimensions, palette, rig and attachment names, pose choices, preview location, screenshots if saved, checks completed, and known visual issues. Update docs/models.md with a concise model entry. Update docs/backlog.md only as needed to record this session's actual result and next review step. Keep CLAUDE.md concise; this character does not require expanding the every-session guide.
+
+Distinguish these states accurately: model script written; model built in ServerStorage; client copy rebuilt; screenshots inspected; pose checks passed; runtime idle tested; gameplay integration pending; awakened form pending; fleet/arrival/finisher pending.
+
+Leave a single clearly labelled review preview if useful and tell the user where it is. Remove only your redundant temporary clones and test rigs. Remind the user that place-only models must be saved in the Studio place file; do not claim the Lua source alone persists them, and do not publish the experience or make a commit.
+
+The final handoff should be brief: what was built, actual part count, a few review images, what was verified, and any material remaining issues. The detailed instructions belong here and in the project docs, not in a huge final chat report.
+
+QUALITY BAR
+
+From across the lane: tricorn, skull, high collar, long torn coat, cutlass, and cold green chest identify Orvoss immediately.
+From normal play distance: the layered naval tailoring, brass hierarchy, skeletal hands, and weapons feel finished.
+In a close-up: the skull has depth, the gun has a real muzzle and lock, the sword has a shaped guard, and marine growth looks intentional.
+From behind: the coat and hat remain as carefully designed as the front.
+With every particle disabled: he still looks like the extraordinarily rare Drowned Admiral in the approved art.
+In motion tests: all those details follow the correct parts, with a rig that will support his eventual command of the Blackwake fleet.

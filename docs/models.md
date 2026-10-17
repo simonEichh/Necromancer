@@ -4,6 +4,7 @@ Moved out of CLAUDE.md. Read before building or changing a unit model, an attack
 
 ## Models and rigs
 
+- **Orvoss, the Blackwake** (`tools/studio/build_orvoss.lua`, Sovereign, 716 parts, model only, 2026-10-17): skeletal pirate admiral after the approved art; cutlass in the RIGHT hand, flintlock in the LEFT. Extra joints Jaw, Hat, Cutlass, Pistol, PistolHammer, Compass, CompassLid, LAnkle/RAnkle and 18 coat-tail joints (`Tail<i>`, `Tail<i>_2`); no Pose/AttackStyle yet. Rig, attachments and checks in docs/orvoss.md; `check_orvoss.lua` tests scaling and joints, `show_orvoss.lua` stages `Workspace.OrvossPreview`.
 - **Knell, the Mourning Bell** (`tools/studio/build_knell.lua`, Legendary Signature, ~276 parts, red and black): see docs/features.md "Signature specials" for its look, rig (Veil, BellSwing, BellClapper joints, rope Beam) and attacks. Rebuild + `publish_unit_models.lua` after changing it; the model carries `SpecialDuration` 11.
 
 The generic special-hit handler now captures its starting wall; remaining delayed hits are discarded if that wall breaks or the run resets. New visuals cannot damage a replacement wall while still playing at the old location. SpecialMeter honours an optional model `SpecialDuration` (Knell 7.8, Hush keeps its existing 8.8 s default).
