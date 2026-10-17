@@ -67,6 +67,29 @@ slit mouths. Neon only in the eyes, chest, cutlass edge and compass needle.
 - At rest the hands are fairly close to the coat. The pistol is rather long and its grip is hard to see from the front.
 - The tails' clearance was only checked by eye (rest pose and a spread pose), not tested in motion.
 
+## Agreed next step: the idle animation (2026-10-17, not built)
+
+Agreed with the user: the base layer plus gestures 1, 3 and 4 (the hammer check is dropped: too small to read).
+
+- New `Pose = "Admiral"` branch in `src/client/Modules/UnitAnimator.lua` (or its own module like
+  `MarksmanAnimator` once attacks exist); set the Pose attribute in `build_orvoss.lua`. All motion on springs or smooth
+  continuous curves, never snapping back to rest (Knell's rule); make the first pass slower than seems right.
+- **Base layer, "sea legs":** a slow deck roll (weight shifting side to side, a little fore and aft, a period of about
+  6-7 s; hips and chest out of phase, the knees giving slightly). The skull counters the roll and stays level, like a
+  sailor keeping the horizon. The coat tails drift as if underwater (soft, slow, low-damping springs, each panel out of
+  phase, a gentle lift / spread / settle; use the `Tail<i>` / `Tail<i>_2` joints and `CoatAngle`). The weapons hang
+  heavy; the cutlass tip lags the roll.
+- **Gestures**, one every 10-15 s at random, never the same twice in a row:
+  1. Brim push: he raises the flintlock and pushes the hat brim up with the barrel (a small Hat joint lift), then
+     lowers it slowly.
+  3. Listening to the fleet: the head turns slowly to one side and up, holds about 2 s, the jaw opens a hair as if
+     about to give an order, then returns.
+  4. Compass glance: the head tilts down to the open compass on the belt; the needle twitches towards the gate (the
+     needle is welded to CompassRoot now: give it its own small joint if needed).
+- Test it on `Workspace.OrvossPreview` / the animated portrait. A preview loop and UnitAnimator must never both write
+  the same joint. The army walk can stay generic for now.
+- Also look at the coat tails from behind first: they were widened after the last rear screenshot.
+
 ## Character direction
 
 A tall, lean skeletal pirate admiral commanding the ghost fleet that sank with him. Ruined charcoal naval greatcoat,

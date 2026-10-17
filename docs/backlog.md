@@ -7,7 +7,7 @@ and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `
 
 `tools/studio/build_orvoss.lua` built 716 parts into `ServerStorage.Models.Orvoss` (state, rig contract and checks in
 docs/orvoss.md). The review copy is in `Workspace.OrvossPreview` (delete it before publishing). UnitModels was
-rebuilt. Next: the user's visual feedback, then a unit def, an idle/animator branch, the kit and the awakened form.
+rebuilt. Next (agreed): the idle animation, see docs/orvoss.md "Agreed next step". Later: the user's visual feedback, a unit def, the kit and the awakened form.
 
 ## Veyr, the Last Sight (2026-10-17: done but for sounds; details in docs/veyr.md)
 
