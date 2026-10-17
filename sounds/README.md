@@ -184,6 +184,31 @@ snap (29.8); 31-36 cold, mechanical (scan, lock-ons); 36-38 a breath; 38-42 full
 (the bow, the charge) and then SILENCE for ~0.5 s before 46; 46-49.4 the beam; 49.4 the gate falls (biggest hit);
 50-54 a calm, cold resolve (he looks at what is left).
 
+## veyr/ (Veyr, the Last Sight: docs/veyr.md)
+
+His sound: quiet, precise, supernatural. One sharp event surrounded by silence, never noisy or busy. Every sound gets a
+cold glassy or soul-light layer (a ring, a shimmer, a breath) on top of the physical sound. No sci-fi lasers, beeps or
+mechanical servo whirs (that is Malak). Mono, one-shots trimmed tight at the start. The `Sfx` name is the slot in
+`src/client/Modules/Sfx.lua`; "placeholder" means a borrowed sound plays there for now.
+
+| File | Sfx slot | Length | Sound | Used in | Prio | Search terms |
+|---|---|---|---|---|---|---|
+| `crack.ogg` | `veyr_crack` (empty) | 1-2.5 s | one heavy rifle shot: a sharp, dry crack, then a short ghostly tail (a whoosh or shimmer that rings out) | every basic shot, the special, the finisher's shot | A | "sniper rifle shot", "rifle crack reverb tail", "magic gunshot", "arcane shot" |
+| `ring.ogg` | `veyr_ring` (placeholder: rune_click) | 0.2-0.6 s | a small glassy "tink": crystal, a tuning fork, a wine glass struck lightly | each sight opening, the shards clicking in, the glints, the tink after the bolt | A | "glass tink", "crystal ping", "magic chime short", "glass clink" |
+| `bolt.ogg` | `veyr_bolt` (empty) | 0.8-1.3 s | a bolt-action cycle: lift, back, forward, down (four clean metallic clicks/slides), heavy and old, not tactical | after every shot, his pull, the finisher's reload | A | "bolt action rifle reload", "bolt cycle", "rifle bolt" |
+| `impact.ogg` | `veyr_impact` (placeholder: shell_impact) | 0.5-1.5 s | a puncture: a sharp hit into stone, then a low thud/tail, no big explosion | where his round lands, the grave burst in his pull | A | "bullet impact stone", "heavy impact punch", "magic impact" |
+| `charge.ogg` | `veyr_charge` (empty) | 2-4 s | a rising inward tone: energy being drawn in, a reversed shimmer, a swell that ends abruptly | the special's build-up, the finisher's charge, before the shot in his pull | B | "reverse whoosh", "magic charge up", "energy build up", "riser" |
+| `collapse.ogg` | `veyr_collapse` (empty) | 1.5-3 s | a deep implosion: air sucked in, then a low soft boom; a dark soul-like tail | the special's fracture, the gate turning to ash | B | "implosion", "deep boom", "magic implosion", "sub drop" |
+| `ash.ogg` | (new slot) | 2-4 s | stone crumbling to dust, a dry hiss and rustle like sand blown away, a faint ghostly whisper in it | the gate turning to ash (finisher) | B | "stone crumble dust", "disintegrate", "sand dissolve", "dust blow away" |
+| `claws.ogg` | (new slot) | 1-2 s | bony fingers scraping and clawing out of earth, cracking soil | the skeletal hands tearing the slit open (pull) | B | "skeleton hands dirt", "zombie rising from grave", "bone scrape dirt" |
+| `ignite.ogg` | (new slot) | 1-2 s | a deep "whoomp" of soul fire catching, a breath of air outward | his eyes ignite, the ring of light (pull) | B | "magic ignite whoosh", "soul fire burst", "fire whoomp" |
+| `cloth.ogg` | (new slot) | 0.5-1.5 s | a heavy cloak snapping out in a gust | the mantle flaring out like wings (pull) | C | "cloak flap", "cape whoosh", "cloth flutter heavy" |
+| `glint.ogg` | (new slot) | 0.3-0.8 s | a bright sparkle "shing", like light catching a lens or a blade | the scope glints, the field of echoes (pull) | C | "glint sparkle", "shine sound effect", "sparkle shing" |
+| `rift.ogg` | (new slot; now tear_rumble / tear_crack) | 1.5-3 s | a thin, dark tear in the air: a low rumble and a crack, quieter and narrower than Malak's sky tear | the far opening in his pull | C | "dimensional rift", "portal tear", "reality crack" |
+
+Done: `voice_arrival.ogg` (pull: "Death is just the distance between us."), `finisher_seat.ogg` ("One round. That is all
+you deserve."), `finisher_bang.ogg` ("Bang."), `finisher_turn.ogg` (cut, not cued); originals in `_source/veyr/`.
+
 ## Preparing files
 
 Originals go in `_source/` (kept, not uploaded). `tools/audio/prep_sound.py` makes the game versions:

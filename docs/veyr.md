@@ -19,8 +19,10 @@ a corridor of sigils for the special, the whole sky as his scope for the finishe
 | Idle / glide / aim / recoil / bolt | done (`MarksmanAnimator.lua`), tuning |
 | Basic shot + mark | done (`Army.fireMarksman`, `VeyrShot.lua`, `VeyrSights.lua`) |
 | Special (The Long Goodbye) | done (`Army.startSpecial` army variant, `VeyrSpecial.lua`), tuning |
-| Finisher (The Final Horizon) | first full pass playing (`VeyrFinisher.lua`, `Army.checkFinisher`), polish next |
-| Pull cinematic, shop card/Codex, audio | to do |
+| Finisher (The Final Horizon) | done (`VeyrFinisher.lua`, `Army.checkFinisher`): voice lines, ash gate, reload ending |
+| Pull cinematic (A Sight Beyond the Grave) | approved for now (`VeyrArrival.lua`); pool weight 0.05 like Malak |
+| Gem Shop card, Codex abilities | done (GemShopPanel Skills, `Units.Abilities.Veyr`) |
+| Sounds | voice lines done; the rest: `sounds/README.md` "veyr/" (the user is looking) |
 
 ## Model and rig (`tools/studio/build_veyr.lua`, `build_veyr_shadow.lua`)
 
@@ -64,8 +66,8 @@ a corridor of sigils for the special, the whole sky as his scope for the finishe
 
 - Server `Army.fireMarksman` (own branch, AttackStyle "Marksman"): publishes AimPos, ShotImpact, ShotAt, then
   AttackCount; damage fixed at the shot, lands at `VeyrTimeline.impactAt(distance)` (FIRE 3.2 s + distance / 600) on
-  the wall he aimed at (dropped if it broke, the run reset or he was removed). attackCD 7.5, damage 637500 (85K DPS,
-  provisional; with the special's pauses his basics are ~91 % of nominal).
+  the wall he aimed at (dropped if it broke, the run reset or he was removed). attackCD 7.5, damage 700000 (93K DPS
+  nominal; with the special's pauses his basics are ~91 % of it, ~85K like Malak; tuned 2026-10-17).
 - Client `VeyrShot.lua`: scope glint, three focusing sights at the muzzle (`VeyrSights`), a small sight on the wall,
   the blast (star, flame spike, two shock discs, smoke, ground dust; owner-only shake), the round + glow + lingering
   pierced line, pressure rings, the sights blown forward; the impact (flash, shock discs, a spear of light out the back
@@ -77,11 +79,13 @@ a corridor of sigils for the special, the whole sky as his scope for the finishe
 
 ## Special: THE LONG GOODBYE
 
-- `Units.Veyr.special = { kind "LongGoodbye", cooldown 150, duration 13.5, army = { seconds 20, hits 80 % at IMPACT
+- `Units.Veyr.special = { kind "LongGoodbye", cooldown 150, duration 13.5, army = { seconds 24, hits 80 % at IMPACT
   9.05 s, 20 % at COLLAPSE 10.4 s } }`; timings in `VeyrTimeline.SPECIAL`. Army: ONE snapshot of the army's ordinary
   DPS at the start (multipliers applied once), all hits on the wall he aimed at, cancelled by a wall change, removal or
-  a finisher. It waits until his last basic shot has settled; basics pause for it. Verified: (85000 + 11) x 1.1
-  (marked) x 20 = 1.87M, dealt 1,496,205 + 374,051 at +9.09 / +10.43 s.
+  a finisher. It waits until his last basic shot has settled; basics pause for it. Verified (at 20 s, before the 2026-10-17
+  tuning): (85000 + 11) x 1.1 (marked) x 20 = 1.87M, dealt 1,496,205 + 374,051 at +9.09 / +10.43 s. Balance against
+  Malak: his Requisition 25 army-seconds / 150 s (+17 %) and aura +10 % vs Veyr's 24 / 150 s (+16 %) and the mark
+  (+10 % for 6 s of every 7.5 s, ~+8 %); own damage ~85K each.
 - Client `VeyrSpecial.lua`: the corridor is laid out at LAYOUT (1.15 s) level along his facing from his muzzle; the
   animator aims the bore exactly down it (measured: 0.00 deg, muzzle within ~0.1 studs). His six real shards fly out
   to the stations (joint transforms), six sigils open in gothic brackets (sized with the corridor's length), lock one
@@ -115,11 +119,13 @@ LOCK 18 (nine targeting lasers), SHIELD 19.5 (the keeper raises his hands, Hands
 (debris faster, light dashes drawn up the lasers, aura sparks, a camera orbit), STILL 27 (debris stops, lasers dim),
 LIGHT_RUN 27.6-29 (a light along every weapon, stock to barrel), FIRE 30 (nine rounds at once: impact frames = a white
 frame, a black frame with white speed lines, a hard black-and-white grade), IMPACT 30.45 (impact frames again, the scope
-picture shatters, the keeper's hands blown back, the gate in smoke), CRUMBLE 32 (the giants dissolve into falling
-sparks), TURN 32.5 / DESCEND 33-37.5 (he lowers the rifle, works the bolt, turns his back, drifts down to his perch while
-cracks spread over the gate), GATE_HIT 38 (the server breaks the gate: the black hole that opened at the hit swells,
-swallows the gate's chunks, implodes at 40.2 and bursts 40.6: a shockwave down the lane, a dust wall past his perch;
-the user replaced the pillar of light with it), FADE 40, END 45. One scope view only (the user): SCOPE_2 28.2-IMPACT, the camera locked at his eyepiece, his whole
+picture shatters, the keeper's hands blown back; the gate stands untouched but for one glowing pinhole), CRUMBLE 32
+(the giants dissolve into falling sparks), TURN 32.5 / DESCEND 33-37.5 (he drifts down to his perch, still on the gate,
+while a branching web of violet cracks spreads from the pinhole over the gate's real stones), GATE_HIT 38 (ALREADY DEAD,
+2026-10-17, the user's pick over the black hole, which replaced a pillar of light: the server breaks the gate; the client
+copies its parts at GATE_HIT - 0.4 and hides the real ones on this screen, then stone by stone, outward from the pinhole
+at ASH_WAVE_SPEED 26 studs/s, each glows, turns to ash and drifts away down the lane; an ash wave rolls past his perch),
+RELOAD 42.3, END 45. One scope view only (the user): SCOPE_2 28.2-IMPACT, the camera locked at his eyepiece, his whole
 model hidden on that screen meanwhile (he blocked the view). The camera path supports hard cuts (`cut = true` keys). Dropped on the way: the echoes, the giant sight on
 the gate, the frozen frame, the ring shatter ("scuffed").
 
@@ -133,6 +139,43 @@ it (this applies to Malak too). Unlock: `profile.finalHorizon` (default false, s
 
 Gameplay contract unchanged from the brief: gem unlock (provisional 1000, separate from Fleet Strike),
 gate at or below 20 % HP, the server holds the gate, one finisher per gate, first eligible commander throne wins.
+
+## Pull cinematic: A SIGHT BEYOND THE GRAVE (first draft 2026-10-17)
+
+`src/client/Modules/VeyrArrival.lua`, ~30 s + the usual absorb. Routing: `SovereignArrival.ARRIVALS` maps a Sovereign to
+its own arrival (`Veyr = VeyrArrival`); `SovereignArrival.play` hands the pull over when the FIRST Sovereign in the
+results has one (Malak keeps the ship); the server's `Digging` keeps the first Sovereign of a dig for `ArrivalShow`, so
+spectators get the same one. If it cannot play, GraveRolling falls back as before. DEV panel `Anim: Veyr Pull`.
+Beats (timeline constants at the top of the file): the bait; a small sight over the grave; far off (ECHO_OUT 150 beyond,
+ECHO_UP 46 above, ECHO_SIDE 22 across) a slim dark opening tears and a glint shows; a long lens on his **echo** (a ghost
+copy of his model: dark parts, his neon, a violet Highlight outline, 1.6x); six sights open along the line from the
+echo's muzzle to the grave while the camera rides it back; the echo fires his real basic shot (`VeyrShot` via
+ShotAt / ShotImpact on the clone): he shot his own grave open; impact frames (white, black), `GraveOpening.burst`; the
+echo fades, the opening closes; a shadow slit opens in the ground with low fog, his eyes first (EyeLight brightened),
+he rises out of it with the rifle held up (ShotAt held); the last sight shrinks round the muzzle, the bolt (ShotAt set
+to the bolt beat), a glassy tink; name, class and the raw odds; a last glint on his scope. His line starts
+`VOICE_LEAD` 1.5 s before he is fully out of the slit (the user's call) and ends about at the tink (~26 s in all). The camera starts revolving round him into the hero shot `ORBIT_DELAY` 1 s after the line
+starts (the user's call; the rifle close-up for the bolt was dropped for it).
+**Added 2026-10-17 (the user: "basically his special with a twist"):** a FIELD of 26 glints round the plot
+(FIELD_FROM 8.4, seeded by the grave's spot so every screen agrees) that lay faint lines on the grave and fire with him,
+their rounds breaking apart in flight; skeletal hands (procedural `buildHand`) claw up and tear the slit open; at
+IGNITE_AT his eyes flare, a ring of light rolls over the ground, the mantle flares out (model attribute `MantleFlare`,
+MarksmanAnimator) and the shards circle wide and click in one by one (`ShardsGatherAt`). It ends on the revolving hero shot
+after he is out (Continue 1.2 s after his line / the bolt); a finale where he aimed at the camera and cut to black was
+tried and cut by the user. Army units within NEARBY_HIDE 45 studs of the grave are hidden on this screen while it plays
+(they blocked the camera). ~29 s.
+Voice (the user wants a demonic undead voice): "Death is just the distance between us." Sfx slot
+`voice_veyr_arrival` (`sounds/veyr/voice_arrival.ogg`, 4.68 s, second phrase at 2.65 s, asset 110588920076095; ElevenLabs original in `sounds/_source/veyr/`).
+Pool weight still 0 (`RARITY_UNITS`) until the user approves the cinematic.
+
+**No turn (2026-10-17):** turning his back looked wrong (in place, and snapping back after the end), so the user cut it:
+he stays on the gate through the eruption and the scene ends on the reload, `FINISHER.RELOAD` 42.3 (the bolt beat at
+RELOAD_SLOW 0.65 speed, MarksmanAnimator), on a cut to a close shot of the receiver (like the seat at the start). The TURN beat is only the cut back to him now.
+
+**Voice lines (2026-10-17, `VeyrFinisher.LINES`, watchers only, subtitles like the pulls):** "One round. That is all you
+deserve." at MARKSMAN + 0.3 (the round seats on the second phrase), "Bang." at FIRE - 0.75. Files `sounds/veyr/finisher_seat|bang.ogg`
+(ElevenLabs originals in `sounds/_source/veyr/`), Sfx `voice_veyr_seat|bang`. A third line as he turns away ("Dead men
+don't need to fall quickly.", `finisher_turn.ogg`, asset 134071586633328) was cut: too much (the user).
 
 ## Sound
 

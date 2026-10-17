@@ -3,20 +3,22 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
-## Veyr, the Last Sight (third 2026-10-16 session, NOT committed; details in docs/veyr.md)
+## Veyr, the Last Sight (2026-10-17: done but for sounds; details in docs/veyr.md)
 
-Built: base + shadow models (`build_veyr.lua`, `build_veyr_shadow.lua`, published to UnitModels), `MarksmanAnimator`
-(IK grip, hover, low ready, aim, horizontal recoil, bolt), basic shot + the mark (`Army.fireMarksman`, `VeyrShot`,
-`VeyrSights`), the special The Long Goodbye (army-seconds, `VeyrSpecial`), the overwatch post + perch high off the
-lane, the finisher The Final Horizon (rebuilt to the user's version: aura, ascent, moon, eight giant rifles, lasers,
-quiet, impact frames, black hole; `VeyrFinisher`, `Army.checkFinisher` shared with Malak, `CinematicGuard`), the
-`finalHorizon` unlock (save/sync/BuyGemItem, 1000 gems), DEV: Tough wall button, Anim "Horizon". The user's test save
-has finalHorizon = true (bought with dev gems).
+Built and committed: base + shadow models, `MarksmanAnimator`, basic shot + the mark, the special The Long Goodbye, the
+overwatch perch, the finisher The Final Horizon (voice lines "One round. That is all you deserve." / "Bang.", the camera
+cut into the scope instead of the face close-up, no turning his back: it ends on a slow reload in close-up, the gate
+turns to ash stone by stone from a glowing pinhole instead of the black hole), the pull cinematic A Sight Beyond the
+Grave (`VeyrArrival`, routed by `SovereignArrival.ARRIVALS`; his echo shoots his own grave open, a field of 26 echo
+glints, skeletal hands tear the slit open, eyes ignite + ring + mantle flare + shards click in, his line "Death is just
+the distance between us."; nearby army units are hidden on this screen), pool weight 0.05 like Malak (each Sovereign
+now 1 in 52,000), Gem Shop Skills card + Codex abilities, damage tuned to Malak's level (700K / 7.5 s, special 24
+army-seconds). Voice files trimmed with `tools/audio/prep_sound.py shot` and uploaded with `upload_sound.py`.
 
-**Next for Veyr:** watch / tune the finisher (black hole size, the 38-41 s framing, the ascent camera), then the pull
-cinematic (stage G: own arrival + SovereignArrival routing; his pool weight is 0 until then), the Gem Shop Skills card
-and Codex text (Abilities entries), sounds (the user may provide `sounds/veyr/`), the remaining checks in docs/veyr.md
-(two Veyrs, rotated plot, Skip / Watch with a second player, both Sovereigns' arbitration), docs/models.md + features.md.
+**Next for Veyr:** sounds (`sounds/README.md` "veyr/": crack, tink, bolt, impact first; the user is looking), then the
+checks nobody did: two Veyrs on one plot, a rotated plot, a second player (Watch / Leave, the RarePull banner), Malak +
+Veyr on both thrones (the first throne's finisher wins), a real pull from a Celestial grave. His shadow form is still a
+first look.
 
 ## State at the end of the 2026-10-16 session (read this first)
 
