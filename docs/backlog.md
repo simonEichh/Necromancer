@@ -15,8 +15,8 @@ the distance between us."; nearby army units are hidden on this screen), pool we
 now 1 in 52,000), Gem Shop Skills card + Codex abilities, damage tuned to Malak's level (700K / 7.5 s, special 24
 army-seconds). Voice files trimmed with `tools/audio/prep_sound.py shot` and uploaded with `upload_sound.py`.
 
-**Next for Veyr:** sounds (`sounds/README.md` "veyr/": crack, tink, bolt, impact first; the user is looking), then the
-checks nobody did: two Veyrs on one plot, a rotated plot, a second player (Watch / Leave, the RarePull banner), Malak +
+**Next for Veyr:** listen to his sounds in game and balance the volumes (all twelve uploaded 2026-10-17, wired into the
+shot, special, finisher and pull), then the checks nobody did: two Veyrs on one plot, a rotated plot, a second player (Watch / Leave, the RarePull banner), Malak +
 Veyr on both thrones (the first throne's finisher wins), a real pull from a Celestial grave. His shadow form is still a
 first look.
 

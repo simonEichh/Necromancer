@@ -22,7 +22,7 @@ a corridor of sigils for the special, the whole sky as his scope for the finishe
 | Finisher (The Final Horizon) | done (`VeyrFinisher.lua`, `Army.checkFinisher`): voice lines, ash gate, reload ending |
 | Pull cinematic (A Sight Beyond the Grave) | approved for now (`VeyrArrival.lua`); pool weight 0.05 like Malak |
 | Gem Shop card, Codex abilities | done (GemShopPanel Skills, `Units.Abilities.Veyr`) |
-| Sounds | voice lines done; the rest: `sounds/README.md` "veyr/" (the user is looking) |
+| Sounds | done 2026-10-17 (`sounds/veyr/`, Sfx veyr_*; finisher: beds + beat one-shots in VeyrFinisher `LINES` / `BEDS` / `once`, tuned with the user: moon drone from the start (quiet), ambience bed off, aura lower + EQ bass, the build-up slowed to 0.6 to span the charge, the collapse at 0.375 + EQ bass from the shot cut at GATE_HIT, a deep boom (impact 0.45 + EQ) at the break, bolt sounds on the seat and the reload; no `cracks.ogg` yet) |
 
 ## Model and rig (`tools/studio/build_veyr.lua`, `build_veyr_shadow.lua`)
 

@@ -206,7 +206,34 @@ mechanical servo whirs (that is Malak). Mono, one-shots trimmed tight at the sta
 | `glint.ogg` | (new slot) | 0.3-0.8 s | a bright sparkle "shing", like light catching a lens or a blade | the scope glints, the field of echoes (pull) | C | "glint sparkle", "shine sound effect", "sparkle shing" |
 | `rift.ogg` | (new slot; now tear_rumble / tear_crack) | 1.5-3 s | a thin, dark tear in the air: a low rumble and a crack, quieter and narrower than Malak's sky tear | the far opening in his pull | C | "dimensional rift", "portal tear", "reality crack" |
 
-Done: `voice_arrival.ogg` (pull: "Death is just the distance between us."), `finisher_seat.ogg` ("One round. That is all
+**His finisher's own sounds (2026-10-17): all in but `cracks.ogg`** (prepared: `buildup` cut at its peak, 5.1 s,
+stereo, ends on the shot; `ambience` 24 s / `aura` 8 s / `moon` 8 s seamless loops faded in and out under the beats
+(watchers only, the ambience dips in the stillness); `launch` 1.6 s, `rifle_slide` 1 s, `circle`, `laser` 1.2 s, `wind`
+3.25 s (peaks ~3 s in, when the ash wave reaches him), `rocks` 3.5 s, `breath` 2 s; ids in `Sfx.lua` veyr_*).
+The original request: The Final Horizon has sound on only a few beats; these fill
+the rest (the existing sounds stand in where one is missing). Drop them in `_source/veyr/` (any name, say which is which).
+Search terms are Splice-style tags (sound categories, not descriptions); combine one with a mood tag like "dark",
+"cinematic", "horror" or "trailer", e.g. "dark whoosh", "cinematic sub drop".
+
+| File | Length | Sound | Used in | Prio | Search terms |
+|---|---|---|---|---|---|
+| `buildup.ogg` | ~6 s, stereo | a short, rising build-up that cuts off hard at its peak (no music under the rest) | the charge into the stillness, ends right before the shot (about 24 .. 30) | A | "string crescendo", "tremolo crescendo", "orchestral swell minor", "shepard tone riser", "rising glissando strings", "cluster crescendo", "brass crescendo stop" |
+| `ambience.ogg` | 20-40 s, seamless loop, stereo | a dark, low, steady bed under the whole finisher: a cold wind, a distant drone, a faint hollow choir; no melody, no beat | the whole finisher, quiet, for whoever watches | A | "minor drone", "pedal tone drone", "low cello drone", "dark ambient pad", "phrygian drone", "dissonant pad", "cluster chord pad", "tremolo strings pianissimo", "sul ponticello strings", "evolving pad minor" |
+| `launch.ogg` | 1-2 s | a powerful upward launch: a burst of air with a rising whoosh | he launches into the sky (ASCENT 7.5) | A | "whoosh", "riser whoosh", "swoosh up", "air burst", "cinematic whoosh", "transition fx up" |
+| `cracks.ogg` | 2-4 s | stone cracking slowly, with a glassy crackle in it | the crack web spreading over the gate | A | "foley crack", "ice crack", "glass foley", "crackle texture", "granular texture", "debris foley" |
+| `rifle_slide.ogg` | 1-2 s | a heavy metal piece sliding out and locking, an arcane shimmer on it | the giant rifles slide out of their circles (GIANTS_OUT 14.5) | A | "sword shing", "metal foley", "blade swipe", "metallic impact", "shimmer", "reverse cymbal" |
+| `moon.ogg` | 2-4 s | a deep, dark swell: a low choir or drone | the moon appears behind him (MOON 10.5) | B | "choir pad", "vocal pad", "dark drone", "swell", "reverse swell", "atmosphere pad" |
+| `circle.ogg` | 0.5-1 s | a magic circle snapping open: a short arcane whoosh with a chime | the eight magic circles (ARSENAL 13) | B | "magic fx", "chime", "bell hit", "glass hit", "sparkle", "shimmer one shot" |
+| `laser.ogg` | 0.5-1.5 s | a thin beam locking on: a short bright electric hum, not sci-fi | the targeting lasers reach the gate (LOCK 18) | B | "zap", "electric fx", "laser", "synth fx one shot", "glitch", "buzz" |
+| `wind.ogg` | 2-4 s | a long gust of wind rushing past | the ash wave blowing down the lane past him | B | "wind", "whoosh", "noise sweep", "white noise riser", "downlifter", "air texture" |
+| `aura.ogg` | 3-5 s, seamless loop | a low rumbling energy hum | his charge aura while the rocks circle (AURA 5.5 .. STILL 27) | C | "drone loop", "hum", "sub bass drone", "dark texture loop", "pad loop", "rumble" |
+| `rocks.ogg` | 1-3 s | rocks breaking loose and rumbling | the ground cracking under his perch, the rocks lifting | C | "debris", "rock foley", "rumble", "impact debris", "earthquake", "sub drop" |
+| `breath.ogg` | 1-2 s | a deep, slow undead exhale, dry and hollow | the stillness, right before "Bang." | C | "breath", "vocal fx", "creature vocal", "growl", "exhale", "horror vocal" |
+
+Done (2026-10-17, trimmed from the user's files in `_source/veyr/`): `crack` (1.8 s), `ring` (from 0.5 s, 0.6 s), `bolt`,
+`impact`, `charge`, `collapse` (3 s), `ash` (3.5 s of 40), `claws` (3 s; really an undead howl, the user kept it),
+`ignite` (from 0.85 s, just before its peak), `cloth`, `glint` (from 0.25 s: only the end of its reverse build-up, 0.55
+s), `rift` (2.2 s, cued 0.6 s early so it builds into the opening); ids in `Sfx.lua` (veyr_*). Also `voice_arrival.ogg` (pull: "Death is just the distance between us."), `finisher_seat.ogg` ("One round. That is all
 you deserve."), `finisher_bang.ogg` ("Bang."), `finisher_turn.ogg` (cut, not cued); originals in `_source/veyr/`.
 
 ## Preparing files

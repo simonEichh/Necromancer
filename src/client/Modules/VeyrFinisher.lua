@@ -71,15 +71,36 @@ local ASH_WAVE_SPEED = 26 -- studs/s: how fast the ash spreads out from the pinh
 
 -- his lines (sounds/veyr/finisher_*.ogg, demonic undead voice): only for watchers; a late Watch joins a line mid-way,
 -- Leave stops it. phrases: when each part of the subtitle starts (s into the clip) and how long it takes to appear
+local BUILDUP_PITCH = 0.6 -- (the build-up's playback speed: slower = longer and deeper)
 local LINES = {
 	{ sound = "voice_veyr_seat", at = F.MARKSMAN + 0.3, length = 3.82, -- (the round seats on "That is all ...")
 		phrases = { { at = 0, text = "ONE ROUND. ", reveal = 1.0 }, { at = 1.97, text = "THAT IS ALL YOU DESERVE.", reveal = 1.5 } } },
 	{ sound = "voice_veyr_bang", at = F.FIRE - 0.75, length = 0.88, -- (the word ends just before the shot)
 		phrases = { { at = 0, text = "BANG.", reveal = 0.4 } } },
+	-- (no subtitles) the flat sounds for watchers: his exhale in the stillness, the build-up that breaks off on the shot
+	{ sound = "veyr_breath", at = F.STILL + 0.2, length = 2.0 },
+	-- (the user: one from the start of the charge) the 5.1 s build-up played slower and deeper, from ~21.5 s to the shot
+	{ sound = "veyr_buildup", at = F.FIRE - 5.1 / BUILDUP_PITCH, length = 5.1 / BUILDUP_PITCH, pitch = BUILDUP_PITCH },
+	-- (the user: a bass after the bang, louder and bassier) the deep implosion far down under the shot, the lows boosted
+	-- (it holds until the gate starts turning to ash and is cut there: 3 s at 0.375 = 8 s, FIRE 30 .. GATE_HIT 38)
+	{ sound = "veyr_collapse", at = F.FIRE, length = 3, volume = 2.4, pitch = 0.375, bass = true, stopAt = F.GATE_HIT },
+	-- (the user: the bright stone break let it down) a deep boom as the gate starts turning to ash
+	{ sound = "veyr_impact", at = F.GATE_HIT, length = 1.1, volume = 2.2, pitch = 0.45, bass = true },
+	-- the bolt: when he seats the round, and the slow reload at the end (played slower to match it), its closing tink
+	{ sound = "veyr_bolt", at = F.SEAT - 1.0, length = 0.8, volume = 0.9 },
+	{ sound = "veyr_bolt", at = F.RELOAD + 0.3, length = 1.2, volume = 1.3, pitch = 0.7 },
+	{ sound = "veyr_ring", at = F.RELOAD + 1.9, length = 0.6, volume = 1.2, pitch = 1.7 },
+}
+-- the beds looping under it for watchers: fading in at `from`, out by `to`; `duck` dips it in the stillness before the shot
+local BEDS = {
+	-- (the ambience bed, off for now: the user was not sure about it)
+	-- { sound = "veyr_ambience", from = F.QUIET + 0.5, to = F.FIRE, fadeIn = 3, fadeOut = 0.5, duck = 0.7 },
+	{ sound = "veyr_aura", from = F.AURA, to = F.STILL, fadeIn = 1.5, fadeOut = 0.25, pitch = 0.85, bass = true }, -- (the user: bassier)
+	{ sound = "veyr_moon", from = F.QUIET + 0.5, to = F.STILL, fadeIn = 3, fadeOut = 0.4 }, -- (the user: from the start)
 }
 for _, l in ipairs(LINES) do
 	l.text = ""
-	for _, ph in ipairs(l.phrases) do
+	for _, ph in ipairs(l.phrases or {}) do
 		ph.count = utf8.len(ph.text)
 		l.text ..= ph.text
 	end
@@ -830,6 +851,34 @@ local function world(folder, ctx)
 			end
 		end
 
+		-- the beats' one-shots (for everyone, in the world)
+		local function once(key, at, fn)
+			if not st[key] and T >= at then
+				st[key] = true
+				if T < at + 0.5 then
+					fn()
+				end
+			end
+		end
+		once("sRocks", F.AURA, function() Sfx.playAt("veyr_rocks", ctx.floor, 1.2, 1, 900) end)
+		once("sLaunch", F.ASCENT_FROM - 0.45, function() Sfx.playAt("veyr_launch", chest, 1.4, 1, 900) end)
+		for gi, g in ipairs(giants) do
+			once("sCircle" .. gi, g.born, function() Sfx.playAt("veyr_circle", chest, 1, 0.9 + gi * 0.04, 900) end)
+			once("sSlide" .. gi, g.out, function() Sfx.playAt("veyr_rifle_slide", chest, 1, 0.85 + (gi % 4) * 0.06, 900) end)
+		end
+		for k = 0, 2 do
+			once("sLaser" .. k, F.LOCK + k * F.LASER_STEP, function() Sfx.playAt("veyr_laser", chest, 1.2, 1 + k * 0.08, 900) end)
+		end
+		-- (the wind peaks as the ash wave reaches him: its file peaks ~3 s in)
+		local windAt = F.GATE_HIT + 0.5 + math.clamp(ctx.laneDist / 110, 1.6, 3) - 3
+		once("sWind", windAt, function() Sfx.playAt("veyr_wind", ctx.ground, 1.5, 1, 900) end)
+		-- the charge's rising tone, cut off by the stillness
+		if not st.chargeSfx and T >= F.STILL - 3.6 then
+			st.chargeSfx = true
+			if T < F.STILL - 3 then
+				Sfx.playAt("veyr_charge", chest, 1.3, 0.85, 900)
+			end
+		end
 		-- ── fire: every weapon at once
 		if not fired and T >= F.FIRE then
 			fired = true
@@ -936,8 +985,8 @@ local function world(folder, ctx)
 			if T < F.GATE_HIT + 1 then
 				local g = st.P or ctx.gate
 				flash(folder, g, VIOLET_CORE, 1, 8, 0.3, 30, 8) -- (the pinhole goes out)
-				Sfx.playAt("gate_collapse", g, 0.7, 0.75, 900)
-				Sfx.playAt("veyr_collapse", g, 0.8, 0.6, 900)
+				Sfx.playAt("gate_collapse", g, 0.5, 0.55, 900) -- (lower and quieter: the boom carries the break)
+				Sfx.playAt("veyr_ash", g, 1.2, 1, 900)
 				task.delay(0.8, function() Sfx.playAt("keeper_roar", ctx.gate + Vector3.new(0, 30, 0), 0.9, 1, 900) end)
 				ctx.shake = 0.4
 			end
@@ -1321,6 +1370,7 @@ function VeyrFinisher.play(opts)
 	subStroke.Transparency = 0.15
 	subStroke.Parent = subLine
 	local voices = {} -- [line] = its playing Sound
+	local beds = {} -- [bed] = its loop handle
 
 	local watching = false
 	local watchStart = 0
@@ -1430,6 +1480,9 @@ function VeyrFinisher.play(opts)
 				s:Destroy()
 			end
 		end
+		for _, h in pairs(beds) do
+			h.stop(0.3)
+		end
 		giveBack()
 		ui:Destroy()
 		cc:Destroy()
@@ -1481,16 +1534,58 @@ function VeyrFinisher.play(opts)
 		for _, l in ipairs(LINES) do
 			local elapsed = T - l.at
 			local inLine = elapsed >= 0 and elapsed < l.length
+			if l.stopAt and T >= l.stopAt and voices[l] then
+				-- (cut off here, a quick fade)
+				local snd = voices[l]
+				voices[l] = false
+				if snd.Parent then
+					TweenService:Create(snd, TweenInfo.new(0.12), { Volume = 0 }):Play()
+					Debris:AddItem(snd, 0.15)
+				end
+			end
+			if l.stopAt and T >= l.stopAt then
+				inLine = false
+			end
 			if watching and inLine and not voices[l] and elapsed < l.length - 0.3 then
-				voices[l] = Sfx.play(l.sound, nil, 1, nil, elapsed)
+				voices[l] = Sfx.play(l.sound, nil, l.volume or 1, l.pitch, elapsed)
+				if l.bass and voices[l] then
+					-- (the lows pushed up, the highs taken away)
+					local eq = Instance.new("EqualizerSoundEffect")
+					eq.LowGain = 9
+					eq.MidGain = -3
+					eq.HighGain = -12
+					eq.Parent = voices[l]
+				end
 			elseif voices[l] and not watching then
 				if voices[l].Parent then
 					voices[l]:Destroy()
 				end
 				voices[l] = nil -- (Leave; Watching again joins the line mid-way)
 			end
-			if elapsed >= 0 and elapsed < l.length + 0.65 then
+			if l.phrases and elapsed >= 0 and elapsed < l.length + 0.65 then
 				current = l
+			end
+		end
+		for _, b in ipairs(BEDS) do
+			local v = 0
+			if watching then
+				v = ease(T, b.from, b.from + b.fadeIn) * (1 - ease(T, b.to - b.fadeOut, b.to))
+				if b.duck then
+					v *= 1 - b.duck * ease(T, F.STILL - 0.3, F.STILL) * (1 - ease(T, F.IMPACT, F.IMPACT + 1.5))
+				end
+			end
+			if v > 0.001 and not beds[b] then
+				beds[b] = Sfx.loop(b.sound)
+				if b.bass and beds[b].sound then
+					local eq = Instance.new("EqualizerSoundEffect")
+					eq.LowGain = 8
+					eq.MidGain = -2
+					eq.HighGain = -9
+					eq.Parent = beds[b].sound
+				end
+			end
+			if beds[b] then
+				beds[b].set(v, b.pitch)
 			end
 		end
 		if watching and current then

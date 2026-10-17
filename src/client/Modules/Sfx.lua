@@ -72,14 +72,31 @@ Sfx.Sounds = {
 	reactor_lock = { id = "rbxassetid://109134827602753", volume = 0.8 },
 	cannon_charge = { id = "rbxassetid://136468737245177", volume = 0.45 },
 	main_beam = { id = "rbxassetid://95516675338021", volume = 1 },
-	-- Veyr (docs/veyr.md "Sound"): slots for his own sounds (empty id = silent until recorded; sounds/veyr/). Until
-	-- then the neutral rune click marks his sights opening and the shell impact is a low layer under his hit.
-	veyr_ring = { id = "rbxassetid://129592415819508", volume = 0.25 }, -- (= rune_click; wanted: a glassy optical tink)
-	veyr_crack = { id = "", volume = 1 }, -- a heavy rifle crack with a short supernatural tail
-	veyr_bolt = { id = "", volume = 0.6 }, -- the bolt worked: lift, back, forward, down
-	veyr_impact = { id = "rbxassetid://81958184521977", volume = 0.45 }, -- (= shell_impact; wanted: a sharp puncture + a low tail)
-	veyr_charge = { id = "", volume = 0.6 }, -- (special / finisher) a rising inward charge tone
-	veyr_collapse = { id = "", volume = 0.9 }, -- (special / finisher) the deep implosion of the fracture
+	-- Veyr (docs/veyr.md "Sound", sounds/README.md "veyr/"; originals in sounds/_source/veyr, trimmed 2026-10-17)
+	veyr_ring = { id = "rbxassetid://117887968343713", volume = 0.4 }, -- ring.ogg: the glassy tink (sights, shards, the bolt's end)
+	veyr_crack = { id = "rbxassetid://99961533538277", volume = 1 }, -- crack.ogg: his rifle shot
+	veyr_bolt = { id = "rbxassetid://76462665268038", volume = 0.7 }, -- bolt.ogg: the bolt worked
+	veyr_impact = { id = "rbxassetid://136696684974250", volume = 0.8 }, -- impact.ogg: the round lands
+	veyr_charge = { id = "rbxassetid://129929686412363", volume = 0.7 }, -- charge.ogg: the rising inward charge (special, finisher, pull)
+	veyr_collapse = { id = "rbxassetid://92603837472906", volume = 0.8 }, -- collapse.ogg: the deep implosion (special, the gate's break)
+	veyr_ash = { id = "rbxassetid://136943880026332", volume = 0.8 }, -- ash.ogg: the gate turning to ash (finisher)
+	veyr_claws = { id = "rbxassetid://127179090907939", volume = 0.7 }, -- claws.ogg: the hands tearing the slit open, an undead howl in it (pull)
+	veyr_ignite = { id = "rbxassetid://114521740751265", volume = 0.9 }, -- ignite.ogg: his eyes ignite (pull)
+	veyr_cloth = { id = "rbxassetid://89294116958275", volume = 0.8 }, -- cloth.ogg: the mantle flaring out (pull)
+	veyr_glint = { id = "rbxassetid://120054004729730", volume = 0.6 }, -- glint.ogg: a scope glint (pull: his echo, the field)
+	veyr_rift = { id = "rbxassetid://135288900082496", volume = 0.8 }, -- rift.ogg: the far opening tears (pull)
+	-- his finisher's own (sounds/veyr/, 2026-10-17): the beds loop under it for whoever watches, the rest are one-shots
+	veyr_ambience = { id = "rbxassetid://129605371290568", volume = 0.35 }, -- ambience.ogg: the dark bed (24 s loop)
+	veyr_aura = { id = "rbxassetid://132362248991955", volume = 0.35 }, -- aura.ogg: his charge aura (8 s loop)
+	veyr_moon = { id = "rbxassetid://90021862324143", volume = 0.2 }, -- moon.ogg: the drone under the moon (8 s loop)
+	veyr_buildup = { id = "rbxassetid://109012853809461", volume = 0.8 }, -- buildup.ogg: 5.1 s, cut off at its peak on the shot
+	veyr_launch = { id = "rbxassetid://99664322421160", volume = 0.9 }, -- launch.ogg: he launches into the sky
+	veyr_rifle_slide = { id = "rbxassetid://137086389136349", volume = 0.25 }, -- rifle_slide.ogg: a giant rifle slides out
+	veyr_circle = { id = "rbxassetid://110729038430714", volume = 0.5 }, -- circle.ogg: a magic circle opens
+	veyr_laser = { id = "rbxassetid://87496554133026", volume = 0.6 }, -- laser.ogg: the lasers lock on the gate
+	veyr_wind = { id = "rbxassetid://113389733640268", volume = 0.9 }, -- wind.ogg: the ash wave rushing past him
+	veyr_rocks = { id = "rbxassetid://76085057308662", volume = 0.8 }, -- rocks.ogg: the ground cracks, the rocks lift
+	veyr_breath = { id = "rbxassetid://82719739571060", volume = 0.8 }, -- breath.ogg: his exhale in the stillness
 	voice_veyr_seat = { id = "rbxassetid://70545838114962", volume = 1 }, -- his finisher (VeyrFinisher): "One round. That is all you deserve."
 	voice_veyr_bang = { id = "rbxassetid://82860162572332", volume = 1 }, -- his finisher, just before the shot: "Bang."
 	voice_veyr_arrival = { id = "rbxassetid://110588920076095", volume = 1 }, -- his pull (VeyrArrival), a demonic undead voice: "Death is just the distance between us."
@@ -149,7 +166,7 @@ function Sfx.music(name, timePosition)
 end
 
 function handle(s, slot)
-	local h = {}
+	local h = { sound = s } -- (sound: for effects on it, e.g. an equalizer)
 	local stopped = false
 	function h.set(volume, pitch)
 		if stopped or not s.Parent then

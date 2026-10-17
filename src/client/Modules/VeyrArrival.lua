@@ -852,9 +852,8 @@ function VeyrArrival.play(results, opts, shared)
 		table.insert(cues, { name = name, at = at, volume = vol, pitch = pitch })
 	end
 	cue("veyr_ring", SIGHT_AT, 1.4, 1.3)
-	cue("tear_rumble", RIFT_FROM, 0.5, 1.3)
-	cue("tear_crack", RIFT_FROM + 0.3, 0.4, 1.4)
-	cue("veyr_ring", GLINT_AT, 1.6, 1.6)
+	cue("veyr_rift", RIFT_FROM - 0.6) -- (it builds up into the opening)
+	cue("veyr_glint", GLINT_AT, 1.4)
 	for k = 1, SIGHTS do
 		cue("veyr_ring", CORRIDOR_FROM + (k - 1) * CORRIDOR_STEP, 1.2, 1.0 + k * 0.08)
 	end
@@ -867,11 +866,12 @@ function VeyrArrival.play(results, opts, shared)
 	cue("veyr_bolt", BOLT_AT)
 	cue("veyr_ring", TINK_AT, 1.8, 1.8) -- the glassy tink as the bolt closes
 	for k = 1, FIELDS, 3 do
-		cue("veyr_ring", FIELD_FROM + (k - 1) * FIELD_STEP, 0.7, 1.3 + (k % 5) * 0.08)
+		cue("veyr_glint", FIELD_FROM + (k - 1) * FIELD_STEP, 0.6, 0.9 + (k % 5) * 0.06)
 	end
-	cue("tear_crack", HANDS_FROM + 0.5, 0.5, 0.7) -- (the hands grip the edges)
+	cue("veyr_claws", HANDS_FROM + 0.2) -- (the hands claw up and grip the edges)
 	cue("tear_rumble", PULL_FROM, 0.6, 0.7) -- (and tear the slit open)
-	cue("veyr_impact", IGNITE_AT, 0.9, 0.85) -- his eyes ignite
+	cue("veyr_ignite", IGNITE_AT) -- his eyes ignite
+	cue("veyr_cloth", IGNITE_AT + 0.1) -- (the mantle flares out)
 	for k = 0, 5 do
 		cue("veyr_ring", SHARDS_AT + k * 0.28, 1.0, 1.2 + k * 0.1) -- (each shard clicks in)
 	end
