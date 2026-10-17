@@ -15,8 +15,12 @@ the distance between us."; nearby army units are hidden on this screen), pool we
 now 1 in 52,000), Gem Shop Skills card + Codex abilities, damage tuned to Malak's level (700K / 7.5 s, special 24
 army-seconds). Voice files trimmed with `tools/audio/prep_sound.py shot` and uploaded with `upload_sound.py`.
 
-**Next for Veyr:** listen to his sounds in game and balance the volumes (all twelve uploaded 2026-10-17, wired into the
-shot, special, finisher and pull), then the checks nobody did: two Veyrs on one plot, a rotated plot, a second player (Watch / Leave, the RarePull banner), Malak +
+Sounds (2026-10-17, d4212a4): all 23 of his sounds are in (the user collects them on Splice; Claude trims with
+`prep_sound.py`, uploads with `upload_sound.py`), the finisher's cue sheet tuned with the user (see docs/veyr.md "State").
+Remember: after a Studio restart check that Rojo is connected (a whole round of "no sounds" was an unsynced Studio).
+
+**Next for Veyr:** `cracks.ogg` for the crack web on the gate (still silent), maybe a real ~9 s build-up instead of the
+slowed 5.1 s one, volumes of the basic shot / special / pull sounds (only the finisher was tuned), then the checks nobody did: two Veyrs on one plot, a rotated plot, a second player (Watch / Leave, the RarePull banner), Malak +
 Veyr on both thrones (the first throne's finisher wins), a real pull from a Celestial grave. His shadow form is still a
 first look.
 
