@@ -2,8 +2,8 @@
 
 ## Status (2026-10-17)
 
-The base character model is built (model only). Not done: unit definition, stats, odds, animations (no `Pose`, so he
-stands static), attacks, the awakened form, fleet / arrival / finisher.
+The base character model and his idle animation are built (approved). Not done: unit definition, stats, odds, the
+walk (generic), attacks, the awakened form, fleet / arrival / finisher.
 
 - Approved art: `Images/Concept/Unit/Orvoss-the-Blackwake-concept-v1.png`; brief: `docs/prompts/orvoss-blackwake-model-claude-prompt.txt`.
 - Builder: `tools/studio/build_orvoss.lua` (Edit mode, via the tools/studio http server). It builds off-tree, validates
@@ -67,7 +67,7 @@ slit mouths. Neon only in the eyes, chest, cutlass edge and compass needle.
 - At rest the hands are fairly close to the coat. The pistol is rather long and its grip is hard to see from the front.
 - The tails' clearance was only checked by eye (rest pose and a spread pose), not tested in motion.
 
-## Idle animation (2026-10-17, first pass built, not approved yet)
+## Idle animation (2026-10-17, built and approved by the user, 04591f8)
 
 `src/client/Modules/AdmiralAnimator.lua` (Pose "Admiral", called from UnitAnimator like Veyr's module): the deck roll
 (6.6 s, feet planted by leg IK, skull level), underwater coat tails on soft springs, heavy arms with the cutlass and
@@ -102,6 +102,25 @@ Agreed with the user: the base layer plus gestures 1, 3 and 4 (the hammer check 
 - Test it on `Workspace.OrvossPreview` / the animated portrait. A preview loop and UnitAnimator must never both write
   the same joint. The army walk can stay generic for now.
 - Also look at the coat tails from behind first: they were widened after the last rear screenshot.
+
+## Basic attack (the user's idea, 2026-10-17, not built)
+
+He takes aim and fires the flintlock while a ghostly cannon forms beside him and fires at the same moment. Proposed beats
+(first pass slow, one attack every ~7 s): the pistol swings up and levels at the wall, side-on like a duellist (0-1 s);
+sea-green fog and upward-dripping water form a see-through ghost cannon, barrel first, then the carriage (0.4-1.6 s);
+stillness, the thumb cocks the hammer (`PistolHammer`), the fuse glows (1.6-2.4 s); both fire at 2.4 s (small pistol
+flash, big cannon boom and smoke, the pistol kicks, the cannon rolls back); a glowing cannonball (with the pistol shot)
+hits ~2.8 s as ONE hit; the cannon sinks into fog, he lowers the pistol slowly (3-5 s). Open: the cannon's side
+(suggested his left, a little behind the pistol arm) and the name ("Dead Reckoning" is Veyr's; ideas: Double Report,
+Gun Salute, Shot Across the Bow). Needs the unit def first. The ghost cannon model is reused in the finisher.
+
+## Finisher models (estimate, 2026-10-17)
+
+New: the flagship (hero model, detailed broadside with stacked gun decks, ports lighting bow to stern; the biggest job,
+needs a part budget), one fleet warship builder with variants (4-6 ships, simpler, seen further away), an anchor with
+chain (reused several times). Reused: the ghost cannon, Orvoss (compass lid, hat, cutlass joints). Effects, not models:
+fog, upward drips, the sky ocean, ship shadows, rigging, cannon fire, the whirlpool. Crews: start with light behind the
+gun ports, a ghost-sailor model only if the close-ups need it. Order: anchor, warship, flagship.
 
 ## Character direction
 

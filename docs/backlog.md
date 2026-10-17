@@ -3,11 +3,20 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
-## Orvoss, the Blackwake (2026-10-17: model built, awaiting the user's visual review)
+## Orvoss, the Blackwake (2026-10-17: model + idle animation done and approved; details in docs/orvoss.md)
 
-`tools/studio/build_orvoss.lua` built 716 parts into `ServerStorage.Models.Orvoss` (state, rig contract and checks in
-docs/orvoss.md). The review copy is in `Workspace.OrvossPreview` (delete it before publishing). UnitModels was
-rebuilt. Next (agreed): the idle animation, see docs/orvoss.md "Agreed next step". Later: the user's visual feedback, a unit def, the kit and the awakened form.
+Committed 04591f8: the idle (`AdmiralAnimator`, Pose "Admiral": deck roll, level skull, underwater coat tails, heavy
+weapons, gestures brim push / listening / compass glance; dev attributes `DevGesture`, `AnimTimeScale`), a
+`CompassNeedle` joint, a normal weapon hold (both weapons down and forward at his sides) and fixed fists (palm outside
+the grip, the pistol's index finger curled). The user approved it. `Workspace.OrvossPreview` is still in the place
+(delete before publishing; tag it `ProceduralUnit` on the client in play mode to see him animate).
+
+**Next for Orvoss (agreed order):** 1) his unit def (Sovereign, throne only, pool weight like Malak/Veyr, Codex, check
+the portraits and the army walk); 2) his basic attack, idea from the user (docs/orvoss.md "Basic attack"): he aims and
+fires the flintlock while a ghost cannon forms beside him and fires at the same moment; open: the cannon's side
+(suggested: his left, a little behind) and the name (not "Dead Reckoning"). Later: the special, the pull cinematic, the
+finisher The Last Broadside (models needed: flagship, fleet warship with variants, anchor + chain; reuses the ghost
+cannon), sounds, the shadow form.
 
 ## Veyr, the Last Sight (2026-10-17: done but for sounds; details in docs/veyr.md)
 
