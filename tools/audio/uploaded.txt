@@ -73,3 +73,9 @@ sounds/veyr/laser.ogg -> rbxassetid://87496554133026
 sounds/veyr/wind.ogg -> rbxassetid://113389733640268
 sounds/veyr/rocks.ogg -> rbxassetid://76085057308662
 sounds/veyr/breath.ogg -> rbxassetid://82719739571060
+sounds/orvoss/cannon.ogg -> rbxassetid://110463231537374
+sounds/orvoss/anchor_drop.ogg -> rbxassetid://104498308999164
+sounds/orvoss/chain.ogg -> rbxassetid://80010441447688
+sounds/orvoss/bell.ogg -> rbxassetid://103036201898959
+sounds/orvoss/sea_rise.ogg -> rbxassetid://139496144479762
+sounds/orvoss/ambience.ogg -> rbxassetid://103262162803548

@@ -100,6 +100,13 @@ Sfx.Sounds = {
 	voice_veyr_seat = { id = "rbxassetid://70545838114962", volume = 1 }, -- his finisher (VeyrFinisher): "One round. That is all you deserve."
 	voice_veyr_bang = { id = "rbxassetid://82860162572332", volume = 1 }, -- his finisher, just before the shot: "Bang."
 	voice_veyr_arrival = { id = "rbxassetid://110588920076095", volume = 1 }, -- his pull (VeyrArrival), a demonic undead voice: "Death is just the distance between us."
+	-- Orvoss (docs/orvoss.md, sounds/README.md "orvoss/"; originals in sounds/_source/orvoss, trimmed 2026-10-17)
+	orvoss_cannon = { id = "rbxassetid://110463231537374", volume = 1 }, -- cannon.ogg: a black-powder cannon (Double Report, every gun in the broadside)
+	orvoss_anchor = { id = "rbxassetid://104498308999164", volume = 1 }, -- anchor_drop.ogg: the anchor slams into the ground
+	orvoss_chain = { id = "rbxassetid://80010441447688", volume = 0.9 }, -- chain.ogg: the anchor's chain rattling / pulling taut
+	orvoss_bell = { id = "rbxassetid://103036201898959", volume = 0.9 }, -- bell.ogg: a distant ship's bell (the call)
+	orvoss_sea = { id = "rbxassetid://139496144479762", volume = 1 }, -- sea_rise.ogg: the sky ocean breaking open
+	orvoss_ambience = { id = "rbxassetid://103262162803548", volume = 0.8 }, -- ambience.ogg: 24 s ghost-ship loop under the finisher
 	keeper_roar = { id = "rbxassetid://130529185820696", volume = 0.8 },
 	gate_collapse = { id = "rbxassetid://79285090609348", volume = 1 },
 	warp_out = { id = "rbxassetid://77036647861580", volume = 0.8 },

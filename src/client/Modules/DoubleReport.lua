@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 
 local AT = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AdmiralTimeline"))
+local Sfx = require(script.Parent.Sfx)
 
 local TAG = "ProceduralUnit"
 local MAX_DISTANCE = 320 -- (beyond this from the camera nothing is drawn)
@@ -439,6 +440,7 @@ local function fire(kit, cannonMuzzle, cannonDir, aimPos, s)
 	kit.muzzle.CFrame = CFrame.lookAt(cannonMuzzle, cannonMuzzle + cannonDir)
 	kit.muzzleSmoke:Emit(22)
 	kit.muzzleSparks:Emit(24)
+	Sfx.playAt("orvoss_cannon", cannonMuzzle, 0.8, 0.95 + math.random() * 0.1, 260)
 	local hrp = model.PrimaryPart
 	local normal = hrp and Vector3.new(hrp.Position.X - aimPos.X, 0, hrp.Position.Z - aimPos.Z) or Vector3.zero
 	normal = normal.Magnitude > 0.1 and normal.Unit or -cannonDir

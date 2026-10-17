@@ -236,6 +236,48 @@ Done (2026-10-17, trimmed from the user's files in `_source/veyr/`): `crack` (1.
 s), `rift` (2.2 s, cued 0.6 s early so it builds into the opening); ids in `Sfx.lua` (veyr_*). Also `voice_arrival.ogg` (pull: "Death is just the distance between us."), `finisher_seat.ogg` ("One round. That is all
 you deserve."), `finisher_bang.ogg` ("Bang."), `finisher_turn.ogg` (cut, not cued); originals in `_source/veyr/`.
 
+## orvoss/ (Orvoss, the Blackwake: docs/orvoss.md)
+
+His sound: heavy, wet, old wood and iron under the sea. Black-powder guns (deep booms, not modern gunshots), creaking
+timber, chains, bells, water, and a hollow ghostly layer on top (underwater reverb, a low choir, a breath of wind).
+Never bright or magical-sparkly (that is Veyr) and never sci-fi (that is Malak). Mono for one-shots in the world,
+stereo for the finisher's beds. Drop them in `_source/orvoss/` (any name, say which is which); Claude trims and uploads.
+
+Done (2026-10-17, from the user's files in `_source/orvoss/`, ids in `Sfx.lua` orvoss_*): `cannon` (1.8 s; Double Report and
+every volley of the broadside), `anchor_drop` (4.5 s), `chain` (4 s), `bell` (4.4 s), `sea_rise` (6 s of a 15 s underwater
+splash; the sea opening and closing), `ambience` (a 24 s mono loop cut from 18 s of the 61 s ghost-ship ambience).
+
+**Basic attack, Double Report** (every 7 s, so keep them short and not tiring):
+
+| File | Length | Sound | Used in | Prio | Search terms |
+|---|---|---|---|---|---|
+| `cannon.ogg` | 1.5-3 s | one black-powder cannon shot: a deep boom with a rolling tail | the ghost cannon fires (and every gun in the finisher) | A | "cannon shot", "cannon fire", "artillery boom", "black powder cannon", "pirate cannon" |
+| `flintlock.ogg` | 0.5-1.2 s | a flintlock pistol: a click-snap of the flint, then a dull pop/bang | the pistol fires with the cannon | A | "flintlock pistol", "musket shot", "old pistol shot", "black powder pistol" |
+| `cannon_impact.ogg` | 1-2 s | a heavy ball smashing into stone: crunch, debris, a low thud | the ball hits the wall | A | "cannonball impact", "stone impact debris", "heavy impact rock", "wall hit debris" |
+| `ghost_form.ogg` | 1-1.5 s | a wet ghostly swell: water bubbling upwards, a hollow whoosh | the ghost cannon forming out of fog | B | "underwater whoosh", "ghost whoosh", "bubbles rising", "spectral swell", "reverse splash" |
+| `hammer.ogg` | 0.2-0.5 s | a pistol hammer being cocked: one heavy metallic click | his thumb cocks the hammer | B | "gun cock", "hammer cock", "revolver cock", "flintlock cock" |
+| `fuse.ogg` | 0.5-1 s | a fuse catching and fizzing | the cannon's fuse | C | "fuse hiss", "fuse burning", "sparkler", "fuse sizzle" |
+
+**The finisher, The Last Broadside** (~67 s; cues in docs/orvoss.md "Beat sheet"):
+
+| File | Length | Sound | Used in | Prio | Search terms |
+|---|---|---|---|---|---|
+| `voice_order.ogg` | 1-2 s | his voice line "Give them the deep." (a deep, cold, undead admiral; you make it in ElevenLabs like Veyr's) | the order (34-40) | A | (ElevenLabs) |
+| `ambience.ogg` | 20-40 s, seamless loop, stereo | a dark sea bed: deep wind, slow waves, distant creaking, a faint low choir; no melody | under the whole finisher | A | "dark ocean ambience", "stormy sea ambience", "ghost ship ambience", "underwater drone", "dark ambient pad" |
+| `bell.ogg` | 2-5 s | one ship's bell or a big church bell, struck once, far away with a long tail | the call (0) | A | "ship bell", "distant bell toll", "church bell single", "bell toll reverb" |
+| `anchor_drop.ogg` | 1.5-3 s | a huge iron weight slamming into the ground: deep boom, earth cracking, a chain rattle after | the anchor lands (9-13) | A | "heavy metal impact", "anchor drop", "earth impact boom", "trailer impact" |
+| `chain.ogg` | 1-3 s | a heavy chain rattling and dragging, then pulling taut with a strain | the anchor's chain, the drag (52-58) | A | "heavy chain rattle", "chain drag", "chain tension", "anchor chain" |
+| `broadside.ogg` | 3-6 s | a rolling volley: many cannons firing one after another, echoing | the travelling broadside (40-52; layered with `cannon`) | A | "cannon volley", "broadside", "naval battle cannons", "cannon barrage", "rolling artillery" |
+| `sea_rise.ogg` | 3-6 s | a vast surge of water, a rising roar like a wave building | the sky ocean opening, the ships breaking out (13-20) | A | "massive wave", "water surge", "tidal wave", "ocean swell", "water riser" |
+| `creak.ogg` | 2-4 s | a big wooden ship creaking and groaning as it turns | the fleet swings into line (28-34), the flagship passing | B | "ship creak", "wood creak", "hull groan", "old ship timber" |
+| `whirlpool.ogg` | 3-6 s | a huge swirling vortex of water, a deep draining roar | the gate dragged into the whirlpool (52-63) | B | "whirlpool", "water vortex", "water drain", "maelstrom", "swirling water" |
+| `fog.ogg` | 3-5 s | a low rolling hiss with a ghostly whisper, like fog creeping in | the fog rolling down the lane (4-9) | B | "fog whoosh", "ghostly wind", "creeping mist", "dark wind texture" |
+| `gate_break.ogg` | 2-4 s | a huge stone structure collapsing: a crack, a roar of falling stone | the gate breaks (52) | B | "building collapse", "stone collapse", "rock crumble large", "castle wall destruction" |
+| `compass.ogg` | 0.2-0.5 s | a small brass lid snapping shut: one sharp metallic click | he snaps the compass shut (0) | B | "pocket watch close", "metal lid click", "brass click", "compass snap" |
+| `rigging.ogg` | 1.5-3 s | ropes stretching and creaking, canvas snapping in the wind | he rises on the spectral rigging (34-40) | C | "rope creak", "rope stretch", "sail flap", "canvas flutter" |
+| `drips.ogg` | 2-4 s, seamless loop | water dripping and trickling, a little reversed | water dripping upwards off his coat (4-20) | C | "water drips", "dripping water", "reverse water drops" |
+| `hat.ogg` | 0.3-0.8 s | a soft cloth/leather catch | he catches his hat (63-67) | C | "cloth grab", "hat catch", "fabric foley" |
+
 ## Preparing files
 
 Originals go in `_source/` (kept, not uploaded). `tools/audio/prep_sound.py` makes the game versions:
