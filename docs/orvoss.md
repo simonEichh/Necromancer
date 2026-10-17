@@ -2,8 +2,11 @@
 
 ## Status (2026-10-17)
 
-The base character model and his idle animation are built (approved). Not done: unit definition, stats, odds, the
-walk (generic), attacks, the awakened form, fleet / arrival / finisher.
+The base character model and his idle animation are built (approved). Unit def added 2026-10-17 (`Units.Orvoss`:
+Sovereign, throne only, pool weight 0.05 from Celestial like Malak/Veyr, 510K / 6 s = 85K DPS placeholder, range 25,
+Codex lore line; the generic hit until his basic attack exists, Malak's pull cinematic until he has his own). Tested
+once: he spawns, walks, attacks, no errors; the hotbar portrait shows. Not done: his attacks, the awakened form, fleet /
+arrival / finisher.
 
 - Approved art: `Images/Concept/Unit/Orvoss-the-Blackwake-concept-v1.png`; brief: `docs/prompts/orvoss-blackwake-model-claude-prompt.txt`.
 - Builder: `tools/studio/build_orvoss.lua` (Edit mode, via the tools/studio http server). It builds off-tree, validates
@@ -113,6 +116,25 @@ flash, big cannon boom and smoke, the pistol kicks, the cannon rolls back); a gl
 hits ~2.8 s as ONE hit; the cannon sinks into fog, he lowers the pistol slowly (3-5 s). Open: the cannon's side
 (suggested his left, a little behind the pistol arm) and the name ("Dead Reckoning" is Veyr's; ideas: Double Report,
 Gun Salute, Shot Across the Bow). Needs the unit def first. The ghost cannon model is reused in the finisher.
+
+## The drowned fleet (first pass built 2026-10-17, waiting for the user's review)
+
+`tools/studio/build_blackwake_fleet.lua` -> `ReplicatedStorage.ShipModels.BlackwakeFleet`: five warships from one
+seeded builder, refined after the concept art `Images/Concept/Unit/Fleetship.png` (taken as inspiration, not exact):
+Brig (737 parts, 1 gun deck), Frigate (844, 2), Galleon (849, 2, tall stern, snapped mizzen), Wreck (850, 2, snapped
+main mast, three breaches, sails mostly torn), ManOWar (933, 3). Dark wet timber (greener below), tumblehome hull with
+raised castles, heavy dark wales, a balustrade rail with brass posts; brass-framed gun ports glowing sea-green with dark
+barrels run out (no lids); breaches held by soul-green ribs over a glowing inside, splintered planks round them; glowing
+cracks; barnacle clusters with drowned skulls in a band along the lower hull, lots of hanging weed (bottom, wales,
+bowsprit); a horned bone skull figurehead with an open jaw and bone ribs down the bow; quarter galleries of glowing
+windows with brass trim, a skull on the stern, three brass lanterns (the big one has a PointLight); masts with brass
+bands, fighting tops, ratlines, torn green translucent sails (one bellied canvas per yard, ragged strips), a pennant.
+Contract: bow -Z, up +Y, origin at the
+waterline amidships; `Root` anchored and invisible, everything welded to it; `PortGlow` parts (attributes Deck, Index
+bow to stern, Side) and `Gun` barrels with a `Muzzle` attachment for the rolling broadside; `Hawse` attachment on Root
+for an anchor chain; model attributes Length, Variant, GunDecks, PortsPerSide. `tools/studio/show_fleet.lua` stages
+them high over the plaza in `Workspace.FleetPreview` (**delete before publishing**). Not yet: the flagship, the anchor
++ chain, the ghost cannon; no close-up check of the stern, bow or breaches.
 
 ## Finisher models (estimate, 2026-10-17)
 
