@@ -2,8 +2,7 @@
 -- unit turns slowly on the pedestal, playing its idle (UnitAnimator, through the ProceduralUnit tag), and the plate shows
 -- its name, title, rarity, its "1 in N" (Units.getBaseOneIn, as in the Codex) and who pulled it last (server
 -- ShowcasePulls: attributes on ReplicatedStorage.ShowcasePulls, global across servers). Every SHOW_TIME s it dissolves into
--- souls sinking into the pedestal and the next one rises: the Sovereigns and the Signatures in turn, a Sovereign every
--- other time. Client only: every player builds their own copy.
+-- souls sinking into the pedestal and the next Sovereign rises (only Sovereigns are shown). Client only: every player builds their own copy.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -32,34 +31,13 @@ end
 -- ============================================================
 -- What is shown, in turn
 -- ============================================================
-local SHOWN = {}
-do
-	local sovereigns, signatures = {}, {}
-	for name in pairs(Units.Stats) do
-		if Units.isSovereign(name) then
-			table.insert(sovereigns, name)
-		elseif Units.isSignature(name) then
-			table.insert(signatures, name)
-		end
-	end
-	-- (the rarest first)
-	local function rank(name)
-		return Rarities.Rank[Units.Rarity[name]] or 0
-	end
-	table.sort(sovereigns, function(a, b) return rank(a) > rank(b) end)
-	table.sort(signatures, function(a, b) return rank(a) > rank(b) end)
-	local s = 1
-	for i, name in ipairs(signatures) do
-		if #sovereigns > 0 and i % 2 == 1 then
-			table.insert(SHOWN, sovereigns[s])
-			s = s % #sovereigns + 1
-		end
+local SHOWN = {} -- (only the Sovereigns, the user's call)
+for name in pairs(Units.Stats) do
+	if Units.isSovereign(name) then
 		table.insert(SHOWN, name)
 	end
-	if #signatures == 0 then
-		SHOWN = sovereigns
-	end
 end
+table.sort(SHOWN) -- (a fixed order)
 if #SHOWN == 0 then
 	return {}
 end
