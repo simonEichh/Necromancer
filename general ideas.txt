@@ -1,0 +1,12 @@
+have a small 3d model hovering over a magic circle on the grave of the assigned unit
+
+the portal needs to be visible behind the gate, not spawn after the gate is gone. the door that is there rn can be removed
+
+i dont like that the overlay of which unit u got after opeing a grave shows up again, just show the odds in the cinematic opening at the end and after the unit is absorbed by the book its over
+
+
+malaks textures flimmering, intentional or z-fighting?
+
+when need payoff for maxing out units like permanent upgrades, maxing out any unit will give a permanent buff of any kind, i think we should remove pity chance increase and lower success chances a little
+
+thinking of going from rarity system to modern gacha system like 3 star (common), 4 star (1 in 10 pulls), 5 star (rare 1 in 80 pulls) , 6 star (1 in 160 pulls), and then drastically decrease pulls, or go with star system but increase pity drastically because you get so many pulls, but with star system it wouldn't make sense to have many different graves, im not sure if it even makes sense to have that many different graves, i just took inspiration from spin a baddie but thkning about it, lowr graves get obsolete fast and you haveto keep making new graves for faster players. on the other hand im genuinely considering the "banner" wish system like in genshin or a lot of other popular gacha games, where you are targeting one rare unit (in our case e.g. malak) and you get mostly 3 stars or 4 stars while pulling for him until you reach pity. i think a system where you get low amount of pulls would require more things to spend your gold on than realm and permannetn upgrade tho, like in other games theres artifacts that can randomly roll, health, defense, crit etc. thats probably out of the scope of this game, so maybe low volume gacha doesn't make sense because you want to make pulling frequent to have a more simple enjoayable gacha experience without too complex game mechanics. thought?

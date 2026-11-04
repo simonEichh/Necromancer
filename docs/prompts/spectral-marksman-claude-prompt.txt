@@ -1,0 +1,313 @@
+BUILD THE SPECTRAL MARKSMAN AS A COMPLETE SOVEREIGN UNIT
+
+Work in C:\RobloxGames\Necromancer.
+
+I want you to build the whole unit shown in:
+Images/Concept/Unit/Spektraler Scharfschütze mit arkanem Gewehr.png
+
+Use Malak as the reference for completeness, character direction, animation quality, cinematic presentation, and integration with the game. Give this unit its own identity and abilities. The deliverable is a playable, integrated unit with a model, awakened form, animations, basic attack, passive, special, unique pull cinematic, gate finisher, sound hooks, Codex content, development controls, and Studio verification. A design document or a model alone does not complete the task.
+
+The name and kit below are a proposed direction for this new unit, not things already agreed or implemented in the project. Use them as the specification for this task. Working name: VEYR, THE LAST SIGHT. Internal unit key: Veyr. Class: Sovereign. Rarity: Primordial. You may improve a minor presentation detail if necessary to make it work, but preserve the concept art, the deliberate sniper identity, and the complete scope.
+
+Proceed through small, reviewable implementation stages. Show useful screenshots and briefly explain important decisions as you go, then continue through the authorized scope. You do not need to stop after each normal implementation step to ask whether to continue. If a real external permission, missing asset, or major contradictory requirement blocks something, explain it precisely and keep working on independent parts. Do not publish the game or commit unless I ask. Do not quietly reduce the task to a prototype.
+
+1. READ THE PROJECT AND THE REAL IMPLEMENTATION FIRST
+
+Read AGENTS.md, then CLAUDE.md, then the relevant sections of Design.md, docs/models.md, docs/envoy.md, docs/features.md, docs/world.md, docs/economy.md, and the newest state in docs/backlog.md. Use the local roblox-animation and roblox-vfx skills. Inspect the concept image directly.
+
+Read enough of these implementation files to understand the contracts you are extending:
+
+- tools/studio/build_malak.lua and build_malak_shadow.lua: procedural model structure, rig construction, recognizable silhouette, secondary joints, base/shadow relationship.
+- tools/studio/build_absolution.lua: an example of expanding one character's visual vocabulary into a major cinematic asset.
+- tools/studio/publish_unit_models.lua: publishing the place-only models to ReplicatedStorage.UnitModels.
+- src/client/Modules/UnitAnimator.lua: Malak's Envoy pose, plus Knell's Bellbearer block as the reference for smooth motion, splines, springs, anticipation, and follow-through.
+- OrbitalStrike.lua, RequisitionFx.lua, and DropPod.lua: readable basic attacks, synchronized effects, recurring visual motifs, reusable assets.
+- FleetStrike.lua: world spectacle, owner camera, optional spectator camera, Skip semantics, monotone Hermite camera interpolation, sound/subtitles, cleanup, lingering aftermath.
+- SovereignArrival.lua, GraveRolling.lua, SignatureDescent.lua, StarSummon.lua, and RarePullBanner.lua: actual pull routing, result flow, absorption, and spectators.
+- HandsAnimator.lua: the realm keeper's reactions and retreat.
+- SpecialFx.lua: the charge meter is implemented here; do not assume a separate SpecialMeter.lua file exists.
+- UnitPortrait.lua, Toolbar.lua, CodexPanel.lua, ArmyPanel.lua, DevPanel.lua, State.lua, Sync.lua, GemShopPanel.lua, Sfx.lua, and the client bootstrap.
+- src/shared/Units.lua, Economy.lua, and the relevant rarity/grave data.
+- src/server/Modules/Army.lua, Walls.lua, PlotFrame.lua, DevTools.lua, Digging.lua, Rolling.lua, Remotes.lua, GemShop.lua, PlayerData.lua, Persistence.lua, and relevant placement/reset code.
+
+Read targeted sections rather than exploring unrelated systems. Inspect the current Studio model/world only as needed. Scripts in src/ are the source of truth and must only be edited there. Use Studio MCP for place-only models, previews, inspection, and testing.
+
+Important: docs/envoy.md contains historical drafts. Current code wins when the document is stale. For example, Malak is now a real Celestial-only Primordial pool entry at weight 0.05, not the old weight-zero placeholder. His current special is the Requisition, not the discarded rail lance; that sniper concept was explicitly left for a later unit. His implemented finisher runs 54 seconds, with the authoritative gate break at 49.4 seconds. Do not copy old draft values as current behavior.
+
+2. WHAT TO CARRY OVER FROM MALAK
+
+Malak works because his entire presentation describes one personality. His restrained gestures, hologram, armillary drone, orbital basic, supply-pod special, ship arrival, and Fleet Strike belong to the same character. His ship enlarges the shapes already present in his helmet, coat blades, and drone. His basic attack hints at a larger source of power which his finisher finally reveals.
+
+Apply that principle to Veyr:
+
+- One visual vocabulary: hood, skeletal hands, tattered mantle, blackened gothic rifle, blue-violet soul light, concentric arcane sights, floating focusing shards.
+- One personality: a patient, silent executioner. He has already found the weak point. He expends almost no motion until the shot.
+- One escalation: a few focusing rings for an ordinary shot, a much larger accelerator for the special, an impossible procession of sights for the gate finisher.
+- One payoff: the individual sniper personally fires the decisive shot. The rifle stays central throughout.
+- Deliberate anticipation, a violent release, physical recovery, then unnerving calm.
+- Spectacle that other players can see happening over the owner's actual plot.
+- A visible aftermath that remains for a few seconds, allowing the result to register.
+
+Build the animations slower than your first instinct. It is easier to shorten a readable performance than rescue an unreadably fast one. Large objects and powerful attacks need time to acquire scale and weight. Ordinary combat still needs a practical cadence; reserve the longest buildup for the finisher.
+
+Use Malak's engineering patterns where they fit. Veyr should have his own arrival, effects, silhouette, and performance. Avoid introducing a ship, orbital bombardment, drone swarm, or military hologram into his kit merely because Malak already has them.
+
+3. CONCEPT ART: THE FEATURES THAT MUST SURVIVE THE TRANSLATION
+
+The image shows a hooded, skeletal spectral marksman holding an exceptionally long arcane rifle. The hood encloses a dark face with two bright blue eyes. Black, sharp armor and skeletal details sit beneath a ragged, wind-torn mantle. Thin cloth strips and fragments trail behind him. His exposed hands are unmistakably skeletal, one at the trigger and one supporting the weapon. Small dark shards with violet-blue cores hover above and behind his shoulders.
+
+The rifle is the defining silhouette: a real stock and receiver, an obvious scope, gothic mechanical ornament, a long structural barrel, glowing channels, and a sequence of luminous magic rings surrounding the extended shot axis. The largest, most ornate sight is in front of the muzzle. The art's rings read as a supernatural extension of the weapon, focusing the shot into something larger than the physical gun.
+
+Translate this into the project's procedural, angular, low-poly Roblox language. Preserve the silhouette and hierarchy of detail. Keep the face and rifle readable at normal gameplay distance. A tiny generic humanoid with a glowing cylinder will not satisfy the reference.
+
+Suggested proportions: a lean figure around Malak's general character scale, perhaps 7-8 studs tall, with a rifle conspicuously longer than his torso and approximately comparable to his height. Validate these proportions visually in the real formation. Do not make a 25-stud physical rifle that constantly intersects the wall or neighboring units. The magical extension can provide the extreme reach in the art.
+
+Palette: near-black cloth, charcoal/blackened steel, restrained cold silver or bone accents, bright spectral blue eyes, indigo/violet energy with a pale hot center. Keep dark surfaces visibly different enough to read as layers. Place bright light deliberately in the eyes, barrel channels, small shard cores, and active runes. Large pale neon surfaces become white under bloom, so use saturated color for most glowing outlines. Shape must carry the detail even without particles.
+
+The base form can already look ghostly; the reference itself is spectral. The awakened form should visibly intensify it rather than look like the same model with every part recolored purple.
+
+Do not model the cathedral background from the art as a permanent unit accessory. Draw on its architectural language for the finisher's sights and temporary framing.
+
+4. MODEL, RIG, AND AWAKENED FORM
+
+Create reproducible, rerunnable build scripts, following repository conventions. Suggested files: tools/studio/build_veyr.lua and build_veyr_shadow.lua. Build ServerStorage.Models.Veyr and Veyr_Shadow. Preserve an existing manually altered version if needed before replacing it. Keep changes scoped to this unit.
+
+Use the existing procedural rig architecture: HumanoidRootPart, the appropriate PrimaryPart, Rig = "Procedural", correct RootHeight and Height attributes, an explicit Pose and AttackStyle, front = local -Z, and the established Motor6D conventions. Match the actual animator's assumptions rather than inventing an incompatible rig. Model-space axes are appropriate for building the model; world-space X/Z are not appropriate for plotting gameplay.
+
+The rig needs independent body, neck, shoulders, elbows, wrists, and lower-body control, plus useful secondary joints for the mantle and weapon. Include sensible named attachments for muzzle, scope/sight reference, receiver/ejection, and focusing-ring origin. A separate weapon joint should support recoil and subtle correction without detaching the hands.
+
+Make the two-handed grip physically convincing. The right hand stays at the trigger/stock and the left hand supports the fore-end. Maintain stock contact at the shoulder while aiming. Coordinate the shoulder, elbow, wrist, torso, and weapon transforms rather than waving the rifle independently through both hands. Use procedural pose math or compatible IK only if it improves this specific rig; do not replace the established animator architecture to satisfy a generic skill example.
+
+Build the hood as a deep shadowed shape with a readable rim and two visible eyes. Use an angular skull or suggested jaw inside, not a bright exposed white face. Give the shoulders asymmetry and a few large, readable torn cloth masses. Split important cloth strips into a manageable number of spring-driven sections. Make floating shards individually legible and keep their motion restrained.
+
+Build enough physical rifle detail that it remains impressive when its effects are off: stock, trigger area, scope with mounts, receiver, layered barrel housing, braces, gothic fins or ribs, restrained rune channels, and muzzle. Avoid coplanar plates, overlapping transparent shells, and decorative parts that cause z-fighting. Establish a hierarchy of silhouette, major forms, then accents before adding small ornament.
+
+Use the existing physics/rig pattern: only the intended root is anchored or controlled as appropriate; moving pieces are connected correctly, noncolliding, and massless where expected. Do not weld a chain of parts to an anchored cosmetic carrier and then assume manually moving the carrier will update every welded child. Follow the project's proven method for each kind of moving assembly.
+
+Awakened form at Economy.AWAKEN_LEVEL, currently 10: same rig and silhouette, darker void materials, stronger violet interior energy, a thin ethereal shell, dark flames, trailing wisps, a low smoke pool, and a restrained outline, consistent with other awakened units. Preserve the bright spectral blue eyes as his trace of life. Add a few subtle suspended weapon/armor fragments if they strengthen the silhouette. Do not rely on recolor alone, and do not obscure the hands, hood, or rifle with fog.
+
+Inspect runtime effects in both forms. Their palette must follow Form or an explicit unit palette; effects that unconditionally restore base colors would erase the awakened treatment. Do not assume recoloring the template fixes code-created rings, lights, and beams.
+
+Publish both finished models with publish_unit_models.lua. Verify world clones, inventory portraits, animated Codex portrait, held unit, and reveal model. ViewportFrames do not render the normal world particle/beam/light effects, so the model's visual identity must work there through geometry, materials, and framing. The long rifle must not make the portrait reduce the face to a dot; use the smallest justified per-unit framing option if necessary.
+
+5. IDLE AND MOVEMENT
+
+Veyr should feel unnaturally still, with small signs of a living performance:
+
+- A slow, irregular hover or gliding step that suits the spectral legs in the art.
+- Very subtle breathing or upper-body settling, without making a skeleton heave like a brute.
+- Occasional small head corrections, as if seeing something far away.
+- A controlled resting rifle angle and a convincing transition into the shoulder.
+- Cloth and shards that lag behind starts, stops, and turns; they must not move in perfect unison.
+- A trailing shadow wake during movement that settles gradually on arrival.
+
+Use springs and smooth blending for secondary motion. Knell's momentum rule applies: preserve continuity through aim, fire, recoil, recovery, walk interruption, special, finisher, and return to idle. Do not lerp the whole rig back to an arbitrary rest pose immediately after impact. Avoid identical sinusoidal motion on every appendage.
+
+Build on the existing formation and marching behavior. Use a normal rear firing row rather than static/infiniteRange behavior unless the live geometry proves that necessary. Start around attackRange 32, which the current standDistance calculation puts about 60 studs from the wall. Measure the actual row rather than treating attackRange as the literal standing distance. Confirm there is room for the figure, rifle, effects, and initial grave-to-wall journey on rotated plots.
+
+6. BASIC ATTACK: DEAD RECKONING
+
+A deliberate, heavy sniper shot approximately every 7.5 seconds. Use that as a first-pass tuning value, then ensure the recovery fits comfortably before the next attack, including normal speed modifiers. Choose base damage to put his ordinary DPS in the same intentional band as the current Sovereign roster; inspect live definitions and docs/economy.md rather than blindly copying a stale number.
+
+First-pass performance, measured from the server-authorized attack start:
+
+0.00-0.90: bring the rifle firmly into the shoulder, settle the off-hand, narrow the posture. A small scope glint and slight eye intensity increase establish focus.
+0.90-2.20: two or three thin arcane focusing rings materialize in sequence along and just ahead of the muzzle. They counter-rotate and draw small motes into the rifle's energy channels. A restrained sight appears at the actual wall aim point.
+2.20-3.15: rings become coaxial and stop drifting; breathing, cloth motion, and aim settle. The center contracts. A short, readable quiet beat precedes release.
+3.20: fire one near-instant spectral round through the rings. Show a brief white-violet core, a narrow directional trail, and pressure rings along the trajectory. It is a powerful rifle discharge with a finite round/trail, rather than a continuously active beam.
+Approximately 3.30: impact at the captured wall point. Match the authoritative server hit exactly to the actual chosen travel time. At different distances use a shared speed/release calculation if needed, rather than allowing the visible hit and HP loss to drift apart.
+3.20-4.50: shoulder and weapon recoil together, torso absorbs the impulse, mantle and shards react slightly later. The wall shows a small, intense puncture flash, a brief dark-violet fracture or entry scar, outward chips, and a contracting ring. The effects communicate concentrated penetration rather than Malak's explosive orbital shell.
+4.50-6.40: rifle returns through a controlled arc; a subtle receiver/bolt or rune-chamber reset gives the action a mechanical finish. Rings cool and withdraw rather than disappearing on a single frame. Flow into the next held posture.
+Remaining time: stillness.
+
+The ring sequence must be visible from the normal gameplay camera, but not so large that the basic competes with a special. Use narrow highlights and timing, not a permanent screen-filling glow cloud. No floating damage numbers. Camera shake is brief, modest, owner-only, and distance-aware; ordinary attacks never take over the camera.
+
+Implement through the game's real attack pipeline. Existing attacks use AttackCount, AimPos, AttackCD, and other model state; OrbitalStrike is the reference. Audit the publication order because the current generic code increments AttackCount before writing AimPos. Ensure this unit cannot read the previous shot's aim. If accurate reconstruction requires an explicit server timestamp, add the smallest compatible field and write dependencies before the trigger. Do not use a client-reported hit as proof of damage.
+
+7. PASSIVE / UNIQUE TRAIT: THE LAST SIGHT
+
+When Veyr's basic round successfully lands on the current wall, it exposes a weak point for 6 seconds. While marked, the whole army deals +10% damage to that wall. Show a restrained broken sight or violet fracture around the impact; the marker must not become visual clutter.
+
+The trait is named after his title, following the commander convention. Numbers are first-pass constants, read from shared data by both gameplay and descriptions. Duplicate Veyrs refresh one effective mark; they do not multiply the same trait. A stronger version, if one exists in future, takes precedence rather than stacking every copy.
+
+This is server-authoritative, tied to a specific wall instance and run, and cleared when the wall is replaced, the plot resets, or the effect expires. The shot that establishes the mark should not retroactively gain its own new bonus. Keep the interaction with existing auras, family multipliers, and other commanders explicit. Reuse the existing trait/multiplier structure when practical, avoiding an unrelated second damage system.
+
+This does not give Veyr a normal family. Like other Signatures/Sovereigns he occupies a commander throne and has a unique trait. Preserve the two-throne limit, locked second throne, recall/place behavior, family-aware Place Best, and the Army screen's tooltip behavior.
+
+8. SPECIAL: THE LONG GOODBYE
+
+A cinematic combat ability on a first-pass 150-second real cooldown, lasting about 12-14 seconds. Use the existing special charge/meter path, including the Studio FAST/REAL option and Arcane family cooldown modifiers.
+
+Veyr interrupts his ordinary aiming cycle smoothly and takes a firmer firing stance. Several floating shards move forward, unfold into dark gothic brackets, and establish a long sequence of 5-7 large focusing sigils between the muzzle and the wall. Each is an enlarged relative of his basic sights. They appear with deliberate rhythm, grow more substantial, and align on one precise target. The mantle is pulled forward by the gathering energy.
+
+A small spectral round forms in the receiver or chamber, enters the barrel, and is released down the sight corridor. Each ring flashes in succession as the round passes through, adding a short pressure pulse. The last release is extremely fast and concentrated. The round creates a large penetrating fracture and a delayed implosion of violet energy at the wall. Veyr absorbs much heavier recoil, then slowly resets as the apparatus breaks into shards and returns to him.
+
+This special should be a short spectacle in normal combat. It does not take over the camera and does not stop other units. Pause his own basics during it, then resume smoothly. Do not add an independent drone companion just to imitate Malak; his shards serve the weapon.
+
+Use a provisional total bonus budget of 20 seconds of the whole army's effective ordinary DPS, with an initial impact and a smaller delayed fracture collapse, for example 80% / 20%. Select exact hit moments after authoring the visual sequence; put the resulting timing contract in shared data or one small shared timeline module so server damage and client visuals agree. The special is additional army-scaled power, not a percentage of wall maximum/current HP.
+
+Important existing limitation: Army.startSpecial's ordinary hits path currently budgets def.damage / def.attackCD * share * cooldown, which is the individual unit's damage share. It will not automatically produce an army-DPS special. Malak's startSwarm has an army-DPS implementation, but it follows the current front because the drones travel; that is a different targeting contract. Extend the smallest suitable server mechanism so Veyr can deliver an army-scaled special to its original wall without double-counting its ordinary damage or changing other units' existing budgets.
+
+Define the army-DPS snapshot precisely: take the ordinary effective DPS of valid active units once at special start, using their already-applied level, ascension, aura, family, and trait multipliers once. Exclude recursively adding this special or other army-seconds specials into that snapshot. Record the budget and distribute it across the authored impacts. If the special pauses Veyr's basics, account for that lost time when describing/tuning his real contribution rather than claiming nominal damage/attackCD is exact combat throughput.
+
+Capture the target wall and a run/attack generation. If that wall breaks or the run resets before either hit, discard the remaining damage and gracefully let the visual finish or dissipate at its original location. This stationary accelerator should not teleport to the next wall or damage a newly raised one. Recall, unit removal, finisher start, and ascension must cancel outstanding gameplay callbacks and end or blend out the effects safely.
+
+9. GATE FINISHER: THE FINAL HORIZON
+
+Give Veyr a complete Sovereign finisher with Malak-level cinematic care. First-pass duration: about 48 seconds. A slow, legible buildup is intentional. The defining image is a long corridor of enormous gothic sights lining up between one small skeletal rifleman and the gate, then one impossible shot passing through them all.
+
+The power escalates from the same rifle and focusing geometry the player already knows. The army understands the danger and clears the line. The world seems to hold its breath. A vast final sight opens against the gate like a spectral cathedral window, composed of thin rings, pointed arches, rune bands, and a sharply defined center. The sniper still fires his own weapon; the apparatus focuses that shot.
+
+Suggested beat structure, to refine against actual Studio framing:
+
+0.0-2.0, THE LINE GOES QUIET. Owner letterbox and camera ease in. Ordinary attacks stop. The wall is held by the server. Move from the player's actual camera to a clear view that establishes Veyr, the firing corridor, and the distant gate.
+
+2.0-7.0, THE MARKSMAN. Slowly approach the hood, supporting hand, scope, and receiver. He lowers his head into the sight and seats one distinct spectral round. Show the physical mechanism or chamber receiving it. This is the first time he treats a target as worth a second of preparation.
+
+7.0-12.0, CLEAR THE SHOT. The army retreats or moves safely out of the corridor with existing server-controlled finisher behavior. Veyr stays. His shards peel away and station themselves along the line. His long cloth strips pull into the growing pressure. Keep the camera spatially understandable.
+
+12.0-22.0, THE PROCESSION OF SIGHTS. Large focusing rings assemble one after another down the lane. Dark structural ribs form around some of them, with thin luminous rune bands inside. Vary scale and depth with purpose. Let each assembly finish enough that viewers understand the mechanism before showing the next. The camera glides beside/through a safe offset from the corridor so the depth reads.
+
+22.0-29.0, THE FINAL HORIZON. The enormous final sight opens in front of the gate and frames it. Reveal the whole alignment in a wide composition. The realm keeper notices: eyes sharpen or change, hands tense, and its attention turns toward the shooter or apparatus. Use the real keeper's position and scale.
+
+29.0-35.0, ALIGNMENT. Ring motion accelerates briefly, then locks in sequence toward the gate. Rune fragments slide into place. A razor-thin central line connects the physically coherent muzzle-to-gate axis. Energy gathers inward, rather than turning the entire screen purple. The shot still has an obvious origin and destination.
+
+35.0-37.0, STILLNESS. Return close enough to read the blue eyes and trigger hand. A small final finger motion. A brief music/ambience duck and suspended dust make the pause feel deliberate. Avoid spending all visual intensity before the shot.
+
+37.0-39.0, THE ROUND. Fire once. It passes each sight with a timed flash and pressure ring. Use a brief cinematic travel treatment if needed to let the audience read the chain, then a violent final acceleration. Do not imply a slow ordinary bullet. Recoil travels from rifle to shoulder to torso to cloth; the marksman must remain physically connected to the weapon.
+
+39.0-43.0, PENETRATION. The gate is struck at the chosen authoritative impact moment. A small blinding entry point becomes a huge dark-violet fracture, a brief delayed collapse, a directional shockwave and debris, then the real gate destruction. The keeper recoils and retreats into the rifts. The shot does not kill the realm keeper, who remains a future boss. If a hand blocks the shot, first validate that the existing hand rig can reach the actual firing line convincingly; otherwise have the keeper react to the gate impact and collapse. Do not draw a straight shot through the low gate and a high face if those points are not collinear. No unsupported teleporting hand or arbitrary giant limb extension.
+
+43.0-48.0, THE LAST SIGHT. Return to a calm hero view of Veyr. His rifle vents a thin shadow wisp; he resets the action once. The enormous sights crack, collapse into fine sparks, and leave the fractured afterimage for a few seconds. His shards return in smooth arcs. The final shot must have time to register before control returns.
+
+Let a restrained residual sight or scar linger briefly in the world after the camera returns, then fade and clean it up. Do not leave a permanent wall prop or expensive effect over the plot. The cinematic should still look good if viewed from a neighboring plot without the owner's camera.
+
+10. FINISHER GAMEPLAY, OWNERSHIP, AND MULTIPLE SOVEREIGNS
+
+Follow Malak's real contract: an account unlock purchased once with gems; an eligible placed commander; THE GATE at or below 20% HP; one finisher for that gate; server holds the gate until the authored destruction beat; server performs the actual break, drops, quest progress, keeper retreat, and portal through the normal wall pipeline.
+
+Use a provisional 1000-gem unlock, kept separate from Fleet Strike. Suggested keys: profile.finalHorizon, Economy.FINAL_HORIZON_PRICE, and BuyGemItem("FinalHorizon"). Integrate the default value, save/load, DataSync, client State, Gem Shop Skills card, and Codex Unlock card. Validate ownership and affordability on the server, debit once, and handle repeat requests without charging twice. Old saves need a safe default. An existing Fleet Strike purchase must not unlock Veyr's finisher or vice versa. Do not reset or remove my test save without asking.
+
+The current trigger is specifically Army.checkFleetStrike, and the per-wall guard is fleetStrikeWall. Merely adding a client module or sovereign = true will not make a second finisher work. Introduce the smallest maintainable shared eligibility/arbitration mechanism needed for both units, retaining Malak's behavior and timings.
+
+Define the both-commanders case now. Default policy for this task: scan eligible commander throne slots in ascending slot order; the first placed commander with its own finisher unlocked wins. If the first commander has no unlocked finisher, the next eligible one may fire. Dev spawns can be eligible through a deterministic fallback only when no real throne candidate wins. Document that priority in the Codex or relevant concise tooltip if players need it. Do not add a whole settings panel solely for arbitration.
+
+One active finisher per plot and one winner per gate instance. Both finishers must never start in the same update or pay out twice. Check any existing finisher before allowing either trigger. Reserve the gate atomically when a winner is chosen. High damage that crosses the threshold in one hit must still respect the trigger/hold contract; inspect the order in which damage handlers call breakWall rather than assuming a later Heartbeat always gets a chance to reserve the gate.
+
+Capture the gate instance/run generation. A delayed finisher callback must not break the next run's gate. Already in-flight ordinary attacks, companion volleys, beams, barrages, specials, and even necromancer damage must not bypass the hold or accidentally damage replacement walls. Keep the local fix proportional, but close paths exercised by the new unit and finisher. In particular, the current ordinary delayed-hit closure does not capture the target wall the way fireCompanion and startSpecial do; audit this when adding Veyr's long windup.
+
+Use the existing generic finisher hold/flee mechanism where it fits. Restore the army and streaming focus on finish or safe cancellation. Removing the source unit or an owner leaving must not leave a gate permanently invulnerable or a plot frozen. Settle or cancel through a clearly defined server path.
+
+Broadcast synchronized world effects to all clients using a server startAt. Render from workspace:GetServerTimeNow() - startAt. Only the owner automatically enters the camera sequence; others see the world performance and can choose Watch/Leave. Skip returns camera, controls, and UI immediately while the real shared-world finisher and server gate resolution continue. Never let Skip or a client-reported end authorize the gate break.
+
+Provide a Studio preview that is distinct from real progression. Preview can hide/damage the gate visually on that client and request the temporary server army hold, but should not grant real gate loot or unlock state. Return false or a clear message if preview prerequisites are missing. Preserve the existing Fleet Strike preview.
+
+11. CINEMATIC ENGINEERING AND STREAMING
+
+Use FleetStrike's successful camera approach: one authored continuous path with smooth position, look-at, and FOV curves. Its current cameraAt uses a monotone Hermite slope rule to avoid overshoot; do not assume the old Catmull-Rom comment describes the final implementation. The key requirement is continuity without clipping or sudden stalls between beats. Author close, medium, wide, target, and return compositions as one understandable journey.
+
+All coordinates must derive from the actual unit transform, plot frame, gate, and keeper, with lateral/forward/up offsets. Plots point in different directions. Never assume the lane is world Z or the next plot is world X. Use PlotFrame.toWorld/toLocal/forwardFlat as appropriate. Keep ring normals aligned to the real shot axis. Preserve the same spatial orientation through close-ups and wide views so the sequence does not feel as if the shooter teleported.
+
+Streaming focus matters for the far gate/keeper. Reuse or extend the server focus handling and RequestStreamAroundAsync where required; restore focus afterward. Keep distant spectacle within a range that low graphics quality actually draws. Malak's ship had to be scaled and brought closer for this reason. Do not build a magnificent accelerator outside the draw distance and assume the camera will render it.
+
+Camera/UI/control takeover and restoration must work on natural completion, Skip, Leave, failure, respawn, model removal, and a conflicting personal cinematic. Restore previous GUI and nameplate visibility rather than blindly enabling everything. Restore FOV, camera mode/subject as appropriate, input controls, local lighting/atmosphere, music volume, and keeper attributes that were temporarily overridden.
+
+Use a small shared presentation guard if needed to prevent Veyr's finisher, Malak's finisher, and either pull cinematic from simultaneously owning the camera. World effects on different plots should be able to coexist even when this client watches only one event. Avoid global cleanup that destroys another plot's effects. Assign unique event/folder/render binding identifiers. Joining Watch late should seek to the shared clock, not replay the beginning or fire all old sounds at once.
+
+12. UNIQUE PULL CINEMATIC: A SIGHT BEYOND THE GRAVE
+
+Build a unique Sovereign arrival for Veyr, about 28-35 seconds before the usual final absorption/result handoff. It should introduce the same supernatural marksmanship, in a spatially coherent scene, rather than borrowing Malak's pod or ship.
+
+Suggested sequence:
+
+- Start with the actual selected grave and the familiar raising/shaking anticipation, then everything becomes unnaturally still.
+- A tiny blue-violet sight appears over the grave. A faint distant glint is seen through a slim dark opening; there is a clear sense that something has already aimed at this location.
+- Arcane rings open in succession along a visible line into the grave, revealing depth and a precise destination. Keep the relevant origin and rings within render distance through staging rather than placing them kilometers away.
+- One spectral shot crosses the sights and strikes the grave. Its burst uses the real GraveOpening behavior and the selected grave model.
+- The impact reveals a narrow shadow breach and low spectral fog. Veyr slowly glides forward or rises from it, already holding the rifle. His eyes are readable before the full body appears.
+- Shards find their places around his shoulders, the final sight shrinks around the muzzle, and he settles the rifle with one deliberate action.
+- Hero framing: hood, skeletal hands, rifle, title, Sovereign treatment, raw displayed odds. A restrained final rifle/eye glint closes the introduction.
+- Continue into the existing absorption and result bookkeeping, including multi-pull results and Sync hold/release. Keep the existing Auto Roll behavior intact. Do not turn this task into a global rewrite of reveal UX.
+
+Crucial routing issue: GraveRolling currently sends any Sovereign to SovereignArrival.play, whose implementation explicitly depends on Malak's Absolution and pod. Adding Veyr with sovereign = true would otherwise summon Malak's ship for him. Add explicit unit-based dispatch or a small arrival registry and preserve the Malak route, including failure fallback. Inspect how the actual best result is chosen so Veyr's arrival cannot show the wrong unit in a multi-pull containing another Sovereign.
+
+Extend the server-validated ArrivalStarted/ArrivalShow route and spectator dispatcher to select the correct arrival. Keep validation of the recent actual Sovereign pull, ownership, reasonable position, age, and replay prevention. Other players see Veyr's world arrival and can Watch/Leave on the shared clock; they do not inherit the owner's ritual, absorb, or inventory rewards. RarePull banners should display Veyr's name/title and correct class. Preserve fallback to existing reveals when a model/effect is unavailable.
+
+13. DATA, ECONOMY, UI, AND COMPLETE INTEGRATION
+
+Register Veyr through the existing shared unit definitions: stats, sovereign flag, title, rarity pool, descriptions, lore, basic attack description, passive, special, and finisher metadata. No emojis in UI or new display strings. Use existing naming/title conventions and formatting. Values in Codex descriptions must come from actual data, including highlighted numeric braces where the existing system uses them.
+
+First-pass release placement: Primordial, Celestial-only, relative pool weight 0.05 like Malak. This is a proposed starting balance, not a preexisting agreement. Inspect the live pool math and run the relevant existing simulator/checks before accepting it. Adding a unit changes the existing units' relative chances; report that effect rather than claiming it preserves Malak's odds. Preserve grave restrictions and the wheel's handling of restricted units. If a simulator cannot model the new special, state that limitation and calculate its incremental contribution explicitly. Do not rewrite the economy to make the unit fit.
+
+Confirm normal ownership flow: rolling, discovery, inventory, lock/sell/dismantle behavior, commander placement, recall, level upgrades, awakening at level 10, persistence of unit level/fails/lock, Place Best, and ascension. Reuse those systems rather than creating a separate inventory or progression path.
+
+Show the new trait, basic, special, and locked/unlocked finisher on Codex. Include a concise original lore paragraph: a dead marksman who sees the last point at which resistance can survive, patient enough to wait beyond death. Avoid borrowing names, biographies, or exact characters from another franchise. Explain the mark/army-DPS special accurately in player-facing language. Implementation details stay out of the UI.
+
+The Gem Shop Skills tab gets the new unlock card, with correct Owned/Unlock/price state and server notices. Use the established dark gothic Theme and existing window registration rules if you introduce any new window. The Army screen should show the Sovereign and its title-derived unique trait through the shared metadata.
+
+Add Studio-only development access: spawn at WALL or GRAVES, inventory give using the existing dev path, base/shadow levels, preview arrival, preview finisher, gate-to-threshold, and the existing FAST/REAL special cooldown behavior. Use the current controls rather than cluttering the HUD with permanent test buttons. Guard every dev remote on the server with RunService:IsStudio(). Dev world spawns must never save.
+
+14. SOUND, SUBTITLES, AND PERFORMANCE
+
+Use Sfx.lua and existing asset conventions. Inspect the local sounds library before reusing assets. The sound character should follow the kit: faint optical/rune ticks, an inward gathering tone, a sharp heavy rifle crack, a short supernatural pressure tail, restrained receiver mechanics, and a low fracture-collapse sound. Finisher layers build from these same sounds. Keep the quiet beat before the decisive shot and avoid stacking every cue at full volume.
+
+Reuse suitable available effects and music where authorized by the existing project. Do not substitute Malak's personal voice lines or invent Roblox asset IDs. If a new voice recording is unavailable, keep the unit complete and playable without speech, provide clearly named optional Sfx slots, and list exact suggested lines and cue times in the unit document. Suggested optional lines: arrival, "You were already in my sights."; before the final shot, "There is no distance left."; aftermath, "The line is clear." These are new suggestions, not existing recordings.
+
+If speech is present, use responsive subtitles with a speaker label, MaxVisibleGraphemes, phrase pauses, shared-clock seeking, and music ducking. Hide subtitles when not watching or after Skip. Preserve the established UI style while giving Veyr an appropriately restrained delivery. World sounds should attenuate or reduce volume for nonwatchers; close personal sounds should not play loudly across the entire server.
+
+Keep effects client-rendered and server damage authoritative. Use particles, beams, trails, and a limited amount of procedural geometry where each is appropriate. Reuse ring/rune construction helpers if practical, while retaining a distinctive sight design. Do not create thousands of tiny parts for every ordinary shot.
+
+Budget by visual layer: readable silhouette and round path first, rings second, impact third, residual smoke last. Control overdraw from overlapping translucent rings, cloth shells, full-screen haze, and smoke. Use local distance/quality culling for normal combat, but do not cull the main cinematic subject while watching just because the character is far away. Cull relative to the viewing camera where appropriate. Reuse textures and cache/reuse builders when useful. Emit short bursts rather than leaving high-rate emitters alive forever.
+
+Destroy temporary parts, attachments, emitters, trails, sounds, lights, UI, connections, and render bindings. Cancellation and normal finish should be idempotent. Repeated attacks, previews, and two nearby units must not accumulate dormant instances or leave a global postprocess effect active.
+
+15. IMPLEMENTATION ORDER
+
+Carry the work through these stages, keeping each one inspectable:
+
+A. Read the references, inspect the image, and briefly restate the visual/behavioral direction plus the relevant existing contracts. Record a compact implementation plan. Identify current code/document disagreements once, then use verified code.
+B. Build and inspect base model from front, side, rear, and ordinary camera distance. Fix silhouette, two-handed grip, scale, cloth, and rifle before effects obscure them.
+C. Add base idle, movement, aim, recoil/recovery, and awakened model. Verify the same rig works in world and Codex.
+D. Integrate the ordinary shot and passive with authoritative timing, formation, wall targeting, and impact effects.
+E. Build the special, charge meter integration, army-DPS budget, interruption behavior, and base/shadow effects.
+F. Implement finisher frame, shared arbitration, preview, and a readable graybox timeline/camera. Then build the ring assemblies, charge, round, gate destruction, keeper reaction, and aftermath. Polish timing once the whole sequence is inspectable.
+G. Implement the complete Veyr pull cinematic and unit-specific owner/spectator dispatch while preserving Malak's arrival.
+H. Finish purchase/save/UI/Codex/lore/pool integration, audio, and DEV controls. Some data integration will naturally happen earlier; this stage verifies it is complete.
+I. Run the functional and visual checks below, fix observed problems, publish client model copies, and update docs. Do not finish with an unexecuted test plan.
+
+Keep user-facing progress updates concise. Focus on what is working, the visual decisions, and unresolved facts. Show screenshots at meaningful points, not a long transcript of tool calls.
+
+16. STUDIO VERIFICATION AND ACCEPTANCE CRITERIA
+
+Use Studio MCP as CLAUDE.md describes: models built in Edit, scripts changed only in src/, allow Rojo to sync, verify the changed source arrived when necessary, start Play, exercise behavior, read get_console_output, and stop. Remember execute_luau returns only explicit return values, and requiring a module through MCP gives a fresh instance rather than the running module's private state. Inspect actual instances, attributes, HP, remotes, and visible results instead of confusing a fresh module with live game state.
+
+At minimum verify:
+
+- Both templates exist, are correctly rigged, and have matching animation contracts. Rerunning each builder is safe. Client copies include both forms.
+- Base and awakened forms appear correctly in-world, in inventory, in held form, in reveal, and in animated Codex. The rifle and hood remain readable without particle rendering in portraits.
+- Idle, marching from a grave/throne, turning, arrival, and repeated basic cycles look smooth. Both hands remain on the weapon, stock/shoulder contact is credible, and there is no rest-pose snap after a shot.
+- Basic HP loss matches visible contact. A wall broken during the windup does not cause the old round to damage its replacement. Recall/removal/reset cancels stale damage.
+- The weak-point mark applies only to its captured wall, expires correctly, refreshes without stacking duplicates, and produces the actual advertised army bonus. Inspect damage values rather than relying only on the tooltip.
+- The special charges in FAST and REAL modes, respects Arcane modifiers, pauses/resumes basics as designed, deals the declared army-seconds budget, and cancels safely on wall replacement, recall, finisher, or ascension. Check level/ascension multipliers are applied once.
+- The whole unit works on at least two differently rotated plots. The muzzle, sights, hit point, and camera derive from the right frame. No ring is underground, behind the wrong wall face, or obstructing the shooter.
+- Finisher locked state cannot trigger. Unlocking debits the right gem amount once, survives save/load, syncs UI, and remains separate from Fleet Strike. Verify persistence through a controlled test, without deleting existing saves or treating the Stop button as proof that leave-save completed.
+- At the gate threshold the right finisher reserves the gate. A large threshold-crossing hit, an in-flight projectile, and a special cannot break it prematurely. At the authored beat it breaks exactly once and pays normal rewards once.
+- Both commanders together select one finisher by the documented policy. Try Veyr first, Malak first, only one unlock, and duplicate eligible units. Repeated finisher requests cannot create overlapping reservations.
+- Owner Skip restores the local view while the world event finishes. A spectator Watch/Leave, including late Watch, follows the server clock. Natural finish and interruption restore camera, controls, GUIs, nameplates, lighting, audio, and streaming focus.
+- Finisher preview is repeatable and does not grant real progression. Finisher FX on one plot do not destroy FX belonging to another event.
+- Veyr's arrival actually shows Veyr's sequence, while Malak still gets his own ship arrival. Check a multi-pull selection, reveal fallback, absorption, data release, banner, and spectator dispatch. Do not claim a true two-player result if you only injected a mocked event on one client.
+- Normal attacks and the finisher remain visible at low graphics quality. Inspect close/normal/far views and small-screen subtitle/UI fit. The final gate impact and keeper retreat are on screen when they matter.
+- Repeating attacks, special, arrival, and finisher previews does not leave accumulating FX, stuck sounds, nameplate state, camera bindings, or smoke. Read the console after meaningful tests and fix new errors.
+- Malak still attacks, uses Requisition, arrives, purchases/owns Fleet Strike, runs his finisher, and restores his camera. Shared changes must not regress him. Other basic attack styles and existing Signature specials still initialize cleanly.
+
+Use focused tests and live checks appropriate to the changed behavior; a successful Rojo build alone is not visual or gameplay verification. If the Studio connection or multiple clients are unavailable, finish everything you can, state exactly which checks remain unverified, and provide reproducible DEV steps. Do not claim a check passed without evidence.
+
+17. DOCUMENTATION AND FINAL HANDOFF
+
+Create docs/veyr.md with the final character direction, concept path, model builder instructions, rig/joint/attachment contract, base/shadow differences, actual kit numbers, authoritative timing tables, finisher beat times, arbitration policy, arrival routing, purchase/save keys, sound slots, optional voice lines, DEV instructions, and any unresolved limitations. Record final behavior rather than leaving obsolete drafts above the truth.
+
+Update the relevant sections of docs/models.md, docs/features.md, docs/economy.md, and docs/backlog.md to reflect what changed. Update docs/envoy.md where a shared finisher/arrival policy materially changes Malak's integration. Change CLAUDE.md only for information every session needs. Keep the architecture understandable for the next agent.
+
+Finish with a concise report covering what was built, where the important files/models are, the exact DEV steps to inspect the unit, which Studio checks passed, and anything requiring recordings or genuine follow-up. Remind me to save the place because models live in Studio. Do not commit or publish.
+
+The quality bar: standing Veyr beside Malak should feel like adding a second fully realized Sovereign with his own visual language and memorable payoff. His silhouette should immediately match the supplied art. Watching one basic shot should explain his character. Watching his finisher should feel like seeing that same rifle and those same sights reveal their full power.
