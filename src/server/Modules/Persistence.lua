@@ -75,6 +75,7 @@ local function collect(player, profile)
 		fleetStrike = profile.fleetStrike,
 		finalHorizon = profile.finalHorizon,
 		lastBroadside = profile.lastBroadside,
+		lastCross = profile.lastCross,
 		commanderSlots = profile.commanderSlots,
 		broker = profile.broker,
 		settings = profile.settings,

@@ -16,6 +16,7 @@ local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rarities = require(ReplicatedStorage.Shared.Rarities)
 local VeyrTimeline = require(ReplicatedStorage.Shared.VeyrTimeline)
 local AdmiralTimeline = require(ReplicatedStorage.Shared.AdmiralTimeline)
+local HushTimeline = require(ReplicatedStorage.Shared.HushTimeline)
 local GraveRune = require(script.Parent.GraveRune)
 
 local UNITS = SharedUnits.Stats
@@ -1292,6 +1293,10 @@ local FINISHERS = {
 	-- (the army never flees in his: it stands idle and the clients hide it on their screens, the user's call)
 	Orvoss = { kind = "LastBroadside", unlock = "lastBroadside", fleeAt = AdmiralTimeline.FINISHER.END + 10,
 		length = AdmiralTimeline.FINISHER.END, gateHit = AdmiralTimeline.FINISHER.GATE_HIT, remote = "LastBroadside" },
+	-- Hush's The Last Cross (docs/hush.md): a Sovereign since 2026-11-05; the army stands idle (hidden on
+	-- the clients' screens), like Orvoss's
+	Hush = { kind = "LastCross", unlock = "lastCross", fleeAt = HushTimeline.FINISHER.END + 10,
+		length = HushTimeline.FINISHER.END, gateHit = HushTimeline.FINISHER.GATE_HIT, remote = "LastCross" },
 }
 
 -- the unit whose finisher fires on this plot now (or nil), and its registry entry

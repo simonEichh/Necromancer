@@ -205,6 +205,7 @@ require(Modules.VeyrSpecial) -- Veyr's special, The Long Goodbye: his shards ope
 require(Modules.VeyrFinisher) -- Veyr's gate finisher, The Final Horizon: the server starts it for everyone (remote FinalHorizon)
 require(Modules.DoubleReport) -- Orvoss's basic attack: the ghost cannon, the two shots and the impact (AdmiralTimeline)
 require(Modules.LastBroadside) -- Orvoss's gate finisher, The Last Broadside: the server starts it for everyone (remote LastBroadside)
+require(Modules.HushFinisher) -- Hush's gate finisher, The Last Cross: the server starts it for everyone (remote LastCross)
 require(Modules.RarePullBanner) -- the banner everyone else sees when someone pulls a Signature / Sovereign
 require(Modules.SpecialFx) -- special attacks: charge meter over the unit, the Rift Chains
 require(Modules.KnellFx) -- Knell's soul tolls and the colossal spectral bell

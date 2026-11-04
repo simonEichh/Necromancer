@@ -58,6 +58,7 @@ function PlayerData.create(player, saved)
 		fleetStrike = false, -- bought Malak's Fleet Strike finisher (Gem Shop / Codex)
 		finalHorizon = false, -- bought Veyr's The Final Horizon finisher (Gem Shop / Codex; separate from the Fleet Strike)
 		lastBroadside = false, -- bought Orvoss's The Last Broadside finisher (Gem Shop / Codex)
+		lastCross = false, -- bought Hush's The Last Cross finisher (Gem Shop / Codex)
 		commanderSlots = 1, -- commander thrones (Signatures / Sovereigns); the second is bought with gems (GemShop)
 		settings = { master = 1, effects = 1, music = 1 }, -- the Settings panel: volumes 0..1 (saved)
 		saved = saved, -- raw saved data, for modules that restore their own state
@@ -86,6 +87,7 @@ function PlayerData.create(player, saved)
 		profile.fleetStrike = saved.fleetStrike == true
 		profile.finalHorizon = saved.finalHorizon == true -- (old saves: false)
 		profile.lastBroadside = saved.lastBroadside == true
+		profile.lastCross = saved.lastCross == true
 		profile.commanderSlots = math.clamp(math.floor(clampNumber(saved.commanderSlots, 1, 1)), 1, 2)
 		if type(saved.settings) == "table" then
 			for key in pairs(profile.settings) do
@@ -311,6 +313,7 @@ function PlayerData.snapshot(profile)
 		fleetStrike = profile.fleetStrike,
 		finalHorizon = profile.finalHorizon,
 		lastBroadside = profile.lastBroadside,
+		lastCross = profile.lastCross,
 		commanderSlots = profile.commanderSlots,
 		broker = { rot = profile.broker.rot, bought = table.clone(profile.broker.bought) },
 		settings = profile.settings,

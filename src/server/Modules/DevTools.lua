@@ -193,6 +193,21 @@ Remotes.DevLastBroadside.OnServerEvent:Connect(function(player, on)
 	Army.startFinisher(plotState, orvoss, F.END + 10, F.END, on ~= false)
 end)
 
+-- a Last Cross preview (client HushFinisher.lua): the plot's army holds (never flees; hidden on the screen), Hush stays
+-- put. No gate hold and no break.
+Remotes.DevLastCross.OnServerEvent:Connect(function(player, on)
+	local plotState = PlotRegistry.getPlot(player)
+	if not plotState then return end
+	local hush
+	for _, u in ipairs(plotState.activeUnits) do
+		if u.unitType == "Hush" then
+			hush = u
+		end
+	end
+	local F = require(ReplicatedStorage.Shared.HushTimeline).FINISHER
+	Army.startFinisher(plotState, hush, F.END + 10, F.END, on ~= false)
+end)
+
 Remotes.DevFastSpecials.OnServerEvent:Connect(function(_player, fast)
 	workspace:SetAttribute("DevFastSpecials", fast == true)
 end)

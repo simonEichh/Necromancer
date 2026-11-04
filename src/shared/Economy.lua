@@ -263,6 +263,8 @@ Economy.FLEET_STRIKE_PRICE = 1000
 Economy.FINAL_HORIZON_PRICE = 1000
 -- Orvoss's The Last Broadside (docs/orvoss.md): its own one-time unlock, the same trigger
 Economy.LAST_BROADSIDE_PRICE = 1000
+-- Hush's The Last Cross (docs/hush.md): its own one-time unlock, the same trigger (price provisional)
+Economy.LAST_CROSS_PRICE = 1000
 -- the second commander slot (the throne for a second Signature / Sovereign; Design.md "the commander slot")
 Economy.COMMANDER_SLOT_PRICE = 500
 Economy.MAX_COMMANDER_SLOTS = 2

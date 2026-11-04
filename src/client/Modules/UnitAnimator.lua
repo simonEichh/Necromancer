@@ -289,6 +289,7 @@ local DIVE_KEYS = {
 local ArrowFx = require(script.Parent.ArrowFx)
 local VenomFx = require(script.Parent.VenomFx)
 local Units = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Units"))
+local HushTimeline = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("HushTimeline"))
 
 -- Malak's drone volley: where its three rings drift to (in the drone's frame, studs at scale 1): a triangle in front of
 -- it, turned towards the wall, the big C-ring (3) on the outer side so nothing swings into him
@@ -1677,6 +1678,55 @@ local function animate(model, rig, dt, now)
 				blend("Waist", ANGLES(wp, wy, 0))
 				blend("Neck", ANGLES(np, 0, nr))
 				blend("Root", CFrame.new(0, float + rise + rise2 * scale, 0) * ANGLES(0, wy * 0.4, 0))
+			end
+		end
+
+		-- THE LAST CROSS (HushFinisher.lua sets FinisherAt / FinisherKind on this client; shared HushTimeline): he floats
+		-- up with his arms lifting, from SNAP on his head twitches and then snaps, harder and faster (every snap is a
+		-- jerk that rings out and settles), then it stays up, looking at the gate, until he floats down again
+		local finAt = model:GetAttribute("FinisherAt")
+		if finAt and model:GetAttribute("FinisherKind") == "LastCross" then
+			local HF = HushTimeline.FINISHER
+			local ft = workspace:GetServerTimeNow() - finAt
+			if ft >= 0 and ft < HF.END then
+				local function sm(x)
+					x = clamp01(x)
+					return x * x * (3 - 2 * x)
+				end
+				local up = sm(ft / HF.RISE_TIME) * (1 - sm((ft - (HF.END - HF.DESCEND_TIME)) / HF.DESCEND_TIME))
+				local w = sm(ft / 1.2) * (1 - sm((ft - (HF.END - 1.5)) / 1.5))
+				local function blend(name, target)
+					local joint = rig.joints[name]
+					if joint then
+						joint.Transform = joint.Transform:Lerp(target, w)
+					end
+				end
+				-- the arms lift towards a cross (the sleeves still hang from the elbows)
+				local lift = 0.5 * up
+				blend("Root", CFrame.new(0, float + rise + HF.RISE_HEIGHT * up * scale, 0) * ANGLES(0, math.sin(t * 0.3) * 0.08, math.sin(t * 0.6) * 0.05))
+				blend("RShoulder", ANGLES(0, 0, -sag + lift))
+				blend("LShoulder", ANGLES(0, 0, sag - lift))
+				blend("RElbow", ANGLES(0.05, 0, (sag - lift) + 0.06))
+				blend("LElbow", ANGLES(0.05, 0, -(sag - lift) - 0.06))
+				-- the head: shuddering more and more before the snaps, each snap a quick jerk that rings out
+				local pitch, roll, yaw = 0, 0, 0
+				local shudder = sm((ft - (HF.SNAP - 3)) / 3) * (1 - sm((ft - HF.RIFTS) / 1.5))
+				roll += math.sin(ft * 41) * 0.07 * shudder
+				pitch += math.sin(ft * 37 + 1) * 0.05 * shudder
+				for i, st in ipairs(HF.SNAPS) do
+					local d = ft - st
+					if d >= 0 and d < 1.2 then
+						local amp = 0.3 + 0.5 * i / #HF.SNAPS
+						local sgn = (i % 2 == 0) and 1 or -1
+						local env = sm(d / 0.04) * math.exp(-d * 7)
+						roll += sgn * amp * env * math.cos(d * 24)
+						pitch += -amp * 0.7 * env * math.cos(d * 19 + 0.6)
+						yaw += -sgn * amp * 0.8 * env * math.cos(d * 21 + 1.1)
+					end
+				end
+				-- after the last snap the head comes up and looks down the lane (towards the gate)
+				local raised = sm((ft - (HF.SNAP + 4.8)) / 2) * (1 - sm((ft - (HF.END - HF.DESCEND_TIME)) / 3))
+				blend("Neck", ANGLES(-0.35 + 0.5 * raised + pitch, math.sin(t * 0.4) * 0.1 * (1 - raised) + yaw, 0.32 * (1 - raised) + roll))
 			end
 		end
 	end

@@ -25,6 +25,8 @@ local EVENTS = {
 	"FinalHorizon", -- server -> all clients: Veyr's gate finisher starts ({ owner, startAt, unit, gate, unitCF })
 	"DevLastBroadside", -- Studio: Orvoss's finisher preview (the army holds; no real gate break)
 	"LastBroadside", -- server -> all clients: Orvoss's gate finisher starts ({ owner, startAt, unit, gate, unitCF })
+	"DevLastCross", -- Studio: Hush's finisher preview (the army holds; no real gate break)
+	"LastCross", -- server -> all clients: Hush's gate finisher starts ({ owner, startAt, unit, gate, unitCF })
 	"DevToughWall", -- Studio: the wall being fought gets a huge HP pool (to watch attacks, marks and specials on one wall)
 	"SaveSettings", -- ({ master, effects, music } volumes 0..1): the Settings panel (PlayerData)
 	"FleetStrike", -- server -> all clients ({ owner, startAt, malak, gate }): Malak's finisher starts (client FleetStrike)

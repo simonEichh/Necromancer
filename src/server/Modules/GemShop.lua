@@ -5,6 +5,7 @@
 --   BuyGemItem("FleetStrike")   one-time, Economy.FLEET_STRIKE_PRICE: Malak's gate finisher (Army.checkFinisher)
 --   BuyGemItem("FinalHorizon")  one-time, Economy.FINAL_HORIZON_PRICE: Veyr's gate finisher (separate from the above)
 --   BuyGemItem("LastBroadside") one-time, Economy.LAST_BROADSIDE_PRICE: Orvoss's gate finisher
+--   BuyGemItem("LastCross")     one-time, Economy.LAST_CROSS_PRICE: Hush's gate finisher
 --   BuyGemItem("CommanderSlot") one-time, Economy.COMMANDER_SLOT_PRICE: the second commander throne (Plots unseals it)
 -- Server authoritative: it checks the gems and the limits and changes the profile through PlayerData.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -75,6 +76,17 @@ function GemShop.buy(player, item)
 		profile.lastBroadside = true
 		PlayerData.changed(player)
 		Remotes.Notice:FireClient(player, "The Last Broadside unlocked: with Orvoss on a commander throne, his fleet takes the gate at 20%.")
+	elseif item == "LastCross" then
+		if profile.lastCross then
+			return
+		end
+		if not PlayerData.spendGems(player, Economy.LAST_CROSS_PRICE) then
+			Remotes.Notice:FireClient(player, "Not enough Gems (" .. Economy.LAST_CROSS_PRICE .. " needed).")
+			return
+		end
+		profile.lastCross = true
+		PlayerData.changed(player)
+		Remotes.Notice:FireClient(player, "The Last Cross unlocked: with Hush on a commander throne, the cross falls on the gate at 20%.")
 	elseif item == "CommanderSlot" then
 		if (profile.commanderSlots or 1) >= Economy.MAX_COMMANDER_SLOTS then
 			return
