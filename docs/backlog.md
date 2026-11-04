@@ -3,6 +3,50 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
+## Hush, the Unbreathing (2026-11-04 / 05: now a Sovereign, his finisher built end to end; details in docs/hush.md)
+
+**Done (first pass, in two commits):** the gate finisher THE LAST CROSS (~59 s, `HushFinisher.lua` + shared
+`HushTimeline`): he floats up with the glow and the first lightning already during the rise, his head snaps, five huge
+rifts open behind him, huge chains swarm out, a solid stone cross floats up out of a rift in the lane floor, the chains
+wind themselves round it (criss-cross lacing), fully wrapped it topples onto the gate like a felled tree, the ravine tears
+open at the hit, runs back down the lane and up the gate tower; he floats down. Server: registry entry, saved unlock
+(`lastCross`, 1000 gems provisional), Gem Shop item, remotes, DEV preview (`Anim: Last Cross`). The **real trigger was
+tested** in Studio (gate under 20 % -> the server logged it, every client played it, the gate was held and broken at
+`GATE_HIT`). The **promotion**: `sovereign = true`, title "The Unbreathing", Primordial, Celestial grave only, weight 0.05
+(1 in 56,000 like the other three), 85K DPS; his Codex page gets the Sovereign label, the COMMANDER badge, the title and
+the finisher ability with its unlock without further code.
+
+**Open for Hush (in this order of importance):**
+1. **Sounds**: thunder, chain rattle, the cross rising, the impact, his mask breath (no voice). Files come from the user.
+2. **The user's review of the whole finisher** (not yet seen in full by them): the face glow is a flat purple silhouette at
+   the snap peaks, the swarm passes very close to the camera (huge slabs fill the screen), the scene is dark overall, how
+   much stone should show under the chains.
+3. **A white frame** appeared a few times in the preview (once at the impact flash, probably Bloom 0.8 on the neon, once
+   at ~58 s that could not be reproduced); the flash was weakened afterwards. Look again with the real thing.
+4. **Not checked at all:** the first frames of the ravine after the hit and the climb up the tower in motion, a rotated
+   plot (everything was only run on plot 1: the geometry uses `PlotFrame`-style vectors but nothing proves it), a real
+   throne (the test used a dev Hush), a second client watching (Watch / Leave), frame rate with a real army (about 2000
+   parts, ~1300 moved by one `BulkMoveTo` per frame), the shadow form (level 10), what spectators see of the staff...
+5. **His own pull cinematic** (he gets Malak's ship, which does not fit a gas-masked child), then the economy sim (he is
+   a Primordial now), the unlock price, a Gem Shop card.
+6. The preview moves a near gate out to 240 studs; the real gate is the last wall. If the real lane is ever shorter than
+   ~240 studs the cross's size clamps (100-150) but the camera shots were only tuned for 240.
+
+**The necromancer's basic attack (restart, 2026-11-04):** a first visual try (hold F, a soul wisp from the Lantern Staff,
+IK arms, a closed-loop grip turn) was written, reviewed by the user ("looks horrible": the staff pointed its butt at the
+wall) and fully REVERTED at their request, nothing of it is in git. Agreed so far: the attack depends on the equipped
+weapon (the weapon slot of the existing outfit items; cosmetic for now, the Lantern Staff is the default), you hold a
+button, it auto-aims at the wall while you stand on your plot, auto-attack unlocks later, the upgrade track comes after
+the animation and VFX are good. **Learned:** the staff is built along the forearm, so it only looks right hanging at the
+side; IK cannot reach the hand's orientation (position works), the grip can be turned through the staff's own
+`RightGripAttachment` (the accessory is held by a `RigidConstraint`, not a weld); the Lich Acolyte's cast stance
+(`UnitAnimator.castPose`: staff out level at the wall, an `RStaff` joint) is the look the user wants to copy.
+
+**Tooling notes from this session:** Rojo's Studio plugin silently stops syncing now and then (the file on disk is right,
+Studio keeps the old copy; reconnecting the plugin fixes it, so always check the script's length in Studio before
+testing); screenshots through the Studio MCP arrive up to ~5 s late and unevenly (time the wait, expect to miss frames);
+`execute_luau` `require` gives fresh module instances (a module's own state is not the running game's).
+
 ## Orvoss, the Blackwake (2026-10-17: model + idle animation done and approved; details in docs/orvoss.md)
 
 Committed 04591f8: the idle (`AdmiralAnimator`, Pose "Admiral": deck roll, level skull, underwater coat tails, heavy

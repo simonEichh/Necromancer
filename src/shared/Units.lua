@@ -258,11 +258,15 @@ local UNITS = {
 	},
 	-- a floating gas-masked child, "crucified" in the air; points a claw finger out of its sleeve and fires a thin beam
 	-- (model attribute AttackStyle = "FingerBeam"; the damage lands hitDelay seconds after the attack, with the beam)
+	-- Hush, the Unbreathing: the FOURTH Sovereign (2026-11-05, docs/hush.md; a Signature until then): Primordial, only from
+	-- the Celestial grave, 85K DPS like the others, his gate finisher THE LAST CROSS (shared HushTimeline, client
+	-- HushFinisher). No own pull cinematic yet (he gets Malak's ship, like Orvoss).
 	Hush = {
-		title = "The Unbreathing", -- (a Signature title: the Codex shows it under the name)
+		sovereign = true,
+		title = "The Unbreathing", -- (shown after his name in SovereignArrival and under it in the Codex; his unique trait is named after it)
 		color = BrickColor.new("Royal purple"),
 		size = Vector3.new(2.2, 4, 2.2),
-		damage = 90000, -- 45K DPS: a Signature unit is among the strongest of its rarity (but stays below the next tier)
+		damage = 170000, -- 85K DPS like the other Sovereigns (placeholder; he was 90000 = 45K DPS as an Eternal Signature)
 		speed = 12,
 		attackRange = 20,
 		attackCD = 2.0,
@@ -455,7 +459,6 @@ local RARITY_UNITS = {
 	Eternal = {
 		{ unit = "TheUndying", weight = 2 },
 		{ unit = "DeathIncarnate", weight = 1 },
-		{ unit = "Hush", weight = 0.2 }, -- Signature: very low weight
 	},
 	Primordial = {
 		{ unit = "LastLantern", weight = 1 },
@@ -463,6 +466,7 @@ local RARITY_UNITS = {
 		{ unit = "Malak", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: rarer than a Signature, and only from the Celestial grave (`graves`: Rolling skips the entry elsewhere, the wheel never gives him)
 		{ unit = "Veyr", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: like Malak (his own pull cinematic, VeyrArrival, approved 2026-10-17)
 		{ unit = "Orvoss", weight = 0.05, graves = { Celestial = true } }, -- Sovereign: like Malak (no own pull cinematic yet: he gets Malak's ship)
+		{ unit = "Hush", weight = 0.05, graves = { Celestial = true } }, -- Sovereign since 2026-11-05 (was an Eternal Signature, weight 0.2): like Malak, no own pull cinematic yet
 	},
 }
 
@@ -595,6 +599,10 @@ local ABILITIES = {
 			return ("Every {%d s} Hush tears a rift into reality: chains swarm out, bite into the wall and explode, dealing {%d s} of Hush's own damage.")
 				:format(def.special.cooldown, ownDamageSeconds(def))
 		end },
+		{ name = "The Last Cross", kind = "Finisher", text = function(_, Economy)
+			return ("When the gate falls below {%d%%} HP, Hush rises into a storm. Rifts tear open behind him and a swarm of chains knots itself into a cross that topples onto the gate and splits the whole lane. Everyone on the server sees it.")
+				:format(math.floor(Economy.FLEET_STRIKE_HP * 100 + 0.5))
+		end, unlock = { state = "lastCross", price = "LAST_CROSS_PRICE", buy = "LastCross" } },
 	},
 	Sigilwright = {
 		{ name = "The Last Word", kind = "Passive", text = function(def)
