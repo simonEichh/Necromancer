@@ -3,6 +3,13 @@
 Read the newest state first. Older session logs were folded into the lists below (what was built is in git history
 and in the feature docs: `docs/features.md`, `docs/envoy.md`, `docs/world.md`, `docs/models.md`, `Design.md`).
 
+## Lanthe, the Last Vigil (2026-11-05: new Sovereign concept after the E33 Lampmaster; details in docs/lanthe.md)
+
+Model built (`build_lanthe.lua`, ~723 parts) and liked by the user; no Units entry, animation or attacks yet. Next: the
+optional lantern pass, the Units entry + publish, her pendulum idle (Pose `Vigil`), then attacks and the finisher.
+Gotcha: the MCP blocks `HttpService` to 127.0.0.1 now; run long build scripts by copying them to `src/shared` as a temp
+module (Rojo syncs it), `require` it in Edit mode, then delete the file.
+
 ## Hush, the Unbreathing (2026-11-04 / 05: now a Sovereign, his finisher built end to end; details in docs/hush.md)
 
 **Done (first pass, in two commits):** the gate finisher THE LAST CROSS (~59 s, `HushFinisher.lua` + shared
